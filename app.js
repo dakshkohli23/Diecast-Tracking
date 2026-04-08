@@ -1061,7 +1061,7 @@ async function createAdminOnce() {
   try {
     const userCred = await createUserWithEmailAndPassword(
       auth,
-      "dlaize",
+      "dlaize@dlaize.com",
       "dlaize"
     );
     console.log("Admin created:", userCred.user.email);
