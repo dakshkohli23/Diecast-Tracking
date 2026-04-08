@@ -1,0 +1,2529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PreTrack — Diecast Dashboard</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <style>
+    /* ═══════════════ RESET & VARS ═══════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    :root {
+      --bg: #f5f7fb;
+      --bg-soft: #eef2ff;
+      --card: #ffffff;
+      --text: #0f172a;
+      --text-2: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --border-2: rgba(148,163,184,0.2);
+
+      --sidebar: #0b1220;
+      --sidebar-2: #121a2b;
+      --sidebar-w: 240px;
+      --sidebar-icon-w: 72px;
+
+      --accent: #6366f1;
+      --accent-2: #8b5cf6;
+      --accent-3: #06b6d4;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --rose: #f43f5e;
+
+      --grad: linear-gradient(135deg, #6366f1, #8b5cf6);
+      --grad-2: linear-gradient(135deg, #06b6d4, #3b82f6);
+      --grad-3: linear-gradient(135deg, #10b981, #14b8a6);
+      --grad-4: linear-gradient(135deg, #f59e0b, #f97316);
+      --grad-5: linear-gradient(135deg, #f43f5e, #fb7185);
+
+      --shadow: 0 4px 20px rgba(15,23,42,0.07);
+      --shadow-lg: 0 12px 40px rgba(15,23,42,0.12);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --topbar-h: 72px;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    button, input, select, textarea { font-family: inherit; }
+    img { display: block; max-width: 100%; }
+    a { text-decoration: none; color: inherit; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    /* ═══════════════ SIDEBAR ═══════════════ */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: linear-gradient(180deg, var(--sidebar), var(--sidebar-2));
+      position: fixed; left: 0; top: 0; bottom: 0;
+      z-index: 1000;
+      display: flex; flex-direction: column;
+      padding: 0;
+      border-right: 1px solid rgba(255,255,255,0.04);
+      transition: transform .3s ease;
+      overflow: hidden;
+    }
+
+    .sidebar-brand {
+      display: flex; align-items: center; gap: 12px;
+      padding: 22px 20px 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .brand-icon {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: var(--grad);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 16px;
+      box-shadow: 0 8px 20px rgba(99,102,241,0.35);
+      flex-shrink: 0;
+    }
+
+    .brand-text {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px; font-weight: 800;
+      color: #fff; letter-spacing: 0.2px;
+    }
+
+    .sidebar-nav {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      padding: 12px 10px;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+
+    .side-label {
+      font-size: 10px; font-weight: 700;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 1.4px; text-transform: uppercase;
+      padding: 12px 10px 6px;
+    }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      color: rgba(255,255,255,0.65);
+      cursor: pointer;
+      transition: .18s ease;
+      font-size: 13.5px; font-weight: 500;
+      border: none; background: transparent; width: 100%;
+      text-align: left; white-space: nowrap;
+    }
+
+    .nav-item i {
+      width: 18px; text-align: center; font-size: 14px; flex-shrink: 0;
+    }
+
+    .nav-item:hover {
+      color: #fff; background: rgba(255,255,255,0.07);
+    }
+
+    .nav-item.active {
+      color: #fff;
+      background: rgba(99,102,241,0.2);
+      box-shadow: inset 0 0 0 1px rgba(99,102,241,0.25);
+    }
+
+    .nav-item.active::before {
+      content: '';
+      position: absolute; left: -10px; top: 10px; bottom: 10px;
+      width: 3px; border-radius: 0 3px 3px 0;
+      background: var(--grad);
+    }
+
+    .nav-item { position: relative; }
+
+    .sidebar-footer {
+      padding: 12px 10px 16px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .user-chip-side {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 12px;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+    .user-chip-side:hover { background: rgba(255,255,255,0.06); }
+    .user-avatar-side {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--grad-2);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 13px; font-weight: 800;
+      flex-shrink: 0;
+    }
+    .user-info-side { min-width: 0; }
+    .user-name-side {
+      font-size: 13px; font-weight: 600; color: #fff;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .user-role-side { font-size: 11px; color: rgba(255,255,255,0.45); }
+
+    /* ═══════════════ MAIN LAYOUT ═══════════════ */
+    .main-wrap {
+      margin-left: var(--sidebar-w);
+      width: calc(100% - var(--sidebar-w));
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    /* ═══════════════ TOPBAR ═══════════════ */
+    .topbar {
+      height: var(--topbar-h);
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 500;
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 24px;
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 14px; flex: 1; }
+
+    .sidebar-toggle {
+      display: none;
+      width: 40px; height: 40px; border-radius: 10px;
+      border: 1.5px solid var(--border); background: var(--card);
+      color: var(--muted); cursor: pointer;
+    }
+
+    .search-box {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg); border: 1.5px solid var(--border);
+      border-radius: 12px; padding: 0 14px;
+      height: 42px; min-width: 280px;
+      transition: .2s ease;
+    }
+
+    .search-box:focus-within {
+      border-color: rgba(99,102,241,0.4);
+      box-shadow: 0 0 0 4px rgba(99,102,241,0.08);
+    }
+
+    .search-box i { color: var(--muted); font-size: 13px; }
+    .search-box input {
+      flex: 1; border: none; background: transparent;
+      color: var(--text); font-size: 13.5px; outline: none;
+    }
+    .search-box input::placeholder { color: var(--muted); }
+    .search-box kbd {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px; font-weight: 600;
+      background: var(--border); color: var(--muted);
+      padding: 2px 7px; border-radius: 6px;
+    }
+
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+    .icon-btn {
+      width: 40px; height: 40px; border-radius: 10px;
+      border: 1.5px solid var(--border); background: var(--card);
+      color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; position: relative;
+      transition: .18s ease;
+    }
+    .icon-btn:hover { color: var(--accent); border-color: rgba(99,102,241,0.3); }
+
+    .notif-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--rose);
+      position: absolute; right: 8px; top: 8px;
+    }
+
+    .topbar-profile {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 10px 6px 8px;
+      border: 1.5px solid var(--border); border-radius: 999px;
+      background: var(--card); cursor: pointer;
+      transition: .18s ease;
+    }
+    .topbar-profile:hover { border-color: rgba(99,102,241,0.3); }
+
+    .avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--grad);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 12px; font-weight: 800;
+    }
+
+    .profile-info { display: flex; flex-direction: column; }
+    .profile-name { font-size: 13px; font-weight: 600; line-height: 1.2; }
+    .profile-role { font-size: 11px; color: var(--muted); }
+
+    /* ═══════════════ PAGE CONTENT ═══════════════ */
+    .page-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .section { display: none; }
+    .section.active { display: flex; flex-direction: column; gap: 20px; }
+
+    .section-header {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px; font-weight: 800;
+    }
+
+    .section-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    /* ═══════════════ BUTTONS ═══════════════ */
+    .btn {
+      height: 40px; padding: 0 16px; border: none; border-radius: 10px;
+      cursor: pointer; font-weight: 600; font-size: 13px;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: .18s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: var(--grad); color: #fff;
+      box-shadow: 0 8px 20px rgba(99,102,241,0.22);
+    }
+    .btn-ghost {
+      background: var(--card); color: var(--text);
+      border: 1.5px solid var(--border);
+    }
+    .btn-success { background: var(--grad-3); color: #fff; }
+    .btn-warning { background: var(--grad-4); color: #fff; }
+    .btn-danger {
+      background: linear-gradient(135deg,#ef4444,#f43f5e); color: #fff;
+      box-shadow: 0 8px 18px rgba(239,68,68,0.18);
+    }
+    .btn-sm { height: 34px; padding: 0 12px; font-size: 12px; border-radius: 8px; }
+
+    /* ═══════════════ CARDS ═══════════════ */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      position: relative; overflow: hidden;
+    }
+
+    .card-title {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin-bottom: 16px;
+    }
+    .card-title h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 14px; font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-title .sub { font-size: 12px; color: var(--muted); }
+
+    .full-width { grid-column: 1 / -1; }
+
+    /* ═══════════════ STAT CARDS ═══════════════ */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+    }
+
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 10px;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+
+    .stat-top { display: flex; align-items: flex-start; justify-content: space-between; }
+
+    .stat-icon {
+      width: 44px; height: 44px; border-radius: 13px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px;
+    }
+
+    .stat-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+    .stat-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 26px; font-weight: 800; line-height: 1;
+    }
+    .stat-sub { font-size: 11.5px; font-weight: 600; }
+    .stat-sub.up { color: var(--success); }
+    .stat-sub.down { color: var(--danger); }
+
+    .mini-prog {
+      height: 5px; background: var(--bg-soft); border-radius: 999px; overflow: hidden;
+    }
+    .mini-prog span { display: block; height: 100%; border-radius: 999px; }
+
+    /* ═══════════════ WIDGET GRID ═══════════════ */
+    .widgets-grid {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    .g-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+    .g-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+    .g-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+    .g-5 { display: grid; grid-template-columns: repeat(5,1fr); gap: 14px; }
+    .grid-main { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; }
+
+    .widget {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 18px; overflow: hidden;
+    }
+
+    .widget-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .widget-header h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 13.5px; font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .widget-header h3 i { color: var(--accent); }
+    .widget-link { font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
+    .widget-link:hover { text-decoration: underline; }
+
+    .empty-state {
+      text-align: center; padding: 24px;
+      color: var(--muted); font-size: 13px;
+    }
+
+    /* ═══════════════ MINI LIST ═══════════════ */
+    .mini-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-2);
+    }
+    .mini-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .mini-item:first-child { padding-top: 0; }
+
+    .mini-icon {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+
+    .mini-item h4 { font-size: 12.5px; font-weight: 600; line-height: 1.3; }
+    .mini-item p { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+    /* ═══════════════ QUICK ACTIONS ═══════════════ */
+    .quick-actions {
+      display: grid; grid-template-columns: repeat(2,1fr); gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .qa-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 14px 8px;
+      background: var(--bg-soft); border: 1.5px solid var(--border);
+      border-radius: 12px; cursor: pointer;
+      font-size: 12px; font-weight: 600; color: var(--text-2);
+      transition: .18s ease;
+    }
+    .qa-btn:hover { border-color: rgba(99,102,241,0.35); color: var(--accent); background: rgba(99,102,241,0.06); }
+    .qa-btn i { font-size: 17px; }
+
+    /* ═══════════════ BADGES ═══════════════ */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 9px; border-radius: 999px;
+      font-size: 11px; font-weight: 700;
+    }
+    .badge.owned   { background: rgba(16,185,129,.12); color: var(--success); }
+    .badge.ordered { background: rgba(99,102,241,.12); color: var(--accent); }
+    .badge.transit { background: rgba(6,182,212,.12);  color: var(--accent-3); }
+    .badge.preorder{ background: rgba(245,158,11,.12); color: var(--warning); }
+    .badge.sold    { background: rgba(244,63,94,.12);  color: var(--rose); }
+    .badge.wishlist{ background: rgba(139,92,246,.12); color: var(--accent-2); }
+    .badge.normal  { background: rgba(148,163,184,.12);color: var(--muted); }
+
+    /* ═══════════════ TOOLBAR & FILTERS ═══════════════ */
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    }
+
+    .field, .select-field {
+      height: 40px; padding: 0 12px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      background: var(--card); color: var(--text);
+      font-size: 13px; outline: none; transition: .2s ease;
+    }
+    .field:focus, .select-field:focus {
+      border-color: rgba(99,102,241,0.4);
+      box-shadow: 0 0 0 4px rgba(99,102,241,0.07);
+    }
+    .field { min-width: 220px; }
+    .select-field { min-width: 150px; }
+
+    /* ═══════════════ TABLE ═══════════════ */
+    .table-wrap { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; min-width: 1000px; }
+    th, td { padding: 12px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+    th {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--muted); font-weight: 700;
+      background: var(--bg-soft);
+      position: sticky; top: 0; z-index: 2;
+    }
+    td { font-size: 13px; }
+    tbody tr:hover td { background: rgba(99,102,241,0.03); }
+
+    .prod-cell { display: flex; align-items: center; gap: 12px; }
+    .prod-thumb {
+      width: 48px; height: 48px; border-radius: 10px;
+      background: var(--bg-soft); overflow: hidden; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); border: 1px solid var(--border);
+    }
+    .prod-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .prod-meta h4 { font-size: 13px; font-weight: 600; }
+    .prod-meta p { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+    .action-row { display: flex; gap: 6px; }
+    .icon-action {
+      width: 32px; height: 32px; border-radius: 8px;
+      border: 1.5px solid var(--border); background: var(--card);
+      cursor: pointer; color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; transition: .18s ease;
+    }
+    .icon-action:hover { color: var(--accent); border-color: rgba(99,102,241,0.35); }
+
+    /* ═══════════════ PRODUCT GRID ═══════════════ */
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px,1fr));
+      gap: 16px;
+    }
+
+    .product-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      overflow: hidden; display: flex; flex-direction: column;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .product-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+    .product-cover {
+      height: 170px; background: var(--bg-soft);
+      display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+    }
+    .product-cover img { width: 100%; height: 100%; object-fit: cover; }
+    .product-cover .fav-btn {
+      position: absolute; right: 10px; top: 10px;
+      width: 32px; height: 32px; border-radius: 10px;
+      border: none; background: rgba(255,255,255,0.9);
+      cursor: pointer; color: var(--rose);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; transition: .18s ease;
+    }
+    .product-cover .fav-btn:hover { background: #fff; }
+
+    .product-info { padding: 14px; display: flex; flex-direction: column; gap: 9px; }
+    .product-title { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+    .product-title h4 { font-size: 14px; font-weight: 700; line-height: 1.3; }
+    .product-price { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; white-space: nowrap; }
+    .product-specs { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .chip {
+      padding: 4px 9px; border-radius: 999px;
+      font-size: 11px; font-weight: 600;
+      background: var(--bg-soft); color: var(--muted);
+    }
+
+    /* ═══════════════ PRODUCT DETAIL PANEL ═══════════════ */
+    .detail-panel { display: grid; grid-template-columns: 300px 1fr; gap: 18px; }
+    .detail-image {
+      background: var(--bg-soft); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden; height: 300px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted);
+    }
+    .detail-image img { width: 100%; height: 100%; object-fit: cover; }
+    .detail-meta { display: flex; flex-direction: column; gap: 14px; }
+    .detail-meta h3 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; }
+    .detail-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+    .kv { padding: 11px; border-radius: 11px; background: var(--bg-soft); border: 1px solid var(--border); }
+    .kv span { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
+    .kv strong { display: block; margin-top: 4px; font-size: 13.5px; font-weight: 700; }
+
+    /* ═══════════════ KANBAN ═══════════════ */
+    .kanban {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px; align-items: start;
+    }
+
+    .kanban-col {
+      background: var(--bg-soft); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px;
+      min-height: 200px;
+      transition: background .15s;
+    }
+    .kanban-col.dropzone-active { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.3); }
+
+    .kanban-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .kanban-head h4 {
+      font-family: 'Syne', sans-serif;
+      font-size: 13px; font-weight: 800;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .kanban-count {
+      background: rgba(99,102,241,.12); color: var(--accent);
+      font-size: 12px; font-weight: 800;
+      padding: 3px 9px; border-radius: 999px;
+    }
+
+    .kanban-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .kanban-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px;
+      cursor: grab; transition: box-shadow .18s;
+    }
+    .kanban-card:active { cursor: grabbing; }
+    .kanban-card.dragging { opacity: 0.5; box-shadow: var(--shadow-lg); }
+    .kanban-card:hover { box-shadow: var(--shadow-lg); border-color: rgba(99,102,241,0.25); }
+    .kanban-card h5 { font-size: 12.5px; font-weight: 700; }
+    .kanban-card p { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+    .k-meta { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+
+    /* ═══════════════ BAR CHARTS ═══════════════ */
+    .bars {
+      display: flex; align-items: flex-end; gap: 10px;
+      height: 180px; padding-top: 10px;
+    }
+    .bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
+    .bar {
+      width: 100%; border-radius: 8px 8px 0 0;
+      background: var(--grad);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 6px; min-height: 20px;
+      transition: height .4s ease;
+    }
+    .bar span { font-size: 10px; font-weight: 700; color: #fff; }
+    .bar-label { font-size: 11px; font-weight: 600; color: var(--muted); }
+
+    /* ═══════════════ SETTINGS ═══════════════ */
+    .settings-list { display: flex; flex-direction: column; gap: 0; }
+    .setting-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border-2);
+      gap: 12px;
+    }
+    .setting-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .setting-item strong { font-size: 14px; font-weight: 600; }
+    .setting-item p { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+
+    /* ═══════════════ MODAL ═══════════════ */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 2000;
+      background: rgba(15,23,42,0.5);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      transition: opacity .2s ease;
+    }
+    .modal-overlay.hidden { display: none; }
+
+    .modal {
+      background: var(--card); border-radius: 20px;
+      box-shadow: var(--shadow-lg);
+      width: 100%; max-width: 780px;
+      max-height: 90vh; overflow: hidden;
+      display: flex; flex-direction: column;
+      animation: modalIn .25s ease;
+    }
+
+    @keyframes modalIn {
+      from { transform: scale(0.96) translateY(10px); opacity: 0; }
+      to   { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 22px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3 {
+      font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800;
+    }
+    .modal-close {
+      width: 34px; height: 34px; border-radius: 9px;
+      border: 1.5px solid var(--border); background: var(--card);
+      cursor: pointer; color: var(--muted); font-size: 15px;
+    }
+    .modal-body { padding: 20px 22px; overflow-y: auto; flex: 1; }
+
+    .modal-grid { display: grid; grid-template-columns: 1fr 260px; gap: 18px; }
+
+    .form-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--text-2); }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: 10px 12px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      background: var(--bg); color: var(--text);
+      font-size: 13px; outline: none; transition: .2s ease;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: rgba(99,102,241,0.4);
+      box-shadow: 0 0 0 4px rgba(99,102,241,0.07);
+    }
+    .form-group textarea { min-height: 90px; resize: vertical; }
+
+    .upload-box {
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      padding: 14px;
+      border: 2px dashed var(--border); border-radius: 14px;
+      text-align: center;
+    }
+    .upload-preview {
+      width: 100%; height: 180px; border-radius: 10px;
+      background: var(--bg-soft);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; cursor: pointer;
+    }
+    .upload-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+    .modal-footer {
+      display: flex; justify-content: flex-end; gap: 10px;
+      padding: 16px 22px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ═══════════════ TOAST ═══════════════ */
+    .toast-container {
+      position: fixed; bottom: 22px; right: 22px;
+      z-index: 9999; display: flex; flex-direction: column; gap: 8px;
+    }
+
+    .toast {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px 16px;
+      box-shadow: var(--shadow-lg);
+      display: flex; align-items: flex-start; gap: 12px;
+      min-width: 300px; max-width: 360px;
+      animation: toastIn .25s ease;
+    }
+
+    @keyframes toastIn {
+      from { transform: translateX(30px); opacity: 0; }
+      to   { transform: translateX(0); opacity: 1; }
+    }
+
+    .toast-icon {
+      width: 32px; height: 32px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+
+    .toast-content h4 { font-size: 13px; font-weight: 700; }
+    .toast-content p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* ═══════════════ NOTIFICATIONS DROPDOWN ═══════════════ */
+    .dropdown-wrap { position: relative; }
+
+    .notif-dropdown {
+      position: absolute; top: calc(100% + 10px); right: 0;
+      width: 320px; background: var(--card);
+      border: 1px solid var(--border); border-radius: 16px;
+      box-shadow: var(--shadow-lg); overflow: hidden;
+      opacity: 0; pointer-events: none;
+      transform: translateY(-8px); transition: .2s ease;
+      z-index: 999;
+    }
+    .notif-dropdown.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+    .notif-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800;
+    }
+
+    .notif-body { max-height: 320px; overflow-y: auto; }
+
+    .notif-item {
+      display: flex; gap: 12px; padding: 12px 16px;
+      border-bottom: 1px solid var(--border-2);
+      cursor: pointer; transition: background .15s;
+    }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-item:hover { background: var(--bg-soft); }
+
+    .notif-icon {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(99,102,241,0.1); color: var(--accent);
+    }
+    .notif-text h4 { font-size: 12.5px; font-weight: 700; }
+    .notif-text p { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+    .notif-text span { font-size: 11px; color: var(--muted); margin-top: 4px; display: block; }
+    .notif-unread { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: auto; flex-shrink: 0; }
+
+    /* ═══════════════ SIDEBAR OVERLAY (MOBILE) ═══════════════ */
+    .sidebar-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(2,8,23,0.5); z-index: 999;
+    }
+    .sidebar-overlay.show { display: block; }
+
+    /* ═══════════════ RESPONSIVE ═══════════════ */
+    @media (max-width: 1100px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr); }
+      .kanban { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 900px) {
+      .widgets-grid { grid-template-columns: 1fr; }
+      .g-2, .g-3, .g-4, .g-5 { grid-template-columns: 1fr 1fr; }
+      .grid-main { grid-template-columns: 1fr; }
+      .modal-grid { grid-template-columns: 1fr; }
+      .detail-panel { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+        z-index: 1001;
+      }
+      .sidebar.show { transform: translateX(0); }
+      .main-wrap { margin-left: 0; width: 100%; }
+      .sidebar-toggle { display: flex; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .search-box { min-width: 160px; }
+      .search-box kbd { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══════════════ SIDEBAR ══════════════ -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon"><i class="fa-solid fa-car-side"></i></div>
+      <span class="brand-text">PreTrack</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="side-label">Main</div>
+      <button class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard',this)">
+        <i class="fa-solid fa-chart-pie"></i><span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="inventory" onclick="switchPage('inventory',this)">
+        <i class="fa-solid fa-table-list"></i><span>Inventory</span>
+      </button>
+      <button class="nav-item" data-page="catalog" onclick="switchPage('catalog',this)">
+        <i class="fa-solid fa-store"></i><span>Catalog</span>
+      </button>
+
+      <div class="side-label">Workflow</div>
+      <button class="nav-item" data-page="kanban" onclick="switchPage('kanban',this)">
+        <i class="fa-solid fa-table-columns"></i><span>Kanban</span>
+      </button>
+      <button class="nav-item" data-page="orders" onclick="switchPage('orders',this)">
+        <i class="fa-solid fa-truck-fast"></i><span>Orders</span>
+      </button>
+      <button class="nav-item" data-page="wishlist" onclick="switchPage('wishlist',this)">
+        <i class="fa-solid fa-heart"></i><span>Wishlist</span>
+      </button>
+
+      <div class="side-label">Reports</div>
+      <button class="nav-item" data-page="analytics" onclick="switchPage('analytics',this)">
+        <i class="fa-solid fa-chart-line"></i><span>Analytics</span>
+      </button>
+
+      <div class="side-label">System</div>
+      <button class="nav-item" data-page="settings" onclick="switchPage('settings',this)">
+        <i class="fa-solid fa-gear"></i><span>Settings</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-chip-side">
+        <div class="user-avatar-side">D</div>
+        <div class="user-info-side">
+          <div class="user-name-side">Daksh</div>
+          <div class="user-role-side">Collection Manager</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════════ MAIN ══════════════ -->
+  <div class="main-wrap" id="mainWrap">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="sidebar-toggle" id="sidebarToggle" onclick="openSidebar()">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="globalSearch" placeholder="Search models, brand, series..." oninput="handleGlobalSearch()" />
+          <kbd>⌘K</kbd>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="dropdown-wrap">
+          <button class="icon-btn" id="notifBtn" onclick="toggleNotifMenu()">
+            <i class="fa-regular fa-bell"></i>
+            <span class="notif-dot hidden" id="notifDot"></span>
+          </button>
+          <div class="notif-dropdown" id="notifDropdown">
+            <div class="notif-head">
+              <span>Notifications</span>
+              <button class="btn btn-ghost btn-sm" onclick="markAllRead()">Mark all read</button>
+            </div>
+            <div class="notif-body" id="notifList"></div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-sm" onclick="openProductModal()">
+          <i class="fa-solid fa-plus"></i> Add Model
+        </button>
+
+        <div class="topbar-profile" onclick="switchPage('settings', document.querySelector('[data-page=settings]'))">
+          <div class="avatar">D</div>
+          <div class="profile-info">
+            <span class="profile-name">Daksh</span>
+            <span class="profile-role">Manager</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- PAGE CONTENT -->
+    <main class="page-content" id="pageContent">
+
+      <!-- ══════ DASHBOARD ══════ -->
+      <section class="section active" id="page-dashboard">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Dashboard</h2>
+            <p class="section-sub">Your diecast collection at a glance.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-primary" onclick="openProductModal()"><i class="fa-solid fa-plus"></i> Add Model</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportData()"><i class="fa-solid fa-file-export"></i> Export</button>
+          </div>
+        </div>
+
+        <!-- 10-STAT GRID -->
+        <div class="stats-grid" id="dashboardStats"></div>
+
+        <!-- WIDGETS ROW -->
+        <div class="widgets-grid">
+          <!-- Recent Activity -->
+          <div class="widget" id="recentActivityWidget">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Activity</h3>
+              <span class="widget-link" onclick="switchPage('inventory', document.querySelector('[data-page=inventory]'))">View All</span>
+            </div>
+            <div id="recentActivity"></div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="widget">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-bolt"></i> Quick Actions</h3>
+            </div>
+            <div class="quick-actions">
+              <button class="qa-btn" onclick="openProductModal()">
+                <i class="fa-solid fa-plus"></i><span>Add Model</span>
+              </button>
+              <button class="qa-btn" onclick="exportData()">
+                <i class="fa-solid fa-download"></i><span>Export JSON</span>
+              </button>
+              <button class="qa-btn" onclick="switchPage('kanban', document.querySelector('[data-page=kanban]'))">
+                <i class="fa-solid fa-table-columns"></i><span>Kanban</span>
+              </button>
+              <button class="qa-btn" onclick="switchPage('wishlist', document.querySelector('[data-page=wishlist]'))">
+                <i class="fa-solid fa-heart"></i><span>Wishlist</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Latest Added -->
+          <div class="widget">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-box-open"></i> Latest Added</h3>
+            </div>
+            <div id="latestAdded"></div>
+          </div>
+        </div>
+
+        <!-- VALUE BARS + SHIPPING INSIGHTS -->
+        <div class="grid-main">
+          <div class="card">
+            <div class="card-title">
+              <h3><i class="fa-solid fa-sack-dollar"></i> Collection Value Trend</h3>
+              <span class="sub">Estimated market value</span>
+            </div>
+            <div class="bars" id="valueBars"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <h3><i class="fa-solid fa-truck-fast"></i> In Transit / Preorders</h3>
+            </div>
+            <div id="shippingInsights"></div>
+          </div>
+        </div>
+
+        <!-- INSIGHT WIDGETS GRID -->
+        <div class="g-2">
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-layer-group"></i> Brand Distribution</h3></div>
+            <div id="brandDistribution"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-scale-balanced"></i> Scale Breakdown</h3></div>
+            <div id="scaleBreakdown"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-copy"></i> Duplicate Detector</h3></div>
+            <div id="duplicateList"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-triangle-exclamation"></i> Low Stock Alerts</h3></div>
+            <div id="lowStockList"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-warehouse"></i> Storage Insights</h3></div>
+            <div id="storageInsights"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-arrow-trend-up"></i> Profit Potential</h3></div>
+            <div id="profitInsights"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-bullseye"></i> Hunt Priority</h3></div>
+            <div id="huntPriority"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-layer-group"></i> Status Mix</h3></div>
+            <div id="dashboardStatusMix"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════ INVENTORY ══════ -->
+      <section class="section" id="page-inventory">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Inventory Manager</h2>
+            <p class="section-sub">Search, filter, sort, edit all models.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-primary" onclick="openProductModal()"><i class="fa-solid fa-plus"></i> Add Model</button>
+            <button class="btn btn-ghost btn-sm" onclick="resetFilters()"><i class="fa-solid fa-filter-circle-xmark"></i> Reset Filters</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="toolbar" style="margin-bottom:16px">
+            <input class="field" id="filterSearch" type="text" placeholder="Search inventory..." oninput="renderInventoryTable()" />
+            <select class="select-field" id="filterBrand" onchange="renderInventoryTable()"></select>
+            <select class="select-field" id="filterStatus" onchange="renderInventoryTable()"></select>
+            <select class="select-field" id="filterScale" onchange="renderInventoryTable()"></select>
+            <select class="select-field" id="sortBy" onchange="renderInventoryTable()">
+              <option value="name-asc">Name A–Z</option>
+              <option value="name-desc">Name Z–A</option>
+              <option value="value-desc">Value High–Low</option>
+              <option value="value-asc">Value Low–High</option>
+              <option value="price-desc">Buy Price High–Low</option>
+              <option value="price-asc">Buy Price Low–High</option>
+              <option value="date-desc">Newest First</option>
+              <option value="date-asc">Oldest First</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th><th>Brand</th><th>Series</th><th>Scale</th>
+                  <th>Status</th><th>Qty</th><th>Buy Price</th><th>Market Value</th>
+                  <th>Seller</th><th>Location</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════ CATALOG ══════ -->
+      <section class="section" id="page-catalog">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Collection Catalog</h2>
+            <p class="section-sub">Visual product cards with full detail panel.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-primary" onclick="openProductModal()"><i class="fa-solid fa-plus"></i> Add Model</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="toolbar">
+            <input class="field" id="productSearch" type="text" placeholder="Search catalog..." oninput="renderProductCards()" />
+            <select class="select-field" id="productBrandFilter" onchange="renderProductCards()"></select>
+            <select class="select-field" id="productStatusFilter" onchange="renderProductCards()"></select>
+          </div>
+        </div>
+
+        <div class="product-grid" id="productGrid"></div>
+
+        <div class="card hidden" id="productDetailCard">
+          <div class="card-title">
+            <h3><i class="fa-solid fa-circle-info"></i> Product Details</h3>
+            <button class="btn btn-ghost btn-sm" onclick="closeProductDetails()"><i class="fa-solid fa-xmark"></i> Close</button>
+          </div>
+          <div class="detail-panel" id="productDetailPanel"></div>
+        </div>
+      </section>
+
+      <!-- ══════ KANBAN ══════ -->
+      <section class="section" id="page-kanban">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Kanban Workflow</h2>
+            <p class="section-sub">Drag & drop models across sourcing → ordered → transit → received.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-ghost btn-sm" onclick="resetKanban()"><i class="fa-solid fa-rotate-left"></i> Reset Board</button>
+          </div>
+        </div>
+        <div class="kanban" id="kanbanBoard"></div>
+      </section>
+
+      <!-- ══════ ORDERS ══════ -->
+      <section class="section" id="page-orders">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Orders & Shipping</h2>
+            <p class="section-sub">Ordered, in transit, and preorder items.</p>
+          </div>
+        </div>
+
+        <div class="g-3" id="orderSummaryCards"></div>
+
+        <div class="card">
+          <div class="card-title">
+            <h3><i class="fa-solid fa-list-check"></i> Shipping Queue</h3>
+            <span class="sub">Ordered / In Transit / Preorder</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th><th>Status</th><th>ETA</th>
+                  <th>Seller</th><th>Tracking</th><th>Value</th>
+                </tr>
+              </thead>
+              <tbody id="ordersTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════ WISHLIST ══════ -->
+      <section class="section" id="page-wishlist">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Wishlist & Hunt List</h2>
+            <p class="section-sub">Chase targets and priority models to source.</p>
+          </div>
+          <button class="btn btn-primary" onclick="openProductModal()"><i class="fa-solid fa-plus"></i> Add to Wishlist</button>
+        </div>
+        <div class="g-3" id="wishlistGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px"></div>
+      </section>
+
+      <!-- ══════ ANALYTICS ══════ -->
+      <section class="section" id="page-analytics">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Analytics</h2>
+            <p class="section-sub">Value, ROI, brand, storage and performance insights.</p>
+          </div>
+        </div>
+
+        <div class="g-4" id="analyticsStats"></div>
+
+        <div class="grid-main">
+          <div class="card">
+            <div class="card-title">
+              <h3><i class="fa-solid fa-chart-column"></i> Brand Value Comparison</h3>
+            </div>
+            <div class="bars" id="brandValueBars"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-map-location-dot"></i> Storage Distribution</h3></div>
+            <div id="analyticsStorage"></div>
+          </div>
+        </div>
+
+        <div class="g-2">
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-trophy"></i> Profit Leaderboard</h3></div>
+            <div id="profitLeaderboard"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-layer-group"></i> Status Mix</h3></div>
+            <div id="statusMix"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════ SETTINGS ══════ -->
+      <section class="section" id="page-settings">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Settings</h2>
+            <p class="section-sub">Data tools and preferences.</p>
+          </div>
+        </div>
+
+        <div class="g-2">
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-database"></i> Data Tools</h3></div>
+            <div class="settings-list">
+              <div class="setting-item">
+                <div>
+                  <strong>Export Backup</strong>
+                  <p>Download all models as a JSON file</p>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="exportData()"><i class="fa-solid fa-file-export"></i> Export JSON</button>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <strong>Import Backup</strong>
+                  <p>Restore from a previous JSON export</p>
+                </div>
+                <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+                  <i class="fa-solid fa-file-import"></i> Import JSON
+                  <input type="file" accept=".json" hidden onchange="importData(event)" />
+                </label>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <strong>Reload Demo Data</strong>
+                  <p>Reset to sample diecast inventory</p>
+                </div>
+                <button class="btn btn-warning btn-sm" onclick="seedDemoData(true)"><i class="fa-solid fa-database"></i> Load Demo</button>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <strong>Clear All Data</strong>
+                  <p>Permanently remove all models</p>
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="resetAllData()"><i class="fa-solid fa-trash-can"></i> Reset All</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title"><h3><i class="fa-solid fa-circle-info"></i> About</h3></div>
+            <div class="settings-list">
+              <div class="setting-item">
+                <div>
+                  <strong>PreTrack NEXUS</strong>
+                  <p>Diecast collection & preorder tracker</p>
+                </div>
+                <span class="badge normal">v3.0</span>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <strong>Storage</strong>
+                  <p>All data stored in localStorage</p>
+                </div>
+                <span id="storageUsage" class="badge normal">—</span>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <strong>Collections</strong>
+                  <p>Total models tracked</p>
+                </div>
+                <span id="settingsModelCount" class="badge owned">0 models</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div><!-- /.main-wrap -->
+
+  <!-- ══════════════ PRODUCT MODAL ══════════════ -->
+  <div class="modal-overlay hidden" id="productModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">Add New Diecast Model</h3>
+        <button class="modal-close" onclick="closeProductModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-grid">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Model Name *</label>
+              <input type="text" id="f_name" placeholder="e.g. Nissan Skyline GT-R R34" />
+            </div>
+            <div class="form-group">
+              <label>Brand</label>
+              <select id="f_brand">
+                <option>Hot Wheels</option><option>Mini GT</option>
+                <option>Tarmac Works</option><option>Tomica</option>
+                <option>Matchbox</option><option>Kaido House</option>
+                <option>Inno64</option><option>Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Series</label>
+              <input type="text" id="f_series" placeholder="e.g. JDM Legends" />
+            </div>
+            <div class="form-group">
+              <label>Scale</label>
+              <select id="f_scale">
+                <option>1:64</option><option>1:43</option>
+                <option>1:18</option><option>1:24</option><option>1:32</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Status</label>
+              <select id="f_status">
+                <option>Owned</option><option>Ordered</option>
+                <option>In Transit</option><option>Preorder</option>
+                <option>Sold</option><option>Wishlist</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Quantity</label>
+              <input type="number" id="f_qty" min="1" value="1" />
+            </div>
+            <div class="form-group">
+              <label>Buy Price (₹)</label>
+              <input type="number" id="f_buyPrice" min="0" placeholder="0" />
+            </div>
+            <div class="form-group">
+              <label>Market Value (₹)</label>
+              <input type="number" id="f_marketValue" min="0" placeholder="0" />
+            </div>
+            <div class="form-group">
+              <label>Seller</label>
+              <input type="text" id="f_seller" placeholder="e.g. Karz & Dolls" />
+            </div>
+            <div class="form-group">
+              <label>Storage Location</label>
+              <input type="text" id="f_location" placeholder="e.g. Shelf A / Box 3" />
+            </div>
+            <div class="form-group">
+              <label>Purchase Date</label>
+              <input type="date" id="f_purchaseDate" />
+            </div>
+            <div class="form-group">
+              <label>ETA</label>
+              <input type="date" id="f_eta" />
+            </div>
+            <div class="form-group">
+              <label>Tracking ID</label>
+              <input type="text" id="f_tracking" placeholder="e.g. AWB123456" />
+            </div>
+            <div class="form-group">
+              <label>Condition</label>
+              <select id="f_condition">
+                <option>Mint</option><option>Near Mint</option>
+                <option>Good</option><option>Loose</option><option>Opened</option>
+              </select>
+            </div>
+            <div class="form-group full">
+              <label>Notes</label>
+              <textarea id="f_notes" placeholder="Variant details, chase, card art, defects..."></textarea>
+            </div>
+          </div>
+
+          <div>
+            <div class="upload-box">
+              <div class="upload-preview" id="imagePreview" onclick="document.getElementById('f_image').click()">
+                <div style="text-align:center;color:var(--muted)">
+                  <i class="fa-regular fa-image" style="font-size:36px"></i>
+                  <p style="margin-top:8px;font-size:12px">Click to upload</p>
+                </div>
+              </div>
+              <input type="file" id="f_image" accept="image/*" hidden onchange="handleImageUpload(event)" />
+              <button class="btn btn-ghost btn-sm" onclick="clearImageUpload()">
+                <i class="fa-solid fa-eraser"></i> Clear
+              </button>
+              <p style="font-size:11px;color:var(--muted);text-align:center">Stored as base64 in localStorage</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeProductModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveProductBtn" onclick="saveProduct()">
+          <i class="fa-solid fa-floppy-disk"></i> Save Model
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ TOAST CONTAINER ══════════════ -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    /* ════════════════════════════════════════════
+       STORAGE KEYS
+    ════════════════════════════════════════════ */
+    const STORAGE = {
+      products: 'pretrack_nexus_products_v3',
+      notifications: 'pretrack_nexus_notifs_v3',
+      kanban: 'pretrack_nexus_kanban_v3'
+    };
+
+    /* ════════════════════════════════════════════
+       GLOBAL STATE
+    ════════════════════════════════════════════ */
+    let products = [];
+    let notifications = [];
+    let kanbanData = {};
+    let editingId = null;
+    let uploadedImageBase64 = '';
+    let draggedKanbanId = null;
+
+    const KANBAN_COLS = [
+      { key:'sourcing', label:'Sourcing',    icon:'fa-magnifying-glass' },
+      { key:'ordered',  label:'Ordered',     icon:'fa-cart-shopping' },
+      { key:'transit',  label:'In Transit',  icon:'fa-truck-fast' },
+      { key:'received', label:'Received',    icon:'fa-box-open' }
+    ];
+
+    /* ════════════════════════════════════════════
+       UTILITIES
+    ════════════════════════════════════════════ */
+    function uid(){
+      return 'id_' + Math.random().toString(36).slice(2,9) + Date.now().toString(36);
+    }
+
+    function formatCurrency(n){
+      const num = Number(n || 0);
+      return '₹' + num.toLocaleString('en-IN', { maximumFractionDigits:0 });
+    }
+
+    function formatDateHuman(dateStr){
+      if(!dateStr) return '—';
+      const d = new Date(dateStr);
+      if(isNaN(d)) return '—';
+      return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+    }
+
+    function daysUntil(dateStr){
+      if(!dateStr) return null;
+      return Math.ceil((new Date(dateStr) - new Date()) / (1000*60*60*24));
+    }
+
+    function getStatusClass(status){
+      const map = {
+        'Owned':'owned','Ordered':'ordered','In Transit':'transit',
+        'Preorder':'preorder','Sold':'sold','Wishlist':'wishlist'
+      };
+      return map[status] || 'normal';
+    }
+
+    function escapeHtml(str){
+      return String(str ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function productMatchesQuery(p, q){
+      if(!q) return true;
+      const text = [p.name,p.brand,p.series,p.scale,p.status,p.seller,p.location,p.notes,p.tracking].join(' ').toLowerCase();
+      return text.includes(q.toLowerCase());
+    }
+
+    /* ════════════════════════════════════════════
+       DEMO DATA
+    ════════════════════════════════════════════ */
+    function getDemoProducts(){
+      const fmtDate = (d) => d.toISOString().split('T')[0];
+      const addDays = (n) => { const d=new Date(); d.setDate(d.getDate()+n); return fmtDate(d); };
+      const subDays = (n) => { const d=new Date(); d.setDate(d.getDate()-n); return fmtDate(d); };
+
+      return [
+        { id:uid(), name:'Nissan Skyline GT-R R34 V-Spec II', brand:'Mini GT', series:'Street Weapon', scale:'1:64', status:'Owned', qty:2, buyPrice:1499, marketValue:2899, seller:'Karz & Dolls', location:'Shelf A / Box 1', purchaseDate:subDays(12), eta:'', tracking:'', condition:'Mint', notes:'Blue variant, one sealed, one display.', image:'', favorite:true, createdAt:Date.now()-1000000 },
+        { id:uid(), name:'Toyota Supra MK4 Top Secret', brand:'Tarmac Works', series:'JDM Legends', scale:'1:64', status:'In Transit', qty:1, buyPrice:1899, marketValue:2499, seller:'Miniature Garage', location:'Incoming', purchaseDate:subDays(4), eta:addDays(5), tracking:'TRK-TW-9821', condition:'Mint', notes:'Expected next week.', image:'', favorite:false, createdAt:Date.now()-900000 },
+        { id:uid(), name:'Porsche 911 GT3 RS', brand:'Hot Wheels', series:'Premium Car Culture', scale:'1:64', status:'Owned', qty:3, buyPrice:899, marketValue:1499, seller:'Local Seller', location:'Shelf B / Box 2', purchaseDate:subDays(30), eta:'', tracking:'', condition:'Near Mint', notes:'One loose, two carded.', image:'', favorite:true, createdAt:Date.now()-800000 },
+        { id:uid(), name:'LBWK Lamborghini Aventador', brand:'Kaido House', series:'Liberty Walk', scale:'1:64', status:'Preorder', qty:1, buyPrice:2399, marketValue:3299, seller:'Model Republic', location:'Preorder Queue', purchaseDate:subDays(2), eta:addDays(18), tracking:'PRE-AV-LBWK', condition:'Mint', notes:'Preorder batch 2.', image:'', favorite:false, createdAt:Date.now()-700000 },
+        { id:uid(), name:'Mazda RX-7 FD3S RE Amemiya', brand:'Inno64', series:'Tuners', scale:'1:64', status:'Wishlist', qty:1, buyPrice:0, marketValue:3199, seller:'Wanted', location:'Wishlist', purchaseDate:'', eta:'', tracking:'', condition:'Mint', notes:'High priority hunt. Chase if available.', image:'', favorite:true, createdAt:Date.now()-600000 },
+        { id:uid(), name:'Nissan Silvia S15 D-MAX', brand:'Mini GT', series:'Drift Series', scale:'1:64', status:'Owned', qty:1, buyPrice:1399, marketValue:1999, seller:'Miniature Garage', location:'Shelf A / Box 1', purchaseDate:subDays(16), eta:'', tracking:'', condition:'Mint', notes:'Display piece.', image:'', favorite:false, createdAt:Date.now()-500000 },
+        { id:uid(), name:'Ford GT Race', brand:'Tomica', series:'Racing Icons', scale:'1:64', status:'Ordered', qty:1, buyPrice:1099, marketValue:1499, seller:'Japan Importer', location:'Incoming', purchaseDate:subDays(1), eta:addDays(9), tracking:'JP-ORD-4432', condition:'Mint', notes:'Awaiting dispatch.', image:'', favorite:false, createdAt:Date.now()-400000 },
+        { id:uid(), name:'Mercedes-Benz 190E Evo II', brand:'Hot Wheels', series:'Boulevard', scale:'1:64', status:'Owned', qty:2, buyPrice:799, marketValue:1699, seller:'Collector Trade', location:'Shelf C / Box 5', purchaseDate:subDays(45), eta:'', tracking:'', condition:'Mint', notes:'One duplicate for trade.', image:'', favorite:false, createdAt:Date.now()-300000 },
+        { id:uid(), name:'Ferrari F40 Competizione', brand:'Tarmac Works', series:'Supercars', scale:'1:64', status:'Sold', qty:1, buyPrice:1599, marketValue:2899, seller:'Resale', location:'Archived', purchaseDate:subDays(60), eta:'', tracking:'', condition:'Mint', notes:'Sold to repeat buyer.', image:'', favorite:false, createdAt:Date.now()-200000 },
+        { id:uid(), name:'Honda NSX Type R', brand:'Mini GT', series:'Japan Special', scale:'1:64', status:'Wishlist', qty:1, buyPrice:0, marketValue:2499, seller:'Wanted', location:'Wishlist', purchaseDate:'', eta:'', tracking:'', condition:'Mint', notes:'White variant preferred.', image:'', favorite:true, createdAt:Date.now()-100000 }
+      ];
+    }
+
+    function getDemoNotifications(){
+      return [
+        { id:uid(), title:'In Transit Update', desc:'Toyota Supra MK4 arriving in 5 days.', time:'2 min ago', unread:true, icon:'fa-truck-fast' },
+        { id:uid(), title:'Duplicate Found', desc:'Skyline GT-R R34 appears more than once.', time:'15 min ago', unread:true, icon:'fa-copy' },
+        { id:uid(), title:'Wishlist Priority', desc:'RX-7 FD3S RE Amemiya is a high-value target.', time:'1 hr ago', unread:true, icon:'fa-heart' },
+        { id:uid(), title:'Low Stock Alert', desc:'190E Evo II duplicate stock is low.', time:'2 hr ago', unread:false, icon:'fa-triangle-exclamation' }
+      ];
+    }
+
+    function getDefaultKanban(list){
+      const board = { sourcing:[], ordered:[], transit:[], received:[] };
+      list.forEach(p => {
+        if(p.status === 'Wishlist') board.sourcing.push(p.id);
+        else if(p.status === 'Ordered' || p.status === 'Preorder') board.ordered.push(p.id);
+        else if(p.status === 'In Transit') board.transit.push(p.id);
+        else if(p.status === 'Owned' || p.status === 'Sold') board.received.push(p.id);
+      });
+      return board;
+    }
+
+    /* ════════════════════════════════════════════
+       STORAGE
+    ════════════════════════════════════════════ */
+    function saveProducts(){ localStorage.setItem(STORAGE.products, JSON.stringify(products)); }
+    function saveNotifications(){ localStorage.setItem(STORAGE.notifications, JSON.stringify(notifications)); }
+    function saveKanban(){ localStorage.setItem(STORAGE.kanban, JSON.stringify(kanbanData)); }
+
+    function loadData(){
+      try { products = JSON.parse(localStorage.getItem(STORAGE.products)) || null; } catch{}
+      if(!products){ products = getDemoProducts(); saveProducts(); }
+
+      try { notifications = JSON.parse(localStorage.getItem(STORAGE.notifications)) || null; } catch{}
+      if(!notifications){ notifications = getDemoNotifications(); saveNotifications(); }
+
+      try { kanbanData = JSON.parse(localStorage.getItem(STORAGE.kanban)) || null; } catch{}
+      if(!kanbanData){ kanbanData = getDefaultKanban(products); saveKanban(); }
+    }
+
+    /* ════════════════════════════════════════════
+       RENDER ALL
+    ════════════════════════════════════════════ */
+    function renderAll(){
+      populateFilters();
+      renderDashboardStats();
+      renderValueBars();
+      renderBrandDistribution();
+      renderScaleBreakdown();
+      renderDuplicateList();
+      renderLowStockList();
+      renderShippingInsights();
+      renderStorageInsights();
+      renderProfitInsights();
+      renderHuntPriority();
+      renderRecentActivity();
+      renderLatestAdded();
+      renderDashboardStatusMix();
+      renderInventoryTable();
+      renderProductCards();
+      renderKanban();
+      renderOrderSummary();
+      renderOrdersTable();
+      renderWishlist();
+      renderAnalytics();
+      renderNotifications();
+      updateSettingsInfo();
+    }
+
+    /* ════════════════════════════════════════════
+       PAGE NAVIGATION
+    ════════════════════════════════════════════ */
+    function switchPage(pageKey, btnEl){
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      const page = document.getElementById('page-' + pageKey);
+      if(page) page.classList.add('active');
+
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      if(btnEl){
+        btnEl.classList.add('active');
+      } else {
+        const found = document.querySelector(`.nav-item[data-page="${pageKey}"]`);
+        if(found) found.classList.add('active');
+      }
+      closeSidebar();
+      closeAllDropdowns();
+      window.scrollTo({ top:0, behavior:'smooth' });
+    }
+
+    function openSidebar(){
+      document.getElementById('sidebar').classList.add('show');
+      document.getElementById('sidebarOverlay').classList.add('show');
+    }
+
+    function closeSidebar(){
+      document.getElementById('sidebar').classList.remove('show');
+      document.getElementById('sidebarOverlay').classList.remove('show');
+    }
+
+    /* ════════════════════════════════════════════
+       NOTIFICATIONS
+    ════════════════════════════════════════════ */
+    function toggleNotifMenu(){
+      const el = document.getElementById('notifDropdown');
+      const isOpen = el.classList.contains('open');
+      closeAllDropdowns();
+      if(!isOpen) el.classList.add('open');
+    }
+
+    function closeAllDropdowns(){
+      document.querySelectorAll('.notif-dropdown').forEach(d => d.classList.remove('open'));
+    }
+
+    function renderNotifications(){
+      const list = document.getElementById('notifList');
+      const dot  = document.getElementById('notifDot');
+      list.innerHTML = '';
+      notifications.forEach(n => {
+        const item = document.createElement('div');
+        item.className = 'notif-item';
+        item.onclick = () => { n.unread = false; saveNotifications(); renderNotifications(); };
+        item.innerHTML = `
+          <div class="notif-icon"><i class="fa-solid ${n.icon}"></i></div>
+          <div class="notif-text">
+            <h4>${escapeHtml(n.title)}</h4>
+            <p>${escapeHtml(n.desc)}</p>
+            <span>${escapeHtml(n.time)}</span>
+          </div>
+          ${n.unread ? '<div class="notif-unread"></div>' : ''}
+        `;
+        list.appendChild(item);
+      });
+      const hasUnread = notifications.some(n => n.unread);
+      dot.classList.toggle('hidden', !hasUnread);
+    }
+
+    function markAllRead(){
+      notifications.forEach(n => n.unread = false);
+      saveNotifications(); renderNotifications();
+    }
+
+    /* ════════════════════════════════════════════
+       SEARCH
+    ════════════════════════════════════════════ */
+    function handleGlobalSearch(){
+      const val = document.getElementById('globalSearch').value.trim();
+      const activePage = document.querySelector('.section.active')?.id || '';
+      if(activePage === 'page-inventory'){
+        const f = document.getElementById('filterSearch');
+        if(f) f.value = val;
+        renderInventoryTable();
+      } else if(activePage === 'page-catalog'){
+        const f = document.getElementById('productSearch');
+        if(f) f.value = val;
+        renderProductCards();
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       FILTERS
+    ════════════════════════════════════════════ */
+    function populateFilters(){
+      const brands   = ['All Brands',   ...new Set(products.map(p=>p.brand))];
+      const statuses = ['All Statuses','Owned','Ordered','In Transit','Preorder','Sold','Wishlist'];
+      const scales   = ['All Scales',  ...new Set(products.map(p=>p.scale))];
+
+      setOpts('filterBrand', brands);
+      setOpts('filterStatus', statuses);
+      setOpts('filterScale', scales);
+      setOpts('productBrandFilter', brands);
+      setOpts('productStatusFilter', statuses);
+    }
+
+    function setOpts(id, opts){
+      const el = document.getElementById(id);
+      if(!el) return;
+      const cur = el.value;
+      el.innerHTML = opts.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+      if(opts.includes(cur)) el.value = cur;
+    }
+
+    function resetFilters(){
+      ['filterSearch','globalSearch','productSearch'].forEach(id => {
+        const el = document.getElementById(id); if(el) el.value = '';
+      });
+      ['filterBrand','filterStatus','filterScale','productBrandFilter','productStatusFilter'].forEach(id => {
+        const el = document.getElementById(id); if(el) el.selectedIndex = 0;
+      });
+      const sb = document.getElementById('sortBy'); if(sb) sb.value = 'name-asc';
+      renderInventoryTable(); renderProductCards();
+    }
+
+    function getFilteredProducts(forCatalog = false){
+      const search = (forCatalog ? document.getElementById('productSearch')?.value : document.getElementById('filterSearch')?.value) || document.getElementById('globalSearch')?.value || '';
+      const brand  = (forCatalog ? document.getElementById('productBrandFilter')?.value  : document.getElementById('filterBrand')?.value)  || 'All Brands';
+      const status = (forCatalog ? document.getElementById('productStatusFilter')?.value : document.getElementById('filterStatus')?.value) || 'All Statuses';
+      const scale  = document.getElementById('filterScale')?.value || 'All Scales';
+
+      let list = products.filter(p => {
+        const okS = productMatchesQuery(p, search);
+        const okB = brand  === 'All Brands'   || p.brand  === brand;
+        const okT = status === 'All Statuses' || p.status === status;
+        const okC = forCatalog ? true : (scale === 'All Scales' || p.scale === scale);
+        return okS && okB && okT && okC;
+      });
+
+      if(!forCatalog){
+        const sort = document.getElementById('sortBy')?.value || 'name-asc';
+        list.sort((a,b) => {
+          switch(sort){
+            case 'name-asc':   return a.name.localeCompare(b.name);
+            case 'name-desc':  return b.name.localeCompare(a.name);
+            case 'value-desc': return Number(b.marketValue||0)-Number(a.marketValue||0);
+            case 'value-asc':  return Number(a.marketValue||0)-Number(b.marketValue||0);
+            case 'price-desc': return Number(b.buyPrice||0)-Number(a.buyPrice||0);
+            case 'price-asc':  return Number(a.buyPrice||0)-Number(b.buyPrice||0);
+            case 'date-desc':  return Number(b.createdAt||0)-Number(a.createdAt||0);
+            case 'date-asc':   return Number(a.createdAt||0)-Number(b.createdAt||0);
+            default: return 0;
+          }
+        });
+      }
+      return list;
+    }
+
+    /* ════════════════════════════════════════════
+       MINI LIST HELPER
+    ════════════════════════════════════════════ */
+    function renderMiniList(id, items){
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.innerHTML = items.map(item => `
+        <div class="mini-item">
+          <div class="mini-icon" style="background:${item.bg};color:${item.color}">
+            <i class="fa-solid ${item.icon}"></i>
+          </div>
+          <div style="flex:1;min-width:0">
+            <h4>${escapeHtml(item.title)}</h4>
+            <p>${escapeHtml(item.desc)}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function emptyItem(text){
+      return [{ icon:'fa-circle-info', color:'var(--muted)', bg:'var(--bg-soft)', title:text, desc:'Nothing to show right now' }];
+    }
+
+    /* ════════════════════════════════════════════
+       DASHBOARD STATS (10 CARDS)
+    ════════════════════════════════════════════ */
+    function renderDashboardStats(){
+      const wrap = document.getElementById('dashboardStats');
+      if(!wrap) return;
+      const owned   = products.filter(p=>p.status==='Owned').length;
+      const ordered = products.filter(p=>p.status==='Ordered').length;
+      const transit = products.filter(p=>p.status==='In Transit').length;
+      const preorder= products.filter(p=>p.status==='Preorder').length;
+      const wishlist= products.filter(p=>p.status==='Wishlist').length;
+      const totalQty= products.reduce((a,p)=>a+Number(p.qty||0),0);
+      const totalBuy= products.reduce((a,p)=>a+(Number(p.buyPrice||0)*Number(p.qty||1)),0);
+      const totalMkt= products.reduce((a,p)=>a+(Number(p.marketValue||0)*Number(p.qty||1)),0);
+      const profit  = totalMkt - totalBuy;
+      const dups    = getDuplicates().length;
+
+      const stats = [
+        { icon:'fa-boxes-stacked', bg:'rgba(99,102,241,.12)', color:'var(--accent)',   label:'Total Models',      value:products.length,          sub:'Collection size' },
+        { icon:'fa-cubes',         bg:'rgba(6,182,212,.12)',  color:'var(--accent-3)', label:'Total Quantity',    value:totalQty,                  sub:'All SKUs' },
+        { icon:'fa-circle-check',  bg:'rgba(16,185,129,.12)', color:'var(--success)', label:'Owned',              value:owned,                     sub:'In collection' },
+        { icon:'fa-cart-shopping', bg:'rgba(99,102,241,.12)', color:'var(--accent)',   label:'Ordered',           value:ordered,                   sub:'Awaiting ship' },
+        { icon:'fa-truck-fast',    bg:'rgba(6,182,212,.12)',  color:'var(--accent-3)', label:'In Transit',        value:transit,                   sub:'On the way' },
+        { icon:'fa-hourglass-half',bg:'rgba(245,158,11,.12)', color:'var(--warning)', label:'Preorders',          value:preorder,                  sub:'Future releases' },
+        { icon:'fa-heart',         bg:'rgba(139,92,246,.12)', color:'var(--accent-2)',label:'Wishlist',            value:wishlist,                  sub:'Target list' },
+        { icon:'fa-sack-dollar',   bg:'rgba(16,185,129,.12)', color:'var(--success)', label:'Market Value',       value:formatCurrency(totalMkt),  sub:'Estimated total' },
+        { icon:'fa-arrow-trend-up',bg:'rgba(16,185,129,.12)', color:profit>=0?'var(--success)':'var(--danger)', label:'Profit Potential', value:formatCurrency(profit), sub:profit>=0?'Upward value':'Underwater' },
+        { icon:'fa-copy',          bg:'rgba(244,63,94,.12)',  color:'var(--rose)',     label:'Duplicates',        value:dups,                      sub:'Detected' }
+      ];
+
+      wrap.innerHTML = stats.map(s => `
+        <div class="stat-card">
+          <div class="stat-top">
+            <div class="stat-icon" style="background:${s.bg};color:${s.color}">
+              <i class="fa-solid ${s.icon}"></i>
+            </div>
+          </div>
+          <div class="stat-label">${s.label}</div>
+          <div class="stat-value">${s.value}</div>
+          <div class="stat-sub ${s.sub==='Underwater'?'down':'up'}">${s.sub}</div>
+        </div>
+      `).join('');
+    }
+
+    /* ════════════════════════════════════════════
+       DASHBOARD WIDGETS
+    ════════════════════════════════════════════ */
+    function renderValueBars(){
+      const el = document.getElementById('valueBars');
+      if(!el) return;
+      const months = ['Jan','Feb','Mar','Apr','May','Jun'];
+      const values = [22,28,35,42,48,56];
+      const max = Math.max(...values);
+      el.innerHTML = months.map((m,i) => `
+        <div class="bar-wrap">
+          <div class="bar" style="height:${Math.max(20,(values[i]/max)*160)}px;background:${i===values.length-1?'var(--grad-3)':'var(--grad)'}">
+            <span>${values[i]}k</span>
+          </div>
+          <div class="bar-label">${m}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderBrandDistribution(){
+      const counts = {};
+      products.forEach(p => counts[p.brand] = (counts[p.brand]||0)+1);
+      const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+      renderMiniList('brandDistribution', sorted.length ? sorted.map(([brand,count]) => ({
+        icon:'fa-tags', color:'var(--accent)', bg:'rgba(99,102,241,.12)',
+        title:brand, desc:`${count} models`
+      })) : emptyItem('No brands yet'));
+    }
+
+    function renderScaleBreakdown(){
+      const counts = {};
+      products.forEach(p => counts[p.scale] = (counts[p.scale]||0)+1);
+      const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+      renderMiniList('scaleBreakdown', sorted.length ? sorted.map(([scale,count]) => ({
+        icon:'fa-ruler-combined', color:'var(--accent-3)', bg:'rgba(6,182,212,.12)',
+        title:scale, desc:`${count} products`
+      })) : emptyItem('No scale data'));
+    }
+
+    function getDuplicates(){
+      const map = {};
+      products.forEach(p => {
+        const key = (p.name||'').trim().toLowerCase();
+        if(!key) return;
+        map[key] = map[key] || [];
+        map[key].push(p);
+      });
+      return Object.values(map).filter(arr => arr.length > 1);
+    }
+
+    function renderDuplicateList(){
+      const dups = getDuplicates();
+      if(!dups.length){ renderMiniList('duplicateList', emptyItem('No duplicates found')); return; }
+      renderMiniList('duplicateList', dups.slice(0,6).map(group => ({
+        icon:'fa-copy', color:'var(--rose)', bg:'rgba(244,63,94,.12)',
+        title:group[0].name, desc:`${group.length} entries • ${group[0].brand}`
+      })));
+    }
+
+    function renderLowStockList(){
+      const low = products.filter(p => p.status==='Owned' && Number(p.qty)<=1).slice(0,6);
+      if(!low.length){ renderMiniList('lowStockList', emptyItem('No low stock alerts')); return; }
+      renderMiniList('lowStockList', low.map(p => ({
+        icon:'fa-triangle-exclamation', color:'var(--danger)', bg:'rgba(239,68,68,.12)',
+        title:p.name, desc:`Qty ${p.qty} • ${p.location||'No location'}`
+      })));
+    }
+
+    function renderShippingInsights(){
+      const shipping = products.filter(p => ['Ordered','In Transit','Preorder'].includes(p.status));
+      if(!shipping.length){ renderMiniList('shippingInsights', emptyItem('No active shipping')); return; }
+      renderMiniList('shippingInsights', shipping.slice(0,6).map(p => {
+        const etaDays = daysUntil(p.eta);
+        return {
+          icon:'fa-truck-fast', color:'var(--accent-3)', bg:'rgba(6,182,212,.12)',
+          title:`${p.name} • ${p.status}`,
+          desc:`ETA: ${p.eta ? `${Math.max(etaDays||0,0)} day(s)` : 'Not set'}`
+        };
+      }));
+    }
+
+    function renderStorageInsights(){
+      const counts = {};
+      products.forEach(p => { const k = p.location||'Unknown'; counts[k]=(counts[k]||0)+1; });
+      const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+      renderMiniList('storageInsights', sorted.length ? sorted.map(([loc,count]) => ({
+        icon:'fa-warehouse', color:'var(--warning)', bg:'rgba(245,158,11,.12)',
+        title:loc, desc:`${count} stored item(s)`
+      })) : emptyItem('No storage data'));
+    }
+
+    function renderProfitInsights(){
+      const list = [...products]
+        .map(p => ({...p, profit:(Number(p.marketValue||0)-Number(p.buyPrice||0))*Number(p.qty||1)}))
+        .sort((a,b)=>b.profit-a.profit).slice(0,6);
+      if(!list.length){ renderMiniList('profitInsights', emptyItem('No profit data')); return; }
+      renderMiniList('profitInsights', list.map(p => ({
+        icon:'fa-arrow-trend-up',
+        color: p.profit>=0?'var(--success)':'var(--danger)',
+        bg:    p.profit>=0?'rgba(16,185,129,.12)':'rgba(239,68,68,.12)',
+        title:p.name, desc:`Potential: ${formatCurrency(p.profit)}`
+      })));
+    }
+
+    function renderHuntPriority(){
+      const list = products.filter(p=>p.status==='Wishlist').sort((a,b)=>Number(b.marketValue||0)-Number(a.marketValue||0)).slice(0,6);
+      if(!list.length){ renderMiniList('huntPriority', emptyItem('No wishlist targets')); return; }
+      renderMiniList('huntPriority', list.map(p => ({
+        icon:'fa-crosshairs', color:'var(--accent-2)', bg:'rgba(139,92,246,.12)',
+        title:p.name, desc:`Target: ${formatCurrency(p.marketValue)}`
+      })));
+    }
+
+    function renderRecentActivity(){
+      const items = [...products].sort((a,b)=>b.createdAt-a.createdAt).slice(0,6).map(p => ({
+        icon:'fa-clock-rotate-left', color:'var(--accent)', bg:'rgba(99,102,241,.12)',
+        title:p.name, desc:`${p.status} • ${formatDateHuman(new Date(p.createdAt).toISOString().split('T')[0])}`
+      }));
+      renderMiniList('recentActivity', items.length ? items : emptyItem('No recent activity'));
+    }
+
+    function renderLatestAdded(){
+      const items = [...products].sort((a,b)=>b.createdAt-a.createdAt).slice(0,5).map(p => ({
+        icon:'fa-box-open', color:'var(--success)', bg:'rgba(16,185,129,.12)',
+        title:p.name, desc:`${p.brand} • ${p.scale} • ${p.status}`
+      }));
+      renderMiniList('latestAdded', items.length ? items : emptyItem('No recent additions'));
+    }
+
+    function renderDashboardStatusMix(){
+      const statuses = ['Owned','Ordered','In Transit','Preorder','Sold','Wishlist'];
+      const cols = { 'Owned':'rgba(16,185,129,.12)','Ordered':'rgba(99,102,241,.12)','In Transit':'rgba(6,182,212,.12)','Preorder':'rgba(245,158,11,.12)','Sold':'rgba(244,63,94,.12)','Wishlist':'rgba(139,92,246,.12)' };
+      const tcol = { 'Owned':'var(--success)','Ordered':'var(--accent)','In Transit':'var(--accent-3)','Preorder':'var(--warning)','Sold':'var(--rose)','Wishlist':'var(--accent-2)' };
+      renderMiniList('dashboardStatusMix', statuses.map(status => ({
+        icon:'fa-layer-group', color:tcol[status], bg:cols[status],
+        title:status, desc:`${products.filter(p=>p.status===status).length} item(s)`
+      })));
+    }
+
+    /* ════════════════════════════════════════════
+       INVENTORY TABLE
+    ════════════════════════════════════════════ */
+    function renderInventoryTable(){
+      const tbody = document.getElementById('inventoryTableBody');
+      if(!tbody) return;
+      const list = getFilteredProducts(false);
+      if(!list.length){
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--muted)">No models match the current filters.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = list.map(p => `
+        <tr>
+          <td>
+            <div class="prod-cell">
+              <div class="prod-thumb">
+                ${p.image ? `<img src="${p.image}" alt="">` : `<i class="fa-solid fa-car-side"></i>`}
+              </div>
+              <div class="prod-meta">
+                <h4>${escapeHtml(p.name)}</h4>
+                <p>${escapeHtml(p.condition||'—')} • ${escapeHtml(p.tracking||'No tracking')}</p>
+              </div>
+            </div>
+          </td>
+          <td>${escapeHtml(p.brand)}</td>
+          <td>${escapeHtml(p.series||'—')}</td>
+          <td>${escapeHtml(p.scale)}</td>
+          <td><span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status)}</span></td>
+          <td>${p.qty}</td>
+          <td>${formatCurrency(p.buyPrice)}</td>
+          <td>${formatCurrency(p.marketValue)}</td>
+          <td>${escapeHtml(p.seller||'—')}</td>
+          <td>${escapeHtml(p.location||'—')}</td>
+          <td>
+            <div class="action-row">
+              <button class="icon-action" onclick="viewProductDetail('${p.id}')" title="View"><i class="fa-regular fa-eye"></i></button>
+              <button class="icon-action" onclick="editProduct('${p.id}')" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
+              <button class="icon-action" onclick="duplicateProduct('${p.id}')" title="Duplicate"><i class="fa-regular fa-copy"></i></button>
+              <button class="icon-action" onclick="deleteProduct('${p.id}')" title="Delete" style="color:var(--danger)"><i class="fa-regular fa-trash-can"></i></button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    /* ════════════════════════════════════════════
+       PRODUCT CARDS + DETAIL
+    ════════════════════════════════════════════ */
+    function renderProductCards(){
+      const grid = document.getElementById('productGrid');
+      if(!grid) return;
+      const list = getFilteredProducts(true);
+      if(!list.length){
+        grid.innerHTML = `<div class="card" style="grid-column:1/-1;text-align:center"><p style="color:var(--muted);padding:16px">No products match the filter.</p></div>`;
+        return;
+      }
+      grid.innerHTML = list.map(p => `
+        <div class="product-card">
+          <div class="product-cover">
+            ${p.image ? `<img src="${p.image}" alt="">` : `<i class="fa-solid fa-car-side" style="font-size:40px;color:var(--muted)"></i>`}
+            <button class="fav-btn" onclick="toggleFavorite('${p.id}')">
+              <i class="${p.favorite?'fa-solid':'fa-regular'} fa-heart"></i>
+            </button>
+          </div>
+          <div class="product-info">
+            <div class="product-title">
+              <h4>${escapeHtml(p.name)}</h4>
+              <div class="product-price">${formatCurrency(p.marketValue)}</div>
+            </div>
+            <div class="product-specs">
+              <span class="chip">${escapeHtml(p.brand)}</span>
+              <span class="chip">${escapeHtml(p.scale)}</span>
+              <span class="chip">${escapeHtml(p.series||'General')}</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+              <span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status)}</span>
+              <span style="font-size:12px;color:var(--muted);font-weight:600">Qty ${p.qty}</span>
+            </div>
+            <div class="toolbar" style="gap:8px">
+              <button class="btn btn-primary btn-sm" onclick="viewProductDetail('${p.id}')"><i class="fa-regular fa-eye"></i> View</button>
+              <button class="btn btn-ghost btn-sm" onclick="editProduct('${p.id}')"><i class="fa-regular fa-pen-to-square"></i> Edit</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function viewProductDetail(id){
+      const p = products.find(x=>x.id===id);
+      if(!p) return;
+      switchPage('catalog', document.querySelector('[data-page=catalog]'));
+      const card  = document.getElementById('productDetailCard');
+      const panel = document.getElementById('productDetailPanel');
+      card.classList.remove('hidden');
+      panel.innerHTML = `
+        <div class="detail-image">
+          ${p.image ? `<img src="${p.image}" alt="">` : `<i class="fa-solid fa-car-side" style="font-size:52px"></i>`}
+        </div>
+        <div class="detail-meta">
+          <div>
+            <h3>${escapeHtml(p.name)}</h3>
+            <p style="margin-top:6px;color:var(--muted);font-size:13px">${escapeHtml(p.notes||'No notes added.')}</p>
+          </div>
+          <div class="product-specs">
+            <span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status)}</span>
+            <span class="chip">${escapeHtml(p.brand)}</span>
+            <span class="chip">${escapeHtml(p.scale)}</span>
+            <span class="chip">${escapeHtml(p.series||'General')}</span>
+            ${p.favorite ? '<span class="chip"><i class="fa-solid fa-heart" style="color:var(--rose)"></i> Fav</span>' : ''}
+          </div>
+          <div class="detail-grid">
+            <div class="kv"><span>Buy Price</span><strong>${formatCurrency(p.buyPrice)}</strong></div>
+            <div class="kv"><span>Market Value</span><strong>${formatCurrency(p.marketValue)}</strong></div>
+            <div class="kv"><span>Profit Potential</span><strong>${formatCurrency((Number(p.marketValue)-Number(p.buyPrice))*Number(p.qty||1))}</strong></div>
+            <div class="kv"><span>Quantity</span><strong>${p.qty}</strong></div>
+            <div class="kv"><span>Seller</span><strong>${escapeHtml(p.seller||'—')}</strong></div>
+            <div class="kv"><span>Location</span><strong>${escapeHtml(p.location||'—')}</strong></div>
+            <div class="kv"><span>Purchase Date</span><strong>${formatDateHuman(p.purchaseDate)}</strong></div>
+            <div class="kv"><span>ETA</span><strong>${formatDateHuman(p.eta)}</strong></div>
+            <div class="kv"><span>Tracking</span><strong>${escapeHtml(p.tracking||'—')}</strong></div>
+            <div class="kv"><span>Condition</span><strong>${escapeHtml(p.condition||'—')}</strong></div>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-primary btn-sm" onclick="editProduct('${p.id}')"><i class="fa-regular fa-pen-to-square"></i> Edit</button>
+            <button class="btn btn-ghost btn-sm" onclick="duplicateProduct('${p.id}')"><i class="fa-regular fa-copy"></i> Duplicate</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')"><i class="fa-regular fa-trash-can"></i> Delete</button>
+          </div>
+        </div>
+      `;
+      setTimeout(() => card.scrollIntoView({ behavior:'smooth', block:'start' }), 100);
+    }
+
+    function closeProductDetails(){
+      document.getElementById('productDetailCard').classList.add('hidden');
+    }
+
+    /* ════════════════════════════════════════════
+       KANBAN
+    ════════════════════════════════════════════ */
+    function renderKanban(){
+      const board = document.getElementById('kanbanBoard');
+      if(!board) return;
+      board.innerHTML = KANBAN_COLS.map(col => {
+        const ids   = kanbanData[col.key] || [];
+        const cards = ids.map(id => products.find(p=>p.id===id)).filter(Boolean);
+        return `
+          <div class="kanban-col" data-col="${col.key}"
+            ondragover="kbDragOver(event)"
+            ondrop="kbDrop(event,'${col.key}')"
+            ondragleave="kbDragLeave(event)">
+            <div class="kanban-head">
+              <h4><i class="fa-solid ${col.icon}"></i> ${col.label}</h4>
+              <span class="kanban-count">${cards.length}</span>
+            </div>
+            <div class="kanban-list">
+              ${cards.map(p => `
+                <div class="kanban-card" draggable="true" data-id="${p.id}"
+                  ondragstart="kbDragStart(event)"
+                  ondragend="kbDragEnd(event)">
+                  <h5>${escapeHtml(p.name)}</h5>
+                  <p>${escapeHtml(p.brand)} • ${escapeHtml(p.scale)} • ${escapeHtml(p.status)}</p>
+                  <div class="k-meta">
+                    <span>${formatCurrency(p.marketValue)}</span>
+                    <span>${escapeHtml(p.location||'—')}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function kbDragStart(e){ draggedKanbanId = e.currentTarget.dataset.id; e.currentTarget.classList.add('dragging'); }
+    function kbDragEnd(e){ e.currentTarget.classList.remove('dragging'); document.querySelectorAll('.kanban-col').forEach(c=>c.classList.remove('dropzone-active')); }
+    function kbDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('dropzone-active'); }
+    function kbDragLeave(e){ e.currentTarget.classList.remove('dropzone-active'); }
+
+    function kbDrop(e, targetCol){
+      e.preventDefault(); e.currentTarget.classList.remove('dropzone-active');
+      if(!draggedKanbanId) return;
+      Object.keys(kanbanData).forEach(key => { kanbanData[key]=(kanbanData[key]||[]).filter(id=>id!==draggedKanbanId); });
+      kanbanData[targetCol] = kanbanData[targetCol] || [];
+      kanbanData[targetCol].push(draggedKanbanId);
+      const p = products.find(x=>x.id===draggedKanbanId);
+      if(p){
+        if(targetCol==='sourcing') p.status='Wishlist';
+        if(targetCol==='ordered')  p.status=(p.status==='Preorder'?'Preorder':'Ordered');
+        if(targetCol==='transit')  p.status='In Transit';
+        if(targetCol==='received' && p.status!=='Sold') p.status='Owned';
+      }
+      saveProducts(); saveKanban(); renderAll();
+      showToast('Status updated', `${p?.name||'Model'} moved to ${targetCol}`, 'success');
+    }
+
+    function resetKanban(){ kanbanData=getDefaultKanban(products); saveKanban(); renderKanban(); showToast('Kanban reset','Board rebuilt from current statuses','success'); }
+
+    /* ════════════════════════════════════════════
+       ORDERS PAGE
+    ════════════════════════════════════════════ */
+    function renderOrderSummary(){
+      const wrap = document.getElementById('orderSummaryCards');
+      if(!wrap) return;
+      const ordered = products.filter(p=>p.status==='Ordered');
+      const transit = products.filter(p=>p.status==='In Transit');
+      const preorder= products.filter(p=>p.status==='Preorder');
+      const data = [
+        { icon:'fa-cart-shopping', color:'var(--accent)',   bg:'rgba(99,102,241,.12)', label:'Ordered',    value:ordered.length,  desc:'Awaiting dispatch' },
+        { icon:'fa-truck-fast',    color:'var(--accent-3)', bg:'rgba(6,182,212,.12)',  label:'In Transit', value:transit.length,  desc:'Moving to you' },
+        { icon:'fa-hourglass-half',color:'var(--warning)',  bg:'rgba(245,158,11,.12)', label:'Preorders',  value:preorder.length, desc:'Future releases' }
+      ];
+      wrap.innerHTML = data.map(s => `
+        <div class="stat-card">
+          <div class="stat-top">
+            <div class="stat-icon" style="background:${s.bg};color:${s.color}"><i class="fa-solid ${s.icon}"></i></div>
+          </div>
+          <div class="stat-label">${s.label}</div>
+          <div class="stat-value">${s.value}</div>
+          <div class="stat-sub up">${s.desc}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderOrdersTable(){
+      const tbody = document.getElementById('ordersTableBody');
+      if(!tbody) return;
+      const list = products.filter(p=>['Ordered','In Transit','Preorder'].includes(p.status));
+      if(!list.length){ tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted)">No active orders.</td></tr>`; return; }
+      tbody.innerHTML = list.map(p => {
+        const etaDays = daysUntil(p.eta);
+        const etaText = p.eta ? `${formatDateHuman(p.eta)}${etaDays!==null?` (${Math.max(etaDays,0)}d)`:''}` : 'Not set';
+        return `
+          <tr>
+            <td>${escapeHtml(p.name)}</td>
+            <td><span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status)}</span></td>
+            <td>${etaText}</td>
+            <td>${escapeHtml(p.seller||'—')}</td>
+            <td>${escapeHtml(p.tracking||'—')}</td>
+            <td>${formatCurrency(p.marketValue)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    /* ════════════════════════════════════════════
+       WISHLIST PAGE
+    ════════════════════════════════════════════ */
+    function renderWishlist(){
+      const wrap = document.getElementById('wishlistGrid');
+      if(!wrap) return;
+      const list = products.filter(p=>p.status==='Wishlist');
+      if(!list.length){ wrap.innerHTML=`<div class="card" style="grid-column:1/-1;text-align:center"><p style="color:var(--muted);padding:16px">No wishlist items yet.</p></div>`; return; }
+      wrap.innerHTML = list.map(p => `
+        <div class="product-card">
+          <div class="product-cover">
+            ${p.image?`<img src="${p.image}" alt="">`:`<i class="fa-solid fa-car-side" style="font-size:40px;color:var(--muted)"></i>`}
+          </div>
+          <div class="product-info">
+            <div class="product-title">
+              <h4>${escapeHtml(p.name)}</h4>
+              <div class="product-price">${formatCurrency(p.marketValue)}</div>
+            </div>
+            <div class="product-specs">
+              <span class="chip">${escapeHtml(p.brand)}</span>
+              <span class="chip">${escapeHtml(p.scale)}</span>
+              <span class="chip">${escapeHtml(p.series||'General')}</span>
+            </div>
+            <span class="badge wishlist">Wishlist</span>
+            <div class="toolbar" style="gap:8px">
+              <button class="btn btn-ghost btn-sm" onclick="editProduct('${p.id}')"><i class="fa-regular fa-pen-to-square"></i> Edit</button>
+              <button class="btn btn-primary btn-sm" onclick="moveToOrdered('${p.id}')"><i class="fa-solid fa-cart-shopping"></i> Ordered</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function moveToOrdered(id){
+      const p = products.find(x=>x.id===id);
+      if(!p) return;
+      p.status='Ordered';
+      if(!p.purchaseDate) p.purchaseDate = new Date().toISOString().split('T')[0];
+      saveProducts(); kanbanData=getDefaultKanban(products); saveKanban(); renderAll();
+      showToast('Moved to Ordered', p.name, 'success');
+    }
+
+    /* ════════════════════════════════════════════
+       ANALYTICS PAGE
+    ════════════════════════════════════════════ */
+    function renderAnalytics(){
+      const totalBuy  = products.reduce((a,p)=>a+Number(p.buyPrice||0)*Number(p.qty||1),0);
+      const totalMkt  = products.reduce((a,p)=>a+Number(p.marketValue||0)*Number(p.qty||1),0);
+      const roi       = totalBuy ? (((totalMkt-totalBuy)/totalBuy)*100).toFixed(1) : 0;
+      const favorites = products.filter(p=>p.favorite).length;
+
+      const wrap = document.getElementById('analyticsStats');
+      if(wrap){
+        const stats = [
+          { label:'Total Invested',   value:formatCurrency(totalBuy), icon:'fa-wallet',     color:'var(--accent)',   bg:'rgba(99,102,241,.12)' },
+          { label:'Estimated Value',  value:formatCurrency(totalMkt), icon:'fa-sack-dollar', color:'var(--success)',  bg:'rgba(16,185,129,.12)' },
+          { label:'ROI Estimate',     value:`${roi}%`,                icon:'fa-chart-line',  color:'var(--accent-3)', bg:'rgba(6,182,212,.12)' },
+          { label:'Favorites',        value:favorites,                icon:'fa-heart',        color:'var(--rose)',     bg:'rgba(244,63,94,.12)' }
+        ];
+        wrap.innerHTML = stats.map(s => `
+          <div class="stat-card">
+            <div class="stat-top">
+              <div class="stat-icon" style="background:${s.bg};color:${s.color}"><i class="fa-solid ${s.icon}"></i></div>
+            </div>
+            <div class="stat-label">${s.label}</div>
+            <div class="stat-value">${s.value}</div>
+          </div>
+        `).join('');
+      }
+
+      // Brand value bars
+      const bvEl = document.getElementById('brandValueBars');
+      if(bvEl){
+        const map = {};
+        products.forEach(p => { map[p.brand]=(map[p.brand]||0)+Number(p.marketValue||0)*Number(p.qty||1); });
+        const list = Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,6);
+        const max  = Math.max(...list.map(x=>x[1]),1);
+        bvEl.innerHTML = list.map(([brand,val]) => `
+          <div class="bar-wrap">
+            <div class="bar" style="height:${Math.max(20,(val/max)*150)}px">
+              <span style="font-size:9px">${formatCurrency(val)}</span>
+            </div>
+            <div class="bar-label" style="font-size:10px;max-width:60px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(brand)}</div>
+          </div>
+        `).join('');
+      }
+
+      // Storage
+      const stMap = {};
+      products.forEach(p => { const k=p.location||'Unknown'; stMap[k]=(stMap[k]||0)+1; });
+      const stList = Object.entries(stMap).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([loc,count]) => ({
+        icon:'fa-warehouse', color:'var(--warning)', bg:'rgba(245,158,11,.12)', title:loc, desc:`${count} item(s)`
+      }));
+      renderMiniList('analyticsStorage', stList.length ? stList : emptyItem('No storage data'));
+
+      // Profit leaderboard
+      const plList = [...products].map(p=>({...p,profit:(Number(p.marketValue||0)-Number(p.buyPrice||0))*Number(p.qty||1)})).sort((a,b)=>b.profit-a.profit).slice(0,8).map(p => ({
+        icon:'fa-trophy',
+        color: p.profit>=0?'var(--success)':'var(--danger)',
+        bg:    p.profit>=0?'rgba(16,185,129,.12)':'rgba(239,68,68,.12)',
+        title:p.name, desc:`${formatCurrency(p.profit)} potential`
+      }));
+      renderMiniList('profitLeaderboard', plList.length ? plList : emptyItem('No profit data'));
+
+      // Status mix
+      const statuses = ['Owned','Ordered','In Transit','Preorder','Sold','Wishlist'];
+      const tcol = { 'Owned':'var(--success)','Ordered':'var(--accent)','In Transit':'var(--accent-3)','Preorder':'var(--warning)','Sold':'var(--rose)','Wishlist':'var(--accent-2)' };
+      const tcbg = { 'Owned':'rgba(16,185,129,.12)','Ordered':'rgba(99,102,241,.12)','In Transit':'rgba(6,182,212,.12)','Preorder':'rgba(245,158,11,.12)','Sold':'rgba(244,63,94,.12)','Wishlist':'rgba(139,92,246,.12)' };
+      renderMiniList('statusMix', statuses.map(status => ({
+        icon:'fa-layer-group', color:tcol[status], bg:tcbg[status],
+        title:status, desc:`${products.filter(p=>p.status===status).length} item(s)`
+      })));
+    }
+
+    /* ════════════════════════════════════════════
+       CRUD OPERATIONS
+    ════════════════════════════════════════════ */
+    function openProductModal(){
+      editingId = null;
+      uploadedImageBase64 = '';
+      document.getElementById('modalTitle').textContent = 'Add New Diecast Model';
+      document.getElementById('saveProductBtn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Model';
+      resetProductForm();
+      document.getElementById('productModal').classList.remove('hidden');
+    }
+
+    function closeProductModal(){
+      document.getElementById('productModal').classList.add('hidden');
+    }
+
+    function resetProductForm(){
+      const today = new Date().toISOString().split('T')[0];
+      const defs = { f_name:'',f_brand:'Hot Wheels',f_series:'',f_scale:'1:64',f_status:'Owned',f_qty:1,f_buyPrice:'',f_marketValue:'',f_seller:'',f_location:'',f_purchaseDate:today,f_eta:'',f_tracking:'',f_condition:'Mint',f_notes:'' };
+      Object.entries(defs).forEach(([id,val]) => { const el=document.getElementById(id); if(el) el.value=val; });
+      document.getElementById('imagePreview').innerHTML = `<div style="text-align:center;color:var(--muted)"><i class="fa-regular fa-image" style="font-size:36px"></i><p style="margin-top:8px;font-size:12px">Click to upload</p></div>`;
+      document.getElementById('f_image').value = '';
+    }
+
+    function handleImageUpload(event){
+      const file = event.target.files?.[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e){
+        uploadedImageBase64 = e.target.result;
+        document.getElementById('imagePreview').innerHTML = `<img src="${uploadedImageBase64}" alt="" style="width:100%;height:100%;object-fit:cover">`;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearImageUpload(){
+      uploadedImageBase64 = '';
+      document.getElementById('f_image').value = '';
+      document.getElementById('imagePreview').innerHTML = `<div style="text-align:center;color:var(--muted)"><i class="fa-regular fa-image" style="font-size:36px"></i><p style="margin-top:8px;font-size:12px">Click to upload</p></div>`;
+    }
+
+    function getVal(id){ return document.getElementById(id)?.value?.trim?.() ?? ''; }
+
+    function saveProduct(){
+      const data = {
+        name:getVal('f_name'), brand:getVal('f_brand'), series:getVal('f_series'),
+        scale:getVal('f_scale'), status:getVal('f_status'),
+        qty:Number(getVal('f_qty')||1), buyPrice:Number(getVal('f_buyPrice')||0),
+        marketValue:Number(getVal('f_marketValue')||0), seller:getVal('f_seller'),
+        location:getVal('f_location'), purchaseDate:getVal('f_purchaseDate'),
+        eta:getVal('f_eta'), tracking:getVal('f_tracking'),
+        condition:getVal('f_condition'), notes:getVal('f_notes')
+      };
+      if(!data.name){ alert('Please enter model name.'); return; }
+
+      if(editingId){
+        const p = products.find(x=>x.id===editingId);
+        if(!p) return;
+        Object.assign(p, data);
+        if(uploadedImageBase64) p.image = uploadedImageBase64;
+        showToast('Model updated', data.name, 'success');
+      } else {
+        products.unshift({ id:uid(), ...data, image:uploadedImageBase64||'', favorite:false, createdAt:Date.now() });
+        showToast('Model added', data.name, 'success');
+      }
+      saveProducts(); kanbanData=getDefaultKanban(products); saveKanban();
+      closeProductModal(); renderAll();
+    }
+
+    function editProduct(id){
+      const p = products.find(x=>x.id===id);
+      if(!p) return;
+      editingId = id;
+      uploadedImageBase64 = p.image || '';
+      document.getElementById('modalTitle').textContent = 'Edit Diecast Model';
+      document.getElementById('saveProductBtn').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Update Model';
+      const map = { f_name:p.name, f_brand:p.brand, f_series:p.series, f_scale:p.scale, f_status:p.status, f_qty:p.qty, f_buyPrice:p.buyPrice, f_marketValue:p.marketValue, f_seller:p.seller, f_location:p.location, f_purchaseDate:p.purchaseDate, f_eta:p.eta, f_tracking:p.tracking, f_condition:p.condition, f_notes:p.notes };
+      Object.entries(map).forEach(([id,val]) => { const el=document.getElementById(id); if(el) el.value=val??''; });
+      document.getElementById('imagePreview').innerHTML = p.image ? `<img src="${p.image}" alt="" style="width:100%;height:100%;object-fit:cover">` : `<div style="text-align:center;color:var(--muted)"><i class="fa-regular fa-image" style="font-size:36px"></i><p style="margin-top:8px;font-size:12px">Click to upload</p></div>`;
+      document.getElementById('productModal').classList.remove('hidden');
+    }
+
+    function deleteProduct(id){
+      const p = products.find(x=>x.id===id);
+      if(!p) return;
+      if(!confirm(`Delete "${p.name}"?`)) return;
+      products = products.filter(x=>x.id!==id);
+      Object.keys(kanbanData).forEach(key => { kanbanData[key]=(kanbanData[key]||[]).filter(pid=>pid!==id); });
+      saveProducts(); saveKanban(); renderAll();
+      closeProductDetails();
+      showToast('Deleted', p.name+' removed', 'warning');
+    }
+
+    function duplicateProduct(id){
+      const p = products.find(x=>x.id===id);
+      if(!p) return;
+      const copy = { ...JSON.parse(JSON.stringify(p)), id:uid(), createdAt:Date.now(), notes:(p.notes?p.notes+' ':'')+'[Copy]' };
+      products.unshift(copy);
+      saveProducts(); kanbanData=getDefaultKanban(products); saveKanban(); renderAll();
+      showToast('Duplicated', copy.name, 'success');
+    }
+
+    function toggleFavorite(id){
+      const p = products.find(x=>x.id===id);
+      if(!p) return;
+      p.favorite = !p.favorite;
+      saveProducts(); renderProductCards(); renderAnalytics();
+    }
+
+    /* ════════════════════════════════════════════
+       IMPORT / EXPORT / RESET
+    ════════════════════════════════════════════ */
+    function exportData(){
+      const blob = new Blob([JSON.stringify({ exportedAt:new Date().toISOString(), products, notifications, kanbanData }, null, 2)], { type:'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = 'pretrack-nexus-backup.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      showToast('Export ready', 'JSON backup downloaded', 'success');
+    }
+
+    function importData(event){
+      const file = event.target.files?.[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e){
+        try{
+          const parsed = JSON.parse(e.target.result);
+          if(Array.isArray(parsed)){ products = parsed; }
+          else{
+            if(Array.isArray(parsed.products)) products = parsed.products;
+            if(Array.isArray(parsed.notifications)) notifications = parsed.notifications;
+            if(parsed.kanbanData && typeof parsed.kanbanData==='object') kanbanData = parsed.kanbanData;
+          }
+          if(!products.length) throw new Error('No products found.');
+          saveProducts(); saveNotifications(); saveKanban(); renderAll();
+          showToast('Import successful', `${products.length} models loaded`, 'success');
+        }catch(err){
+          showToast('Import failed', 'Invalid JSON file', 'danger');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function seedDemoData(force = false){
+      if(force && !confirm('Reload demo data? Current data will be replaced.')) return;
+      products = getDemoProducts();
+      notifications = getDemoNotifications();
+      kanbanData = getDefaultKanban(products);
+      saveProducts(); saveNotifications(); saveKanban(); renderAll();
+      showToast('Demo loaded', 'Sample data restored', 'success');
+    }
+
+    function resetAllData(){
+      if(!confirm('Reset ALL data? This cannot be undone.')) return;
+      localStorage.removeItem(STORAGE.products);
+      localStorage.removeItem(STORAGE.notifications);
+      localStorage.removeItem(STORAGE.kanban);
+      products = getDemoProducts();
+      notifications = getDemoNotifications();
+      kanbanData = getDefaultKanban(products);
+      saveProducts(); saveNotifications(); saveKanban(); renderAll();
+      showToast('Reset complete', 'Dashboard cleared', 'warning');
+    }
+
+    /* ════════════════════════════════════════════
+       SETTINGS INFO
+    ════════════════════════════════════════════ */
+    function updateSettingsInfo(){
+      const mc = document.getElementById('settingsModelCount');
+      if(mc) mc.textContent = products.length + ' models';
+      const su = document.getElementById('storageUsage');
+      if(su){
+        const bytes = new Blob([JSON.stringify(products)]).size;
+        su.textContent = bytes > 1024 ? `${(bytes/1024).toFixed(1)} KB` : `${bytes} B`;
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       TOAST SYSTEM
+    ════════════════════════════════════════════ */
+    function showToast(title, desc, type = 'success'){
+      const container = document.getElementById('toastContainer');
+      const colors = { success:{ bg:'rgba(16,185,129,.12)', color:'var(--success)', icon:'fa-circle-check' }, warning:{ bg:'rgba(245,158,11,.12)', color:'var(--warning)', icon:'fa-triangle-exclamation' }, danger:{ bg:'rgba(239,68,68,.12)', color:'var(--danger)', icon:'fa-circle-xmark' } };
+      const c = colors[type] || colors.success;
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `
+        <div class="toast-icon" style="background:${c.bg};color:${c.color}"><i class="fa-solid ${c.icon}"></i></div>
+        <div class="toast-content"><h4>${escapeHtml(title)}</h4><p>${escapeHtml(desc)}</p></div>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => { toast.style.opacity='0'; toast.style.transform='translateX(20px)'; toast.style.transition='.3s ease'; setTimeout(()=>toast.remove(),300); }, 3000);
+    }
+
+    /* ════════════════════════════════════════════
+       GLOBAL EVENTS
+    ════════════════════════════════════════════ */
+    function setupEvents(){
+      document.addEventListener('click', function(e){
+        if(!e.target.closest('.dropdown-wrap') && !e.target.closest('#notifBtn')){
+          closeAllDropdowns();
+        }
+        if(e.target.id === 'productModal'){
+          closeProductModal();
+        }
+      });
+
+      document.addEventListener('keydown', function(e){
+        if(e.key === 'Escape'){ closeProductModal(); closeAllDropdowns(); closeSidebar(); }
+        if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){
+          e.preventDefault();
+          const s = document.getElementById('globalSearch');
+          if(s){ s.focus(); s.select(); }
+        }
+        if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='n'){
+          e.preventDefault(); openProductModal();
+        }
+      });
+    }
+
+    /* ════════════════════════════════════════════
+       INIT
+    ════════════════════════════════════════════ */
+    function init(){
+      loadData();
+      renderAll();
+      setupEvents();
+      showToast('PreTrack NEXUS ready', 'Collection dashboard loaded', 'success');
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
