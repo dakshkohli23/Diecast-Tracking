@@ -2,8 +2,9 @@
 
 /* ═══════════════════════════════════════════════
    PRETRACK — FIREBASE AUTH + FIRESTORE VERSION
-   Firestore-only version (no Firebase Storage for now)
-   ═══════════════════════════════════════════════ */
+   Firestore-only version (base64 image preview saved in Firestore)
+   Matched to final index.html
+═══════════════════════════════════════════════ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import {
@@ -47,7 +48,7 @@ const db = getFirestore(app);
    GLOBAL DB STATE
 ══════════════════════════════════════ */
 let DB = { orders: [], activity: [] };
-let _currentImageB64 = ''; // preview only (not uploaded to Firebase Storage)
+let _currentImageB64 = ''; // preview + saved to Firestore (base64)
 let _authReady = false;
 
 /* ══════════════════════════════════════
@@ -68,7 +69,8 @@ function initLoginPage() {
   togglePw?.addEventListener('click', () => {
     const isText = pwInput.type === 'text';
     pwInput.type = isText ? 'password' : 'text';
-    togglePw.querySelector('i').className = `fa-solid fa-eye${isText ? '' : '-slash'}`;
+    const icon = togglePw.querySelector('i');
+    if (icon) icon.className = `fa-solid fa-eye${isText ? '' : '-slash'}`;
   });
 
   onAuthStateChanged(auth, (user) => {
@@ -77,25 +79,37 @@ function initLoginPage() {
     }
   });
 
-  loginForm.addEventListener('submit', async (e) => {
+  loginForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const email = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
+    const email = document.getElementById('username')?.value.trim() || '';
+    const password = document.getElementById('password')?.value || '';
 
-    loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
-    loginBtn.disabled = true;
+    if (!email || !password) {
+      loginErr?.classList.remove('hidden');
+      if (errMsg) errMsg.textContent = 'Please enter email and password';
+      return;
+    }
+
+    if (loginBtn) {
+      loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
+      loginBtn.disabled = true;
+    }
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
       window.location.href = 'index.html';
     } catch (error) {
       console.error(error);
-      loginErr.classList.remove('hidden');
-      errMsg.textContent = 'Invalid email or password';
-      loginBtn.innerHTML = '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>';
-      loginBtn.disabled = false;
-      setTimeout(() => loginErr.classList.add('hidden'), 4000);
+      loginErr?.classList.remove('hidden');
+      if (errMsg) errMsg.textContent = 'Invalid email or password';
+
+      if (loginBtn) {
+        loginBtn.innerHTML = '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>';
+        loginBtn.disabled = false;
+      }
+
+      setTimeout(() => loginErr?.classList.add('hidden'), 4000);
     }
   });
 }
@@ -112,13 +126,11 @@ if (document.getElementById('pageContent')) {
       return;
     }
 
-    // Set username
     const profileNameEl = document.getElementById('profileName');
     if (profileNameEl) {
       profileNameEl.textContent = user.email || 'Admin';
     }
 
-    // Load data then init dashboard
     await fetchData();
     initDashboard();
   });
@@ -131,8 +143,12 @@ function initDashboard() {
   const sidebarToggle = document.getElementById('sidebarToggle');
 
   sidebarToggle?.addEventListener('click', () => {
-    sidebar.classList.toggle('collapsed');
-    mainWrap.classList.toggle('expanded');
+    if (window.innerWidth <= 980) {
+      sidebar?.classList.toggle('collapsed');
+    } else {
+      sidebar?.classList.toggle('collapsed');
+      mainWrap?.classList.toggle('expanded');
+    }
   });
 
   /* ── NAV ROUTING ── */
@@ -158,6 +174,9 @@ function initDashboard() {
     document.getElementById(`section-${section}`)?.classList.add('active');
   }
 
+  /* expose if needed */
+  window.__navigateTo = navigateTo;
+
   /* ── DARK MODE ── */
   const darkToggle = document.getElementById('darkModeToggle');
   const settingDark = document.getElementById('settingDarkMode');
@@ -169,8 +188,14 @@ function initDashboard() {
   function applyTheme(theme) {
     html.setAttribute('data-theme', theme);
     localStorage.setItem('pt_theme', theme);
+
     const isDark = theme === 'dark';
-    if (darkToggle) darkToggle.querySelector('i').className = `fa-solid fa-${isDark ? 'sun' : 'moon'}`;
+
+    const icon = darkToggle?.querySelector('i');
+    if (icon) {
+      icon.className = `fa-solid fa-${isDark ? 'sun' : 'moon'}`;
+    }
+
     if (settingDark) settingDark.checked = isDark;
   }
 
@@ -215,11 +240,18 @@ function initDashboard() {
   document.getElementById('filterDateTo')?.addEventListener('change', applyFilters);
 
   document.getElementById('clearFilters')?.addEventListener('click', () => {
-    document.getElementById('orderSearch').value = '';
-    document.getElementById('filterStatus').value = '';
-    document.getElementById('filterVendor').value = '';
-    document.getElementById('filterDateFrom').value = '';
-    document.getElementById('filterDateTo').value = '';
+    const orderSearch = document.getElementById('orderSearch');
+    const filterStatus = document.getElementById('filterStatus');
+    const filterVendor = document.getElementById('filterVendor');
+    const filterDateFrom = document.getElementById('filterDateFrom');
+    const filterDateTo = document.getElementById('filterDateTo');
+
+    if (orderSearch) orderSearch.value = '';
+    if (filterStatus) filterStatus.value = '';
+    if (filterVendor) filterVendor.value = '';
+    if (filterDateFrom) filterDateFrom.value = '';
+    if (filterDateTo) filterDateTo.value = '';
+
     renderTable(DB.orders);
   });
 
@@ -231,11 +263,17 @@ function initDashboard() {
     const to      = document.getElementById('filterDateTo')?.value;
 
     const filtered = DB.orders.filter(o => {
-      const matchQ      = !q || (o.product_name || '').toLowerCase().includes(q) || (o.order_number || '').toLowerCase().includes(q);
+      const matchQ =
+        !q ||
+        (o.product_name || '').toLowerCase().includes(q) ||
+        (o.order_number || '').toLowerCase().includes(q) ||
+        (o.vendor || '').toLowerCase().includes(q);
+
       const matchStatus = !status || o.status === status;
       const matchVendor = !vendor || o.vendor === vendor;
-      const matchFrom   = !from || new Date(o.order_date) >= new Date(from);
-      const matchTo     = !to   || new Date(o.order_date) <= new Date(to);
+      const matchFrom   = !from || !o.order_date || new Date(o.order_date) >= new Date(from);
+      const matchTo     = !to   || !o.order_date || new Date(o.order_date) <= new Date(to);
+
       return matchQ && matchStatus && matchVendor && matchFrom && matchTo;
     });
 
@@ -254,40 +292,39 @@ function initDashboard() {
   function closeModal() {
     orderModal?.classList.add('hidden');
     document.body.style.overflow = '';
+
     document.getElementById('orderForm')?.reset();
-    if (document.getElementById('editOrderId')) document.getElementById('editOrderId').value = '';
+
+    const editField = document.getElementById('editOrderId');
+    if (editField) editField.value = '';
+
     const imagePreview = document.getElementById('imagePreview');
     if (imagePreview) {
       imagePreview.innerHTML = '<i class="fa-solid fa-image"></i><p>Image preview only (upload disabled)</p>';
     }
+
     const fImage = document.getElementById('fImage');
     if (fImage) fImage.value = '';
+
     _currentImageB64 = '';
 
     document.querySelectorAll('.form-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelector('.form-tab[data-tab="basic"]')?.classList.add('active');
     document.getElementById('tab-basic')?.classList.add('active');
+
     calcTotals();
   }
 
-  document.getElementById('addOrderBtn')?.addEventListener('click', () => {
+  function openNewOrderModal() {
     const modalTitle = document.getElementById('modalTitle');
     if (modalTitle) modalTitle.textContent = 'Add New Order';
     openModal();
-  });
+  }
 
-  document.getElementById('quickAddBtn')?.addEventListener('click', () => {
-    const modalTitle = document.getElementById('modalTitle');
-    if (modalTitle) modalTitle.textContent = 'Add New Order';
-    openModal();
-  });
-
-  document.getElementById('qaAddOrder')?.addEventListener('click', () => {
-    const modalTitle = document.getElementById('modalTitle');
-    if (modalTitle) modalTitle.textContent = 'Add New Order';
-    openModal();
-  });
+  document.getElementById('addOrderBtn')?.addEventListener('click', openNewOrderModal);
+  document.getElementById('quickAddBtn')?.addEventListener('click', openNewOrderModal);
+  document.getElementById('qaAddOrder')?.addEventListener('click', openNewOrderModal);
 
   document.getElementById('modalClose')?.addEventListener('click', closeModal);
   document.getElementById('modalCancel')?.addEventListener('click', closeModal);
@@ -328,36 +365,38 @@ function initDashboard() {
     const qty   = parseInt(document.getElementById('fQty')?.value) || 1;
     const ship  = parseFloat(document.getElementById('fShipping')?.value) || 0;
     const paid  = parseFloat(document.getElementById('fPaid')?.value) || 0;
+
     const total   = (price * qty) + ship;
     const pending = Math.max(0, total - paid);
 
-    if (document.getElementById('fTotal')) {
-      document.getElementById('fTotal').value = `₹${total.toLocaleString('en-IN')}`;
-    }
-    if (document.getElementById('fPending')) {
-      document.getElementById('fPending').value = `₹${pending.toLocaleString('en-IN')}`;
-    }
+    const totalEl = document.getElementById('fTotal');
+    const pendingEl = document.getElementById('fPending');
+
+    if (totalEl) totalEl.value = `₹${total.toLocaleString('en-IN')}`;
+    if (pendingEl) pendingEl.value = `₹${pending.toLocaleString('en-IN')}`;
   }
 
-  /* ── IMAGE PREVIEW ONLY (NO STORAGE) ── */
+  /* ── IMAGE PREVIEW + SAVE TO FIRESTORE (BASE64) ── */
   document.getElementById('imageUploadArea')?.addEventListener('click', () => {
     document.getElementById('fImage')?.click();
   });
 
   document.getElementById('fImage')?.addEventListener('change', (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
       showToast('Image too large (max 2MB)', 'warning');
+      e.target.value = '';
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-      _currentImageB64 = ev.target.result; // preview only, not saved to firestore
+      _currentImageB64 = ev.target?.result || '';
+
       const preview = document.getElementById('imagePreview');
-      if (preview) {
+      if (preview && _currentImageB64) {
         preview.innerHTML = `<img src="${_currentImageB64}" alt="preview" />`;
       }
     };
@@ -383,7 +422,7 @@ function initDashboard() {
       product_name:   document.getElementById('fProductName')?.value.trim() || '',
       order_number:   document.getElementById('fOrderNumber')?.value.trim() || '',
       vendor:         document.getElementById('fVendor')?.value.trim() || '',
-      variant:        document.getElementById('fVariant')?.value || '',
+      variant:        document.getElementById('fVariant')?.value.trim() || '',
       quantity:       qty,
       order_date:     document.getElementById('fOrderDate')?.value || '',
       eta:            document.getElementById('fEta')?.value || '',
@@ -394,9 +433,17 @@ function initDashboard() {
       paid:           paid,
       pending:        pending,
       total:          total,
-      image:          existing?.image || '', // keep existing image if any
+
+      /* FIXED: save new preview if selected, otherwise keep existing */
+      image:          _currentImageB64 || existing?.image || '',
+
       updatedAt:      serverTimestamp()
     };
+
+    if (!order.product_name) {
+      showToast('Product name is required', 'warning');
+      return;
+    }
 
     try {
       if (editId) {
@@ -426,8 +473,12 @@ function initDashboard() {
 
   document.getElementById('qaDelayed')?.addEventListener('click', () => {
     navigateTo('orders');
+
     const today = new Date();
-    const delayed = DB.orders.filter(o => o.eta && new Date(o.eta) < today && o.status !== 'Delivered');
+    const delayed = DB.orders.filter(o => {
+      if (!o.eta) return false;
+      return new Date(o.eta) < today && o.status !== 'Delivered';
+    });
 
     if (delayed.length === 0) {
       showToast('No delayed orders!', 'info');
@@ -445,22 +496,45 @@ function initDashboard() {
       return;
     }
 
-    const headers = ['ID','Product','Order#','Vendor','Variant','Qty','Preorder Price','Actual Price','Shipping','Paid','Pending','Total','Status','ETA','Order Date'];
+    const headers = [
+      'ID','Product','Order#','Vendor','Variant','Qty',
+      'Preorder Price','Actual Price','Shipping','Paid',
+      'Pending','Total','Status','ETA','Order Date'
+    ];
+
     const rows = DB.orders.map(o => [
-      o.id, o.product_name, o.order_number, o.vendor, o.variant, o.quantity,
-      o.preorder_price, o.actual_price, o.shipping, o.paid, o.pending, o.total,
-      o.status, o.eta, o.order_date
+      o.id,
+      o.product_name,
+      o.order_number,
+      o.vendor,
+      o.variant,
+      o.quantity,
+      o.preorder_price,
+      o.actual_price,
+      o.shipping,
+      o.paid,
+      o.pending,
+      o.total,
+      o.status,
+      o.eta,
+      o.order_date
     ]);
 
-    const csv = [headers, ...rows].map(r => r.map(c => `"${c ?? ''}"`).join(',')).join('\n');
+    const csv = [headers, ...rows]
+      .map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
+
     a.href = url;
     a.download = `pretrack_orders_${Date.now()}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
 
+    URL.revokeObjectURL(url);
     showToast('CSV exported successfully!', 'success');
   }
 
@@ -643,6 +717,9 @@ window.editOrder = function(id) {
   setVal('fShipping', o.shipping);
   setVal('fPaid', o.paid);
 
+  /* FIXED: load existing image into preview and into _currentImageB64 */
+  _currentImageB64 = o.image || '';
+
   const imagePreview = document.getElementById('imagePreview');
   if (imagePreview) {
     if (o.image) {
@@ -667,12 +744,11 @@ window.editOrder = function(id) {
   const total = (price * qty) + ship;
   const pending = Math.max(0, total - paid);
 
-  if (document.getElementById('fTotal')) {
-    document.getElementById('fTotal').value = `₹${total.toLocaleString('en-IN')}`;
-  }
-  if (document.getElementById('fPending')) {
-    document.getElementById('fPending').value = `₹${pending.toLocaleString('en-IN')}`;
-  }
+  const totalEl = document.getElementById('fTotal');
+  const pendingEl = document.getElementById('fPending');
+
+  if (totalEl) totalEl.value = `₹${total.toLocaleString('en-IN')}`;
+  if (pendingEl) pendingEl.value = `₹${pending.toLocaleString('en-IN')}`;
 };
 
 window.deleteOrder = async function(id) {
@@ -947,6 +1023,8 @@ function renderAnalytics() {
     DB.orders.forEach(o => {
       if (!o.order_date) return;
       const d = new Date(o.order_date);
+      if (isNaN(d.getTime())) return;
+
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}`;
       monthMap[key] = (monthMap[key] || 0) + (o.total || 0);
     });
@@ -954,7 +1032,7 @@ function renderAnalytics() {
     const html = Object.entries(monthMap).sort().map(([k, v]) => `
       <div class="mini-bar-row">
         <span>${escHtml(k)}</span>
-        <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100, Math.round(v / 500))}%"></div></div>
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100, Math.max(10, Math.round(v / 500)))}%"></div></div>
         <strong>₹${v.toLocaleString('en-IN')}</strong>
       </div>
     `).join('') || `<div class="empty-state">No data</div>`;
@@ -971,9 +1049,9 @@ function renderVendorFilter() {
   const vendors = [...new Set(DB.orders.map(o => o.vendor).filter(Boolean))];
 
   select.innerHTML = `<option value="">All Vendors</option>` +
-    vendors.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+    vendors.map(v => `<option value="${escapeAttr(v)}">${escHtml(v)}</option>`).join('');
 
-  select.value = current;
+  select.value = vendors.includes(current) ? current : '';
 }
 
 /* ══════════════════════════════════════
@@ -996,6 +1074,14 @@ function escHtml(str = '') {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function escapeAttr(str = '') {
+  return String(str)
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 }
 
 function formatDate(dateStr) {
