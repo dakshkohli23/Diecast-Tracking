@@ -824,7 +824,7 @@
     <nav class="sidebar-nav">
       <div class="side-label">Main</div>
 
-      <button class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard', this)">
+      <button class="nav-item active" data-section="dashboard" onclick="switchPage('dashboard', this)">
         <i class="fa-solid fa-chart-pie"></i><span>Dashboard</span>
       </button>
 
@@ -870,11 +870,11 @@
     </div>
   </aside>
 
-  <div class="main-wrap">
+  <div class="main-wrap" id="mainWrap">
 
     <header class="topbar">
       <div class="topbar-left">
-        <button class="sidebar-toggle" onclick="openSidebar()">
+        <button class="sidebar-toggle" id="sidebarToggle" onclick="openSidebar()">
           <i class="fa-solid fa-bars"></i>
         </button>
 
@@ -916,7 +916,7 @@
       </div>
     </header>
 
-    <main class="page-content">
+    <main class="page-content" id="pageContent">
 
       <!-- DASHBOARD -->
       <section class="section active" id="page-dashboard">
