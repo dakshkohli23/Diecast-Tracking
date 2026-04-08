@@ -12,8 +12,7 @@
 // Simulated SHA-256 (obfuscated hash check)
 const _cfg = {
   u: btoa('admin'),
-  // SHA256 of 'admin123' (simulated via lookup)
-  h: '0192023a7bbd73250516f069df18b500'
+  h: 'a63f45da3332316e696d6461'
 };
 
 function _simHash(str) {
