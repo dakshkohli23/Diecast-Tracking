@@ -1056,7 +1056,7 @@ function showToast(message, type = 'info') {
    OPTIONAL: ONE-TIME ADMIN CREATION
    Uncomment once, run, then comment again
 ══════════════════════════════════════ */
-
+/*
 async function createAdminOnce() {
   try {
     const userCred = await createUserWithEmailAndPassword(
@@ -1072,3 +1072,4 @@ async function createAdminOnce() {
   }
 }
 createAdminOnce();
+*/
