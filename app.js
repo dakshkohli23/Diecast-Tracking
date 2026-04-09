@@ -354,13 +354,11 @@ function initDashboard() {
     }
 
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      _currentImageB64 = ev.target.result; // preview only, not saved to firestore
-      const preview = document.getElementById('imagePreview');
-      if (preview) {
-        preview.innerHTML = `<img src="${_currentImageB64}" alt="preview" />`;
-      }
-    };
+    reader.onload = async (ev) => {
+  _currentImageB64 = await compressImage(ev.target.result);
+  const preview = document.getElementById('imagePreview');
+  if (preview) preview.innerHTML = `<img src="${_currentImageB64}" alt="preview" />`;
+};
     reader.readAsDataURL(file);
   });
 
@@ -518,6 +516,20 @@ async function addActivity(type, msg) {
   } catch (e) {
     console.error('Activity log failed:', e);
   }
+}
+function compressImage(base64, maxWidth = 300, quality = 0.7) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = base64;
+  });
 }
 
 function renderAll() {
@@ -1056,7 +1068,7 @@ function showToast(message, type = 'info') {
    OPTIONAL: ONE-TIME ADMIN CREATION
    Uncomment once, run, then comment again
 ══════════════════════════════════════ */
-
+/*
 async function createAdminOnce() {
   try {
     const userCred = await createUserWithEmailAndPassword(
@@ -1072,3 +1084,4 @@ async function createAdminOnce() {
   }
 }
 createAdminOnce();
+*/
