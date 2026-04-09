@@ -607,21 +607,50 @@ function renderAll() {
    STATS
 ══════════════════════════════════════ */
 function renderStats() {
-  const orders   = DB.orders;
-  const total    = orders.length;
-  const invest   = orders.reduce((s, o) => s + (o.total || 0), 0);
-  const pending  = orders.reduce((s, o) => s + (o.pending || 0), 0);
-  const delivered = orders.filter(o => o.status === 'Delivered').length;
-  const transit   = orders.filter(o => o.status === 'Shipped').length;
+  const orders = DB.orders;
+  const total  = orders.length;
 
-  setText('statTotal', total);
-  setText('statInvestment', '₹' + invest.toLocaleString('en-IN'));
-  setText('statPending', '₹' + pending.toLocaleString('en-IN'));
-  setText('statDelivered', delivered);
-  setText('statTransit', transit);
+  const totalQty     = orders.reduce((s, o) => s + (o.quantity || 1), 0);
+  const marketValue  = orders.reduce((s, o) => s + ((o.preorder_price || 0) * (o.quantity || 1)), 0);
+  const investment   = orders.reduce((s, o) => s + (o.total || 0), 0);
+  const pendingAmt   = orders.reduce((s, o) => s + (o.pending || 0), 0);
+  const pendingPO    = orders.filter(o => o.status === 'Ordered' || o.status === 'Processing').length;
+  const delivered    = orders.filter(o => o.status === 'Delivered').length;
+  const transit      = orders.filter(o => o.status === 'Shipped').length;
+  const overdue      = orders.filter(o => o.eta && new Date(o.eta) < new Date() && o.status !== 'Delivered').length;
+
+  // Duplicates: product names appearing more than once
+  const nameCount = {};
+  orders.forEach(o => { const k = (o.product_name || '').toLowerCase().trim(); nameCount[k] = (nameCount[k] || 0) + 1; });
+  const duplicates = Object.values(nameCount).filter(v => v > 1).length;
+
+  setText('statTotal',       total);
+  setText('statQty',         totalQty);
+  setText('statMarketValue', '₹' + marketValue.toLocaleString('en-IN'));
+  setText('statInvestment',  '₹' + investment.toLocaleString('en-IN'));
+  setText('statPending',     '₹' + pendingAmt.toLocaleString('en-IN'));
+  setText('statPendingPO',   pendingPO);
+  setText('statDelivered',   delivered);
+  setText('statTransit',     transit);
+  setText('statOverdue',     overdue);
+  setText('statDuplicates',  duplicates);
+
+  // Progress bars (% of total orders)
+  const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
+  const setBar = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.style.width = val + '%';
+  };
+
+  setBar('statDeliveredBar',  pct(delivered));
+  setBar('statTransitBar',    pct(transit));
+  setBar('statPendingPOBar',  pct(pendingPO));
+  setBar('statOverdueBar',    pct(overdue));
+  setBar('statDuplicatesBar', pct(duplicates));
+  setBar('statPendingBar',    investment > 0 ? Math.round((pendingAmt / investment) * 100) : 0);
 
   const dot = document.getElementById('notifDot');
-  if (dot) dot.classList.toggle('show', pending > 0);
+  if (dot) dot.classList.toggle('show', pendingAmt > 0 || overdue > 0);
 }
 
 /* ══════════════════════════════════════
