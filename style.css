@@ -1516,11 +1516,35 @@ input, select, textarea { color-scheme: light; }
 }
 
 @media (max-width: 900px) {
-  :root { --sidebar-w: var(--sidebar-collapsed); }
+  .sidebar {
+    transform: translateX(-100%);
+    width: var(--sidebar-w) !important;
+    transition: transform var(--transition);
+    z-index: 300;
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20,10,60,0.35);
+    z-index: 299;
+    backdrop-filter: blur(2px);
+  }
+  .sidebar-overlay.show { display: block; }
+
   .sidebar .brand-text,
-  .sidebar .nav-item span { opacity: 0; pointer-events: none; }
-  .widgets-grid { grid-template-columns: 1fr 1fr; }
+  .sidebar .brand-sub,
+  .sidebar .nav-item span { opacity: 1; pointer-events: auto; }
+
+  .main-wrap,
+  .main-wrap.expanded { margin-left: 0 !important; }
+
+  .widgets-grid { grid-template-columns: 1fr; }
   .analytics-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 640px) {
