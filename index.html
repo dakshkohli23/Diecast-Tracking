@@ -91,6 +91,21 @@
 
       <!-- ═══ SECTION: DASHBOARD ═══ -->
       <section class="section active" id="section-dashboard">
+
+        <!-- GREETING BAR -->
+        <div class="greeting-bar" id="greetingBar">
+          <div class="greeting-left">
+            <h2 class="greeting-text" id="greetingText">Good Morning, Daksh! 👋</h2>
+            <div class="greeting-meta">
+              <span id="greetingDate"></span>
+              <span class="greeting-divider">•</span>
+              <span class="system-status" id="systemStatus">
+                <span class="status-dot"></span> Checking systems...
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div class="section-header">
           <div>
             <h2 class="section-title">Dashboard</h2>
@@ -100,7 +115,7 @@
             <i class="fa-solid fa-plus"></i> Add Order
           </button>
         </div>
-
+		
         <!-- STATS CARDS -->
         <div class="stats-grid" id="statsGrid">
           <div class="stat-card glass" data-stat="total">
