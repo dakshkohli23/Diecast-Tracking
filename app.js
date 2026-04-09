@@ -852,6 +852,7 @@ function renderRecentOrders() {
   `).join('');
 }
 
+/* renderEtaWidget() */
 function renderEtaWidget() {
   const container = document.getElementById('etaList');
   if (!container) return;
@@ -859,12 +860,50 @@ function renderEtaWidget() {
   const upcoming = DB.orders
     .filter(o => o.eta && o.status !== 'Delivered')
     .sort((a, b) => new Date(a.eta) - new Date(b.eta))
-    .slice(0, 5);
+    .slice(0, 6);
 
   if (!upcoming.length) {
-    container.innerHTML = `<div class="empty-state">No upcoming orders</div>`;
+    container.innerHTML = `<div class="empty-state">No upcoming deliveries</div>`;
     return;
   }
+
+  const today = new Date();
+
+  container.innerHTML = upcoming.map(o => {
+    const etaDate = new Date(o.eta);
+    const diffDays = Math.ceil((etaDate - today) / (1000 * 60 * 60 * 24));
+
+    let dayClass = 'eta-chip-ok';
+    let dayLabel = `${diffDays}d`;
+
+    if (diffDays < 0) {
+      dayClass = 'eta-chip-overdue';
+      dayLabel = `${Math.abs(diffDays)}d overdue`;
+    } else if (diffDays <= 7) {
+      dayClass = 'eta-chip-soon';
+    }
+
+    return `
+      <div class="delivery-item">
+        <div class="delivery-icon">
+          <i class="fa-solid fa-truck"></i>
+        </div>
+        <div class="delivery-info">
+          <div class="delivery-name">${escHtml(o.product_name)}</div>
+          <div class="delivery-meta">${escHtml(o.vendor || '—')} • ETA ${escHtml(o.eta)}</div>
+          <div class="delivery-chips">
+            <span class="delivery-chip eta-chip ${dayClass}">
+              <i class="fa-solid fa-calendar-days"></i> ${dayLabel}
+            </span>
+            <span class="delivery-chip vendor-chip">
+              <i class="fa-solid fa-store"></i> ${escHtml(o.vendor || '—')}
+            </span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 
   const today = new Date();
 
