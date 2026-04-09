@@ -2,6 +2,7 @@
 
 /* ═══════════════════════════════════════════════
    PRETRACK — FIREBASE AUTH + FIRESTORE VERSION
+   Firestore-only version (no Firebase Storage for now)
    ═══════════════════════════════════════════════ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
@@ -43,14 +44,14 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 /* ══════════════════════════════════════
-   GLOBAL STATE
+   GLOBAL DB STATE
 ══════════════════════════════════════ */
 let DB = { orders: [], activity: [] };
-let _currentImageB64 = '';
+let _currentImageB64 = ''; // preview only (not uploaded to Firebase Storage)
 let _authReady = false;
 
 /* ══════════════════════════════════════
-   LOGIN PAGE
+   LOGIN PAGE LOGIC
 ══════════════════════════════════════ */
 if (document.getElementById('loginForm')) {
   initLoginPage();
@@ -71,12 +72,15 @@ function initLoginPage() {
   });
 
   onAuthStateChanged(auth, (user) => {
-    if (user) window.location.href = 'index.html';
+    if (user) {
+      window.location.href = 'index.html';
+    }
   });
 
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email    = document.getElementById('username').value.trim();
+
+    const email = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
 
     loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
@@ -97,30 +101,38 @@ function initLoginPage() {
 }
 
 /* ══════════════════════════════════════
-   DASHBOARD INIT
+   DASHBOARD INIT (index.html)
 ══════════════════════════════════════ */
 if (document.getElementById('pageContent')) {
   onAuthStateChanged(auth, async (user) => {
     _authReady = true;
+
     if (!user) {
       window.location.href = 'login.html';
       return;
     }
+
+    // Set username
     const profileNameEl = document.getElementById('profileName');
-    if (profileNameEl) profileNameEl.textContent = user.email || 'Admin';
+    if (profileNameEl) {
+      profileNameEl.textContent = user.email || 'Admin';
+    }
+
+    // Load data then init dashboard
     await fetchData();
     initDashboard();
   });
 }
 
 function initDashboard() {
-  const sidebar        = document.getElementById('sidebar');
-  const mainWrap       = document.getElementById('mainWrap');
-  const sidebarToggle  = document.getElementById('sidebarToggle');
-  const sidebarOverlay = document.getElementById('sidebarOverlay');
-  const isMobile       = () => window.innerWidth <= 900;
+  /* ── SIDEBAR TOGGLE ── */
+  const sidebar = document.getElementById('sidebar');
+  const mainWrap = document.getElementById('mainWrap');
+  const sidebarToggle = document.getElementById('sidebarToggle');
 
-  /* ── SIDEBAR ── */
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  const isMobile = () => window.innerWidth <= 900;
+
   sidebarToggle?.addEventListener('click', () => {
     if (isMobile()) {
       sidebar.classList.toggle('mobile-open');
@@ -130,27 +142,30 @@ function initDashboard() {
       mainWrap.classList.toggle('expanded');
     }
   });
-
+	
+	initGreeting();
+	
   sidebarOverlay?.addEventListener('click', () => {
     sidebar.classList.remove('mobile-open');
     sidebarOverlay.classList.remove('show');
   });
 
-  /* ── GREETING ── */
-  initGreeting();
-
-  /* ── NAV ROUTING (single listener) ── */
-  function navigateTo(section) {
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.querySelector(`.nav-item[data-section="${section}"]`)?.classList.add('active');
-    document.getElementById(`section-${section}`)?.classList.add('active');
-  }
-
+  // Close sidebar on nav click (mobile)
   document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+    item.addEventListener('click', () => {
+      if (isMobile()) {
+        sidebar.classList.remove('mobile-open');
+        sidebarOverlay?.classList.remove('show');
+      }
+    });
+  });
+
+  /* ── NAV ROUTING ── */
+   document.querySelectorAll('.nav-item[data-section]').forEach(item => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
-      navigateTo(item.dataset.section);
+      const target = item.dataset.section;
+      navigateTo(target);
       if (isMobile()) {
         sidebar.classList.remove('mobile-open');
         sidebarOverlay?.classList.remove('show');
@@ -164,6 +179,14 @@ function initDashboard() {
       navigateTo(el.dataset.goto);
     });
   });
+
+  function navigateTo(section) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelector(`.nav-item[data-section="${section}"]`)?.classList.add('active');
+    document.getElementById(`section-${section}`)?.classList.add('active');
+  }
+
 
   /* ── LOGOUT ── */
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {
@@ -189,7 +212,7 @@ function initDashboard() {
     }
   });
 
-  /* ── FILTERS ── */
+  /* ── ORDER SEARCH + FILTERS ── */
   document.getElementById('orderSearch')?.addEventListener('input', applyFilters);
   document.getElementById('filterStatus')?.addEventListener('change', applyFilters);
   document.getElementById('filterVendor')?.addEventListener('change', applyFilters);
@@ -206,11 +229,11 @@ function initDashboard() {
   });
 
   function applyFilters() {
-    const q      = (document.getElementById('orderSearch')?.value || '').toLowerCase();
-    const status = document.getElementById('filterStatus')?.value || '';
-    const vendor = document.getElementById('filterVendor')?.value || '';
-    const from   = document.getElementById('filterDateFrom')?.value;
-    const to     = document.getElementById('filterDateTo')?.value;
+    const q       = (document.getElementById('orderSearch')?.value || '').toLowerCase();
+    const status  = document.getElementById('filterStatus')?.value || '';
+    const vendor  = document.getElementById('filterVendor')?.value || '';
+    const from    = document.getElementById('filterDateFrom')?.value;
+    const to      = document.getElementById('filterDateTo')?.value;
 
     const filtered = DB.orders.filter(o => {
       const matchQ      = !q || (o.product_name || '').toLowerCase().includes(q) || (o.order_number || '').toLowerCase().includes(q);
@@ -224,7 +247,7 @@ function initDashboard() {
     renderTable(filtered);
   }
 
-  /* ── MODAL ── */
+  /* ── MODAL OPEN/CLOSE ── */
   const orderModal = document.getElementById('orderModal');
   const viewModal  = document.getElementById('viewModal');
 
@@ -239,10 +262,13 @@ function initDashboard() {
     document.getElementById('orderForm')?.reset();
     if (document.getElementById('editOrderId')) document.getElementById('editOrderId').value = '';
     const imagePreview = document.getElementById('imagePreview');
-    if (imagePreview) imagePreview.innerHTML = '<i class="fa-solid fa-image"></i><p>Click to upload image</p>';
+    if (imagePreview) {
+      imagePreview.innerHTML = '<i class="fa-solid fa-image"></i><p>Image preview only (upload disabled)</p>';
+    }
     const fImage = document.getElementById('fImage');
     if (fImage) fImage.value = '';
     _currentImageB64 = '';
+
     document.querySelectorAll('.form-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelector('.form-tab[data-tab="basic"]')?.classList.add('active');
@@ -250,19 +276,41 @@ function initDashboard() {
     calcTotals();
   }
 
-  document.getElementById('addOrderBtn')?.addEventListener('click',  () => { document.getElementById('modalTitle').textContent = 'Add New Order'; openModal(); });
-  document.getElementById('quickAddBtn')?.addEventListener('click',  () => { document.getElementById('modalTitle').textContent = 'Add New Order'; openModal(); });
-  document.getElementById('qaAddOrder')?.addEventListener('click',   () => { document.getElementById('modalTitle').textContent = 'Add New Order'; openModal(); });
-  document.getElementById('modalClose')?.addEventListener('click',   closeModal);
-  document.getElementById('modalCancel')?.addEventListener('click',  closeModal);
-  orderModal?.addEventListener('click', e => { if (e.target === orderModal) closeModal(); });
+  document.getElementById('addOrderBtn')?.addEventListener('click', () => {
+    const modalTitle = document.getElementById('modalTitle');
+    if (modalTitle) modalTitle.textContent = 'Add New Order';
+    openModal();
+  });
+
+  document.getElementById('quickAddBtn')?.addEventListener('click', () => {
+    const modalTitle = document.getElementById('modalTitle');
+    if (modalTitle) modalTitle.textContent = 'Add New Order';
+    openModal();
+  });
+
+  document.getElementById('qaAddOrder')?.addEventListener('click', () => {
+    const modalTitle = document.getElementById('modalTitle');
+    if (modalTitle) modalTitle.textContent = 'Add New Order';
+    openModal();
+  });
+
+  document.getElementById('modalClose')?.addEventListener('click', closeModal);
+  document.getElementById('modalCancel')?.addEventListener('click', closeModal);
+
+  orderModal?.addEventListener('click', e => {
+    if (e.target === orderModal) closeModal();
+  });
 
   document.getElementById('viewModalClose')?.addEventListener('click', () => {
     viewModal?.classList.add('hidden');
     document.body.style.overflow = '';
   });
+
   viewModal?.addEventListener('click', e => {
-    if (e.target === viewModal) { viewModal.classList.add('hidden'); document.body.style.overflow = ''; }
+    if (e.target === viewModal) {
+      viewModal.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
   });
 
   /* ── FORM TABS ── */
@@ -275,23 +323,28 @@ function initDashboard() {
     });
   });
 
-  /* ── PAYMENT CALC ── */
+  /* ── PAYMENT AUTO CALC ── */
   ['fPreorderPrice','fActualPrice','fShipping','fPaid','fQty'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', calcTotals);
   });
 
   function calcTotals() {
-    const price   = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
-    const qty     = parseInt(document.getElementById('fQty')?.value) || 1;
-    const ship    = parseFloat(document.getElementById('fShipping')?.value) || 0;
-    const paid    = parseFloat(document.getElementById('fPaid')?.value) || 0;
+    const price = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
+    const qty   = parseInt(document.getElementById('fQty')?.value) || 1;
+    const ship  = parseFloat(document.getElementById('fShipping')?.value) || 0;
+    const paid  = parseFloat(document.getElementById('fPaid')?.value) || 0;
     const total   = (price * qty) + ship;
     const pending = Math.max(0, total - paid);
-    if (document.getElementById('fTotal'))   document.getElementById('fTotal').value   = `₹${total.toLocaleString('en-IN')}`;
-    if (document.getElementById('fPending')) document.getElementById('fPending').value = `₹${pending.toLocaleString('en-IN')}`;
+
+    if (document.getElementById('fTotal')) {
+      document.getElementById('fTotal').value = `₹${total.toLocaleString('en-IN')}`;
+    }
+    if (document.getElementById('fPending')) {
+      document.getElementById('fPending').value = `₹${pending.toLocaleString('en-IN')}`;
+    }
   }
 
-  /* ── IMAGE UPLOAD ── */
+  /* ── IMAGE PREVIEW ONLY (NO STORAGE) ── */
   document.getElementById('imageUploadArea')?.addEventListener('click', () => {
     document.getElementById('fImage')?.click();
   });
@@ -299,26 +352,34 @@ function initDashboard() {
   document.getElementById('fImage')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { showToast('Image too large (max 2MB)', 'warning'); return; }
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Image too large (max 2MB)', 'warning');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = async (ev) => {
-      _currentImageB64 = await compressImage(ev.target.result);
-      const preview = document.getElementById('imagePreview');
-      if (preview) preview.innerHTML = `<img src="${_currentImageB64}" alt="preview" />`;
-    };
+  _currentImageB64 = await compressImage(ev.target.result);
+  const preview = document.getElementById('imagePreview');
+  if (preview) preview.innerHTML = `<img src="${_currentImageB64}" alt="preview" />`;
+};
     reader.readAsDataURL(file);
   });
 
   /* ── SAVE ORDER ── */
   document.getElementById('orderForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const editId   = document.getElementById('editOrderId')?.value || '';
-    const price    = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
-    const qty      = parseInt(document.getElementById('fQty')?.value) || 1;
-    const ship     = parseFloat(document.getElementById('fShipping')?.value) || 0;
-    const paid     = parseFloat(document.getElementById('fPaid')?.value) || 0;
-    const total    = (price * qty) + ship;
-    const pending  = Math.max(0, total - paid);
+
+    const editId = document.getElementById('editOrderId')?.value || '';
+
+    const price = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
+    const qty   = parseInt(document.getElementById('fQty')?.value) || 1;
+    const ship  = parseFloat(document.getElementById('fShipping')?.value) || 0;
+    const paid  = parseFloat(document.getElementById('fPaid')?.value) || 0;
+    const total = (price * qty) + ship;
+    const pending = Math.max(0, total - paid);
+
     const existing = DB.orders.find(o => o.id === editId);
 
     const order = {
@@ -336,7 +397,7 @@ function initDashboard() {
       paid:           paid,
       pending:        pending,
       total:          total,
-      image:          _currentImageB64 || existing?.image || '',  // FIX: saves new image
+      image:          existing?.image || '', // keep existing image if any
       updatedAt:      serverTimestamp()
     };
 
@@ -346,10 +407,14 @@ function initDashboard() {
         await addActivity('info', `Order updated — ${order.product_name}`);
         showToast('Order updated successfully!', 'success');
       } else {
-        await addDoc(collection(db, 'orders'), { ...order, createdAt: serverTimestamp() });
+        await addDoc(collection(db, 'orders'), {
+          ...order,
+          createdAt: serverTimestamp()
+        });
         await addActivity('success', `New order added — ${order.product_name}`);
         showToast('Order added successfully!', 'success');
       }
+
       await fetchData();
       closeModal();
     } catch (error) {
@@ -361,10 +426,12 @@ function initDashboard() {
   /* ── QUICK ACTIONS ── */
   document.getElementById('qaExport')?.addEventListener('click', exportCSV);
   document.getElementById('qaAnalytics')?.addEventListener('click', () => navigateTo('analytics'));
+
   document.getElementById('qaDelayed')?.addEventListener('click', () => {
     navigateTo('orders');
-    const today   = new Date();
+    const today = new Date();
     const delayed = DB.orders.filter(o => o.eta && new Date(o.eta) < today && o.status !== 'Delivered');
+
     if (delayed.length === 0) {
       showToast('No delayed orders!', 'info');
     } else {
@@ -372,30 +439,42 @@ function initDashboard() {
       showToast(`${delayed.length} delayed order(s) shown`, 'warning');
     }
   });
+
   document.getElementById('exportCsvBtn')?.addEventListener('click', exportCSV);
 
   function exportCSV() {
-    if (DB.orders.length === 0) { showToast('No orders to export', 'warning'); return; }
+    if (DB.orders.length === 0) {
+      showToast('No orders to export', 'warning');
+      return;
+    }
+
     const headers = ['ID','Product','Order#','Vendor','Variant','Qty','Preorder Price','Actual Price','Shipping','Paid','Pending','Total','Status','ETA','Order Date'];
-    const rows    = DB.orders.map(o => [
+    const rows = DB.orders.map(o => [
       o.id, o.product_name, o.order_number, o.vendor, o.variant, o.quantity,
       o.preorder_price, o.actual_price, o.shipping, o.paid, o.pending, o.total,
       o.status, o.eta, o.order_date
     ]);
-    const csv  = [headers, ...rows].map(r => r.map(c => `"${c ?? ''}"`).join(',')).join('\n');
+
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c ?? ''}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = `pretrack_orders_${Date.now()}.csv`; a.click();
+    a.href = url;
+    a.download = `pretrack_orders_${Date.now()}.csv`;
+    a.click();
     URL.revokeObjectURL(url);
+
     showToast('CSV exported successfully!', 'success');
   }
 
   /* ── CLEAR DATA ── */
   document.getElementById('clearDataBtn')?.addEventListener('click', async () => {
     if (!confirm('Are you sure? This will delete ALL orders permanently.')) return;
+
     try {
-      await Promise.all(DB.orders.map(o => deleteDoc(doc(db, 'orders', o.id))));
+      const deletes = DB.orders.map(o => deleteDoc(doc(db, 'orders', o.id)));
+      await Promise.all(deletes);
+
       await addActivity('warning', 'All orders cleared');
       await fetchData();
       showToast('All data cleared', 'info');
@@ -412,10 +491,16 @@ function initDashboard() {
 async function fetchData() {
   try {
     const ordersSnap = await getDocs(query(collection(db, 'orders'), orderBy('createdAt', 'desc')));
-    DB.orders = ordersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    DB.orders = ordersSnap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
 
     const activitySnap = await getDocs(query(collection(db, 'activity'), orderBy('createdAt', 'desc')));
-    DB.activity = activitySnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    DB.activity = activitySnap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
 
     renderAll();
   } catch (error) {
@@ -428,7 +513,8 @@ async function fetchData() {
 async function addActivity(type, msg) {
   try {
     await addDoc(collection(db, 'activity'), {
-      type, msg,
+      type,
+      msg,
       time: new Date().toLocaleString(),
       createdAt: serverTimestamp()
     });
@@ -436,14 +522,13 @@ async function addActivity(type, msg) {
     console.error('Activity log failed:', e);
   }
 }
-
 function compressImage(base64, maxWidth = 300, quality = 0.7) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      const scale  = Math.min(1, maxWidth / img.width);
+      const scale = Math.min(1, maxWidth / img.width);
       const canvas = document.createElement('canvas');
-      canvas.width  = img.width  * scale;
+      canvas.width = img.width * scale;
       canvas.height = img.height * scale;
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL('image/jpeg', quality));
@@ -452,44 +537,54 @@ function compressImage(base64, maxWidth = 300, quality = 0.7) {
   });
 }
 
-/* ══════════════════════════════════════
-   GREETING
-══════════════════════════════════════ */
+/* Wishing Function */
 function initGreeting() {
   const greetingText = document.getElementById('greetingText');
   const greetingDate = document.getElementById('greetingDate');
   const systemStatus = document.getElementById('systemStatus');
 
   function updateGreeting() {
-    const now  = new Date();
+    const now = new Date();
     const hour = now.getHours();
+
     const emoji = hour < 12 ? '<i class="fa-solid fa-cloud-sun"></i>' : hour < 17 ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
     const word  = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
-    if (greetingText) greetingText.innerHTML = `Good ${word}, Daksh! ${emoji}`;
-    if (greetingDate) greetingDate.textContent = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    if (greetingText) greetingText.innerHTML = `${word}, Daksh! ${emoji}`;
+
+    if (greetingDate) {
+      greetingDate.textContent = now.toLocaleDateString('en-IN', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+      });
+    }
   }
 
   function checkSystems() {
     if (!systemStatus) return;
     systemStatus.innerHTML = `<span class="status-dot"></span> Checking systems...`;
     systemStatus.className = 'system-status';
+
     setTimeout(() => {
       const ok = DB.orders !== undefined;
-      systemStatus.innerHTML = `<span class="status-dot"></span> ${ok ? 'All systems live' : 'Connection issue'}`;
-      systemStatus.className = `system-status ${ok ? 'live' : 'error'}`;
+      if (ok) {
+        systemStatus.innerHTML = `<span class="status-dot"></span> All systems live`;
+        systemStatus.className = 'system-status live';
+      } else {
+        systemStatus.innerHTML = `<span class="status-dot"></span> Connection issue`;
+        systemStatus.className = 'system-status error';
+      }
     }, 1200);
   }
 
   updateGreeting();
   checkSystems();
-  setInterval(updateGreeting, 60000);
+  setInterval(updateGreeting, 60000); // update every minute
 }
 
-/* ══════════════════════════════════════
-   RENDER ALL
-══════════════════════════════════════ */
 function renderAll() {
-  renderStats();           // FIX: only called once
+	console.log('Orders with ETA:', DB.orders.filter(o => o.eta && o.status !== 'Delivered'));
+  renderStats();
+  renderStats();
   renderTable(DB.orders);
   renderRecentOrders();
   renderEtaWidget();
@@ -500,12 +595,15 @@ function renderAll() {
   renderVendorFilter();
   renderBrandLeaderboard();
 
-  // Update system status after data loads
+
+  // Refresh system status after data loads
   const systemStatus = document.getElementById('systemStatus');
   if (systemStatus) {
     const ok = DB.orders !== undefined;
-    systemStatus.innerHTML = `<span class="status-dot"></span> ${ok ? 'All systems live' : 'Connection issue'}`;
-    systemStatus.className = `system-status ${ok ? 'live' : 'error'}`;
+    systemStatus.innerHTML = ok
+      ? `<span class="status-dot"></span> All systems live`
+      : `<span class="status-dot"></span> Connection issue`;
+    systemStatus.className = ok ? 'system-status live' : 'system-status error';
   }
 }
 
@@ -513,24 +611,26 @@ function renderAll() {
    STATS
 ══════════════════════════════════════ */
 function renderStats() {
-  const orders     = DB.orders;
-  const total      = orders.length;
-  const totalQty   = orders.reduce((s, o) => s + (o.quantity || 1), 0);
-  const marketVal  = orders.reduce((s, o) => s + ((o.preorder_price || 0) * (o.quantity || 1)), 0);
-  const investment = orders.reduce((s, o) => s + (o.total || 0), 0);
-  const pendingAmt = orders.reduce((s, o) => s + (o.pending || 0), 0);
-  const pendingPO  = orders.filter(o => o.status === 'Ordered' || o.status === 'Processing').length;
-  const delivered  = orders.filter(o => o.status === 'Delivered').length;
-  const transit    = orders.filter(o => o.status === 'Shipped').length;
-  const overdue    = orders.filter(o => o.eta && new Date(o.eta) < new Date() && o.status !== 'Delivered').length;
+  const orders = DB.orders;
+  const total  = orders.length;
 
+  const totalQty     = orders.reduce((s, o) => s + (o.quantity || 1), 0);
+  const marketValue  = orders.reduce((s, o) => s + ((o.preorder_price || 0) * (o.quantity || 1)), 0);
+  const investment   = orders.reduce((s, o) => s + (o.total || 0), 0);
+  const pendingAmt   = orders.reduce((s, o) => s + (o.pending || 0), 0);
+  const pendingPO    = orders.filter(o => o.status === 'Ordered' || o.status === 'Processing').length;
+  const delivered    = orders.filter(o => o.status === 'Delivered').length;
+  const transit      = orders.filter(o => o.status === 'Shipped').length;
+  const overdue      = orders.filter(o => o.eta && new Date(o.eta) < new Date() && o.status !== 'Delivered').length;
+
+  // Duplicates: product names appearing more than once
   const nameCount = {};
   orders.forEach(o => { const k = (o.product_name || '').toLowerCase().trim(); nameCount[k] = (nameCount[k] || 0) + 1; });
   const duplicates = Object.values(nameCount).filter(v => v > 1).length;
 
   setText('statTotal',       total);
   setText('statQty',         totalQty);
-  setText('statMarketValue', '₹' + marketVal.toLocaleString('en-IN'));
+  setText('statMarketValue', '₹' + marketValue.toLocaleString('en-IN'));
   setText('statInvestment',  '₹' + investment.toLocaleString('en-IN'));
   setText('statPending',     '₹' + pendingAmt.toLocaleString('en-IN'));
   setText('statPendingPO',   pendingPO);
@@ -539,8 +639,12 @@ function renderStats() {
   setText('statOverdue',     overdue);
   setText('statDuplicates',  duplicates);
 
-  const pct    = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
-  const setBar = (id, val) => { const el = document.getElementById(id); if (el) el.style.width = val + '%'; };
+  // Progress bars (% of total orders)
+  const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
+  const setBar = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.style.width = val + '%';
+  };
 
   setBar('statDeliveredBar',  pct(delivered));
   setBar('statTransitBar',    pct(transit));
@@ -554,7 +658,7 @@ function renderStats() {
 }
 
 /* ══════════════════════════════════════
-   TABLE
+   TABLE RENDER
 ══════════════════════════════════════ */
 function renderTable(orders) {
   const tbody = document.getElementById('ordersTableBody');
@@ -566,12 +670,15 @@ function renderTable(orders) {
   }
 
   tbody.innerHTML = orders.map(o => {
-    const payPct      = o.total ? Math.min(100, Math.round((o.paid / o.total) * 100)) : 0;
+    const payPct  = o.total ? Math.min(100, Math.round((o.paid / o.total) * 100)) : 0;
     const statusClass = (o.status || '').toLowerCase().replace(/\s+/g, '-');
+    const fillClass   = `fill-${statusClass}`;
     const payBadge    = o.pending <= 0 ? 'badge-paid' : (o.paid > 0 ? 'badge-partial' : 'badge-pending-b');
     const payLabel    = o.pending <= 0 ? 'Paid' : (o.paid > 0 ? 'Partial' : 'Pending');
-    const thumb       = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-cube"></i>`;
-    const etaStr      = o.eta ? formatDate(o.eta) : '—';
+    const thumb       = o.image
+      ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />`
+      : `<i class="fa-solid fa-cube"></i>`;
+    const etaStr = o.eta ? formatDate(o.eta) : '—';
 
     return `<tr>
       <td>
@@ -596,14 +703,20 @@ function renderTable(orders) {
       </td>
       <td>
         <span class="badge badge-${statusClass}">${escHtml(o.status || 'Ordered')}</span>
-        <div class="status-bar"><div class="status-fill fill-${statusClass}"></div></div>
+        <div class="status-bar"><div class="status-fill ${fillClass}"></div></div>
       </td>
       <td style="font-size:0.78rem;color:var(--text-muted)">${etaStr}</td>
       <td>
         <div class="table-actions">
-          <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')" title="View"><i class="fa-solid fa-eye"></i></button>
-          <button class="btn btn-ghost btn-icon" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+          <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')" title="View">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+          <button class="btn btn-ghost btn-icon" onclick="editOrder('${o.id}')" title="Edit">
+            <i class="fa-solid fa-pen"></i>
+          </button>
+          <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')" title="Delete">
+            <i class="fa-solid fa-trash"></i>
+          </button>
         </div>
       </td>
     </tr>`;
@@ -611,34 +724,36 @@ function renderTable(orders) {
 }
 
 /* ══════════════════════════════════════
-   GLOBAL ACTIONS
+   GLOBAL ACTIONS (for inline onclick)
 ══════════════════════════════════════ */
 window.editOrder = function(id) {
   const o = DB.orders.find(x => x.id === id);
   if (!o) return;
 
-  document.getElementById('modalTitle').textContent = 'Edit Order';
-  setVal('editOrderId',    id);
-  setVal('fProductName',   o.product_name);
-  setVal('fOrderNumber',   o.order_number);
-  setVal('fVendor',        o.vendor);
-  setVal('fVariant',       o.variant);
-  setVal('fQty',           o.quantity);
-  setVal('fOrderDate',     o.order_date);
-  setVal('fEta',           o.eta);
-  setVal('fStatus',        o.status);
-  setVal('fPreorderPrice', o.preorder_price);
-  setVal('fActualPrice',   o.actual_price);
-  setVal('fShipping',      o.shipping);
-  setVal('fPaid',          o.paid);
+  const modalTitle = document.getElementById('modalTitle');
+  if (modalTitle) modalTitle.textContent = 'Edit Order';
 
-  _currentImageB64 = ''; // reset so existing image is kept unless new one uploaded
+  setVal('editOrderId', id);
+  setVal('fProductName', o.product_name);
+  setVal('fOrderNumber', o.order_number);
+  setVal('fVendor', o.vendor);
+  setVal('fVariant', o.variant);
+  setVal('fQty', o.quantity);
+  setVal('fOrderDate', o.order_date);
+  setVal('fEta', o.eta);
+  setVal('fStatus', o.status);
+  setVal('fPreorderPrice', o.preorder_price);
+  setVal('fActualPrice', o.actual_price);
+  setVal('fShipping', o.shipping);
+  setVal('fPaid', o.paid);
 
   const imagePreview = document.getElementById('imagePreview');
   if (imagePreview) {
-    imagePreview.innerHTML = o.image
-      ? `<img src="${o.image}" alt="preview" />`
-      : '<i class="fa-solid fa-image"></i><p>Click to upload image</p>';
+    if (o.image) {
+      imagePreview.innerHTML = `<img src="${o.image}" alt="preview" />`;
+    } else {
+      imagePreview.innerHTML = '<i class="fa-solid fa-image"></i><p>Image preview only (upload disabled)</p>';
+    }
   }
 
   document.getElementById('orderModal')?.classList.remove('hidden');
@@ -649,18 +764,24 @@ window.editOrder = function(id) {
   document.querySelector('.form-tab[data-tab="basic"]')?.classList.add('active');
   document.getElementById('tab-basic')?.classList.add('active');
 
-  const price   = parseFloat(o.actual_price) || 0;
-  const qty     = parseInt(o.quantity) || 1;
-  const ship    = parseFloat(o.shipping) || 0;
-  const paid    = parseFloat(o.paid) || 0;
-  const total   = (price * qty) + ship;
+  const price = parseFloat(o.actual_price) || 0;
+  const qty   = parseInt(o.quantity) || 1;
+  const ship  = parseFloat(o.shipping) || 0;
+  const paid  = parseFloat(o.paid) || 0;
+  const total = (price * qty) + ship;
   const pending = Math.max(0, total - paid);
-  if (document.getElementById('fTotal'))   document.getElementById('fTotal').value   = `₹${total.toLocaleString('en-IN')}`;
-  if (document.getElementById('fPending')) document.getElementById('fPending').value = `₹${pending.toLocaleString('en-IN')}`;
+
+  if (document.getElementById('fTotal')) {
+    document.getElementById('fTotal').value = `₹${total.toLocaleString('en-IN')}`;
+  }
+  if (document.getElementById('fPending')) {
+    document.getElementById('fPending').value = `₹${pending.toLocaleString('en-IN')}`;
+  }
 };
 
 window.deleteOrder = async function(id) {
   if (!confirm('Delete this order?')) return;
+
   try {
     const order = DB.orders.find(o => o.id === id);
     await deleteDoc(doc(db, 'orders', id));
@@ -674,14 +795,14 @@ window.deleteOrder = async function(id) {
 };
 
 window.viewOrder = function(id) {
-  const o    = DB.orders.find(x => x.id === id);
+  const o = DB.orders.find(x => x.id === id);
   if (!o) return;
-  const body  = document.getElementById('viewModalBody');
+
+  const body = document.getElementById('viewModalBody');
   const modal = document.getElementById('viewModal');
   if (!body || !modal) return;
 
   body.innerHTML = `
-    ${o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" class="view-image" />` : ''}
     <div class="view-grid">
       <div><strong>Product:</strong> ${escHtml(o.product_name || '—')}</div>
       <div><strong>Order #:</strong> ${escHtml(o.order_number || o.id)}</div>
@@ -697,20 +818,26 @@ window.viewOrder = function(id) {
       <div><strong>Paid:</strong> ₹${(o.paid || 0).toLocaleString('en-IN')}</div>
       <div><strong>Pending:</strong> ₹${(o.pending || 0).toLocaleString('en-IN')}</div>
       <div><strong>Total:</strong> ₹${(o.total || 0).toLocaleString('en-IN')}</div>
-    </div>`;
+    </div>
+  `;
 
   modal.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 };
 
 /* ══════════════════════════════════════
-   WIDGETS
+   WIDGETS / FEEDS / ANALYTICS
 ══════════════════════════════════════ */
 function renderRecentOrders() {
   const container = document.getElementById('recentOrdersList');
   if (!container) return;
+
   const items = DB.orders.slice(0, 5);
-  if (!items.length) { container.innerHTML = `<div class="empty-state">No orders yet</div>`; return; }
+  if (!items.length) {
+    container.innerHTML = `<div class="empty-state">No orders yet</div>`;
+    return;
+  }
+
   container.innerHTML = items.map(o => `
     <div class="recent-order-item">
       <div class="roi-thumb">
@@ -727,6 +854,7 @@ function renderRecentOrders() {
   `).join('');
 }
 
+/* renderEtaWidget() */
 function renderEtaWidget() {
   const container = document.getElementById('etaList');
   if (!container) return;
@@ -736,15 +864,26 @@ function renderEtaWidget() {
     .sort((a, b) => new Date(a.eta) - new Date(b.eta))
     .slice(0, 6);
 
-  if (!upcoming.length) { container.innerHTML = `<div class="empty-state">No upcoming deliveries</div>`; return; }
+  if (!upcoming.length) {
+    container.innerHTML = `<div class="empty-state">No upcoming deliveries</div>`;
+    return;
+  }
 
   const today = new Date();
+
   container.innerHTML = upcoming.map(o => {
-    const diffDays = Math.ceil((new Date(o.eta) - today) / (1000 * 60 * 60 * 24));
+    const etaDate = new Date(o.eta);
+    const diffDays = Math.ceil((etaDate - today) / (1000 * 60 * 60 * 24));
+
     let dayClass = 'eta-chip-ok';
     let dayLabel = `${diffDays}d`;
-    if (diffDays < 0)      { dayClass = 'eta-chip-overdue'; dayLabel = `${Math.abs(diffDays)}d overdue`; }
-    else if (diffDays <= 7){ dayClass = 'eta-chip-soon'; }
+
+    if (diffDays < 0) {
+      dayClass = 'eta-chip-overdue';
+      dayLabel = `${Math.abs(diffDays)}d overdue`;
+    } else if (diffDays <= 7) {
+      dayClass = 'eta-chip-soon';
+    }
 
     return `
       <div class="delivery-item">
@@ -753,31 +892,47 @@ function renderEtaWidget() {
           <div class="delivery-name">${escHtml(o.product_name)}</div>
           <div class="delivery-meta">${escHtml(o.vendor || '—')} • ETA ${escHtml(o.eta)}</div>
           <div class="delivery-chips">
-            <span class="delivery-chip eta-chip ${dayClass}"><i class="fa-solid fa-calendar-days"></i> ${dayLabel}</span>
-            <span class="delivery-chip vendor-chip"><i class="fa-solid fa-store"></i> ${escHtml(o.vendor || '—')}</span>
+            <span class="delivery-chip eta-chip ${dayClass}">
+              <i class="fa-solid fa-calendar-days"></i> ${dayLabel}
+            </span>
+            <span class="delivery-chip vendor-chip">
+              <i class="fa-solid fa-store"></i> ${escHtml(o.vendor || '—')}
+            </span>
           </div>
         </div>
-      </div>`;
+      </div>
+    `;
   }).join('');
 }
 
 function renderActivityFeed() {
   const container = document.getElementById('activityList');
   if (!container) return;
+
   const items = DB.activity.slice(0, 8);
-  if (!items.length) { container.innerHTML = `<div class="empty-state">No recent activity</div>`; return; }
+
+  if (!items.length) {
+    container.innerHTML = `<div class="empty-state">No recent activity</div>`;
+    return;
+  }
+
   container.innerHTML = items.map(a => `
     <div class="activity-item">
       <span class="activity-dot ${escHtml(a.type || 'info')}"></span>
       <span>${escHtml(a.msg || '')}</span>
       <span class="activity-time">${escHtml(a.time || '')}</span>
-    </div>`).join('');
+    </div>
+  `).join('');
 }
 
 function renderBrandLeaderboard() {
   const container = document.getElementById('leaderboardList');
   if (!container) return;
-  if (!DB.orders.length) { container.innerHTML = `<div class="empty-state">No data yet</div>`; return; }
+
+  if (!DB.orders.length) {
+    container.innerHTML = `<div class="empty-state">No data yet</div>`;
+    return;
+  }
 
   const brandMap = {};
   DB.orders.forEach(o => {
@@ -785,7 +940,9 @@ function renderBrandLeaderboard() {
     brandMap[key] = (brandMap[key] || 0) + (o.quantity || 1);
   });
 
-  const sorted = Object.entries(brandMap).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const sorted = Object.entries(brandMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
 
   const rankIcon = (i) => {
     if (i === 0) return `<div class="lb-rank-icon gold"><i class="fa-solid fa-crown"></i></div>`;
@@ -802,32 +959,62 @@ function renderBrandLeaderboard() {
         <div class="lb-sub">${qty} unit${qty !== 1 ? 's' : ''} tracked</div>
       </div>
       <span class="lb-count">${qty}</span>
-    </div>`).join('');
+    </div>
+  `).join('');
 }
 
 function renderAlerts() {
   const container = document.getElementById('alertsPanel');
   if (!container) return;
-  const alerts  = [];
+
+  const alerts = [];
+
   const delayed = DB.orders.filter(o => o.eta && new Date(o.eta) < new Date() && o.status !== 'Delivered');
-  const unpaid  = DB.orders.filter(o => (o.pending || 0) > 0);
-  if (delayed.length > 0) alerts.push({ type: 'warning', msg: `${delayed.length} delayed order(s)` });
-  if (unpaid.length  > 0) alerts.push({ type: 'danger',  msg: `${unpaid.length} order(s) with pending payment` });
-  if (alerts.length === 0) alerts.push({ type: 'info', msg: 'All systems normal' });
+  if (delayed.length > 0) {
+    alerts.push({
+      type: 'warning',
+      msg: `${delayed.length} delayed order(s)`
+    });
+  }
+
+  const unpaid = DB.orders.filter(o => (o.pending || 0) > 0);
+  if (unpaid.length > 0) {
+    alerts.push({
+      type: 'danger',
+      msg: `${unpaid.length} order(s) with pending payment`
+    });
+  }
+
+  if (alerts.length === 0) {
+    alerts.push({
+      type: 'info',
+      msg: 'All systems normal'
+    });
+  }
+
   container.innerHTML = alerts.map(a => `
     <div class="alert-item ${a.type}">
       <i class="fa-solid fa-circle-info"></i>
       <span>${escHtml(a.msg)}</span>
-    </div>`).join('');
+    </div>
+  `).join('');
 }
 
 function renderPayments() {
   const container = document.getElementById('paymentsContent');
   if (!container) return;
+
   if (!DB.orders.length) {
-    container.innerHTML = `<div class="widget glass full-width"><div class="widget-body"><div class="empty-state">No payment data yet</div></div></div>`;
+    container.innerHTML = `
+      <div class="widget glass full-width">
+        <div class="widget-body">
+          <div class="empty-state">No payment data yet</div>
+        </div>
+      </div>
+    `;
     return;
   }
+
   const rows = DB.orders.map(o => `
     <tr>
       <td>${escHtml(o.product_name || '—')}</td>
@@ -836,70 +1023,105 @@ function renderPayments() {
       <td style="color:var(--green)">₹${(o.paid || 0).toLocaleString('en-IN')}</td>
       <td style="color:${(o.pending || 0) > 0 ? 'var(--orange)' : 'var(--green)'}">₹${(o.pending || 0).toLocaleString('en-IN')}</td>
       <td>${escHtml(o.status || 'Ordered')}</td>
-    </tr>`).join('');
+    </tr>
+  `).join('');
 
   container.innerHTML = `
     <div class="widget glass full-width">
-      <div class="widget-header"><h3><i class="fa-solid fa-credit-card"></i> Payment Overview</h3></div>
+      <div class="widget-header">
+        <h3><i class="fa-solid fa-credit-card"></i> Payment Overview</h3>
+      </div>
       <div class="table-wrap">
         <table class="orders-table">
-          <thead><tr><th>Product</th><th>Order #</th><th>Total</th><th>Paid</th><th>Pending</th><th>Status</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Order #</th>
+              <th>Total</th>
+              <th>Paid</th>
+              <th>Pending</th>
+              <th>Status</th>
+            </tr>
+          </thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
-    </div>`;
+    </div>
+  `;
 }
 
 function renderAnalytics() {
-  const vendorChart  = document.getElementById('vendorChart');
-  const statusChart  = document.getElementById('statusChart');
+  const vendorChart = document.getElementById('vendorChart');
+  const statusChart = document.getElementById('statusChart');
   const monthlyChart = document.getElementById('monthlyChart');
 
   if (vendorChart) {
     const vendorMap = {};
-    DB.orders.forEach(o => { const k = o.vendor || 'Unknown'; vendorMap[k] = (vendorMap[k] || 0) + 1; });
-    vendorChart.innerHTML = Object.entries(vendorMap).map(([k, v]) => `
+    DB.orders.forEach(o => {
+      const key = o.vendor || 'Unknown';
+      vendorMap[key] = (vendorMap[key] || 0) + 1;
+    });
+
+    const html = Object.entries(vendorMap).map(([k, v]) => `
       <div class="mini-bar-row">
         <span>${escHtml(k)}</span>
         <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100, v * 20)}%"></div></div>
         <strong>${v}</strong>
-      </div>`).join('') || `<div class="empty-state">No data</div>`;
+      </div>
+    `).join('') || `<div class="empty-state">No data</div>`;
+
+    vendorChart.innerHTML = html;
   }
 
   if (statusChart) {
     const statusMap = {};
-    DB.orders.forEach(o => { const k = o.status || 'Unknown'; statusMap[k] = (statusMap[k] || 0) + 1; });
-    statusChart.innerHTML = Object.entries(statusMap).map(([k, v]) => `
+    DB.orders.forEach(o => {
+      const key = o.status || 'Unknown';
+      statusMap[key] = (statusMap[key] || 0) + 1;
+    });
+
+    const html = Object.entries(statusMap).map(([k, v]) => `
       <div class="mini-bar-row">
         <span>${escHtml(k)}</span>
         <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100, v * 20)}%"></div></div>
         <strong>${v}</strong>
-      </div>`).join('') || `<div class="empty-state">No data</div>`;
+      </div>
+    `).join('') || `<div class="empty-state">No data</div>`;
+
+    statusChart.innerHTML = html;
   }
 
   if (monthlyChart) {
     const monthMap = {};
     DB.orders.forEach(o => {
       if (!o.order_date) return;
-      const d   = new Date(o.order_date);
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const d = new Date(o.order_date);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}`;
       monthMap[key] = (monthMap[key] || 0) + (o.total || 0);
     });
-    monthlyChart.innerHTML = Object.entries(monthMap).sort().map(([k, v]) => `
+
+    const html = Object.entries(monthMap).sort().map(([k, v]) => `
       <div class="mini-bar-row">
         <span>${escHtml(k)}</span>
         <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100, Math.round(v / 500))}%"></div></div>
         <strong>₹${v.toLocaleString('en-IN')}</strong>
-      </div>`).join('') || `<div class="empty-state">No data</div>`;
+      </div>
+    `).join('') || `<div class="empty-state">No data</div>`;
+
+    monthlyChart.innerHTML = html;
   }
 }
 
 function renderVendorFilter() {
   const select = document.getElementById('filterVendor');
   if (!select) return;
+
   const current = select.value;
   const vendors = [...new Set(DB.orders.map(o => o.vendor).filter(Boolean))];
-  select.innerHTML = `<option value="">All Vendors</option>` + vendors.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+
+  select.innerHTML = `<option value="">All Vendors</option>` +
+    vendors.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+
   select.value = current;
 }
 
@@ -929,31 +1151,74 @@ function formatDate(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
 }
 
 function showToast(message, type = 'info') {
   let toast = document.getElementById('globalToast');
+
   if (!toast) {
     toast = document.createElement('div');
     toast.id = 'globalToast';
-    Object.assign(toast.style, {
-      position: 'fixed', right: '20px', bottom: '20px', zIndex: '9999',
-      padding: '12px 16px', borderRadius: '12px', color: '#fff',
-      fontSize: '14px', fontWeight: '600',
-      boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
-      transition: 'all .25s ease', transform: 'translateY(20px)', opacity: '0'
-    });
+    toast.style.position = 'fixed';
+    toast.style.right = '20px';
+    toast.style.bottom = '20px';
+    toast.style.zIndex = '9999';
+    toast.style.padding = '12px 16px';
+    toast.style.borderRadius = '12px';
+    toast.style.color = '#fff';
+    toast.style.fontSize = '14px';
+    toast.style.fontWeight = '600';
+    toast.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
+    toast.style.transition = 'all .25s ease';
+    toast.style.transform = 'translateY(20px)';
+    toast.style.opacity = '0';
     document.body.appendChild(toast);
   }
+
   const colors = {
     success: 'linear-gradient(135deg,#22c55e,#14b8a6)',
     warning: 'linear-gradient(135deg,#f97316,#ef4444)',
-    info:    'linear-gradient(135deg,#7c5cfc,#6366f1)'
+    info: 'linear-gradient(135deg,#7c5cfc,#6366f1)'
   };
+
   toast.style.background = colors[type] || colors.info;
   toast.textContent = message;
-  requestAnimationFrame(() => { toast.style.transform = 'translateY(0)'; toast.style.opacity = '1'; });
+
+  requestAnimationFrame(() => {
+    toast.style.transform = 'translateY(0)';
+    toast.style.opacity = '1';
+  });
+
   clearTimeout(window.__toastTimer);
-  window.__toastTimer = setTimeout(() => { toast.style.transform = 'translateY(20px)'; toast.style.opacity = '0'; }, 2500);
+  window.__toastTimer = setTimeout(() => {
+    toast.style.transform = 'translateY(20px)';
+    toast.style.opacity = '0';
+  }, 2500);
 }
+
+/* ══════════════════════════════════════
+   OPTIONAL: ONE-TIME ADMIN CREATION
+   Uncomment once, run, then comment again
+══════════════════════════════════════ */
+/*
+async function createAdminOnce() {
+  try {
+    const userCred = await createUserWithEmailAndPassword(
+      auth,
+      "dlaize",
+      "dlaize"
+    );
+    console.log("Admin created:", userCred.user.email);
+    alert("Admin created successfully!");
+  } catch (e) {
+    console.error(e);
+    alert(e.message);
+  }
+}
+createAdminOnce();
+*/
