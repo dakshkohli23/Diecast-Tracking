@@ -871,35 +871,27 @@ function renderEtaWidget() {
 
   container.innerHTML = upcoming.map(o => {
     const etaDate = new Date(o.eta);
-    const diffDays = Math.ceil((etaDate - today) / (1000 * 60 * 60 * 24));
+    const diffMs = etaDate - today;
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-    let dayClass = 'eta-chip-ok';
-    let dayLabel = `${diffDays}d`;
+    let cls = 'ok';
+    let label = `${diffDays}d`;
 
     if (diffDays < 0) {
-      dayClass = 'eta-chip-overdue';
-      dayLabel = `${Math.abs(diffDays)}d overdue`;
+      cls = 'overdue';
+      label = `${Math.abs(diffDays)}d overdue`;
     } else if (diffDays <= 7) {
-      dayClass = 'eta-chip-soon';
+      cls = 'soon';
+      label = `${diffDays}d left`;
     }
 
     return `
-      <div class="delivery-item">
-        <div class="delivery-icon">
-          <i class="fa-solid fa-truck"></i>
+      <div class="eta-item">
+        <div>
+          <div>${escHtml(o.product_name)}</div>
+          <small style="color:var(--text-muted)">${formatDate(o.eta)}</small>
         </div>
-        <div class="delivery-info">
-          <div class="delivery-name">${escHtml(o.product_name)}</div>
-          <div class="delivery-meta">${escHtml(o.vendor || '—')} • ETA ${escHtml(o.eta)}</div>
-          <div class="delivery-chips">
-            <span class="delivery-chip eta-chip ${dayClass}">
-              <i class="fa-solid fa-calendar-days"></i> ${dayLabel}
-            </span>
-            <span class="delivery-chip vendor-chip">
-              <i class="fa-solid fa-store"></i> ${escHtml(o.vendor || '—')}
-            </span>
-          </div>
-        </div>
+        <div class="eta-countdown ${cls}">${label}</div>
       </div>
     `;
   }).join('');
