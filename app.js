@@ -582,6 +582,8 @@ function initGreeting() {
 }
 
 function renderAll() {
+	console.log('Orders with ETA:', DB.orders.filter(o => o.eta && o.status !== 'Delivered'));
+  renderStats();
   renderStats();
   renderTable(DB.orders);
   renderRecentOrders();
