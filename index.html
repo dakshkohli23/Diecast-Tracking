@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PreTrack — Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body class="dashboard-body">
+
+  <!-- ═══════════════ SIDEBAR ═══════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon"><i class="fa-solid fa-box-open"></i></div>
+      <span class="brand-text">PreTrack</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-section="dashboard" data-tooltip="Dashboard">
+        <i class="fa-solid fa-chart-pie"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-section="orders" data-tooltip="Orders">
+        <i class="fa-solid fa-box"></i>
+        <span>Orders</span>
+      </a>
+      <a href="#" class="nav-item" data-section="analytics" data-tooltip="Analytics">
+        <i class="fa-solid fa-chart-line"></i>
+        <span>Analytics</span>
+      </a>
+      <a href="#" class="nav-item" data-section="payments" data-tooltip="Payments">
+        <i class="fa-solid fa-credit-card"></i>
+        <span>Payments</span>
+      </a>
+      <a href="#" class="nav-item" data-section="settings" data-tooltip="Settings">
+        <i class="fa-solid fa-gear"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="nav-item logout-btn" id="logoutBtn" data-tooltip="Logout">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══════════════ MAIN CONTENT ═══════════════ -->
+  <div class="main-wrap" id="mainWrap">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="sidebar-toggle" id="sidebarToggle">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="globalSearch" placeholder="Search orders, products..." />
+          <kbd>⌘K</kbd>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <button class="icon-btn" id="darkModeToggle" data-tooltip="Toggle Theme">
+          <i class="fa-solid fa-moon"></i>
+        </button>
+        <button class="icon-btn notif-btn" data-tooltip="Notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span class="notif-dot" id="notifDot"></span>
+        </button>
+        <div class="topbar-profile">
+          <div class="avatar"><i class="fa-solid fa-user"></i></div>
+          <div class="profile-info">
+            <span class="profile-name" id="profileName">Admin</span>
+            <span class="profile-role">Manager</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- PAGE CONTENT -->
+    <main class="page-content" id="pageContent">
+
+      <!-- ═══ SECTION: DASHBOARD ═══ -->
+      <section class="section active" id="section-dashboard">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Dashboard</h2>
+            <p class="section-sub">Welcome back! Here's your overview.</p>
+          </div>
+          <button class="btn btn-primary" id="quickAddBtn">
+            <i class="fa-solid fa-plus"></i> Add Order
+          </button>
+        </div>
+
+        <!-- STATS CARDS -->
+        <div class="stats-grid" id="statsGrid">
+          <div class="stat-card glass" data-stat="total">
+            <div class="stat-icon indigo"><i class="fa-solid fa-box"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Total Orders</span>
+              <span class="stat-value" id="statTotal">0</span>
+            </div>
+            <div class="stat-trend up"><i class="fa-solid fa-arrow-trend-up"></i></div>
+          </div>
+          <div class="stat-card glass" data-stat="investment">
+            <div class="stat-icon purple"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Total Investment</span>
+              <span class="stat-value" id="statInvestment">₹0</span>
+            </div>
+            <div class="stat-trend up"><i class="fa-solid fa-arrow-trend-up"></i></div>
+          </div>
+          <div class="stat-card glass" data-stat="pending">
+            <div class="stat-icon pink"><i class="fa-solid fa-hourglass-half"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Pending Payments</span>
+              <span class="stat-value" id="statPending">₹0</span>
+            </div>
+            <div class="stat-trend down"><i class="fa-solid fa-arrow-trend-down"></i></div>
+          </div>
+          <div class="stat-card glass" data-stat="delivered">
+            <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Delivered</span>
+              <span class="stat-value" id="statDelivered">0</span>
+            </div>
+            <div class="stat-trend up"><i class="fa-solid fa-arrow-trend-up"></i></div>
+          </div>
+          <div class="stat-card glass" data-stat="transit">
+            <div class="stat-icon orange"><i class="fa-solid fa-truck"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">In Transit</span>
+              <span class="stat-value" id="statTransit">0</span>
+            </div>
+            <div class="stat-trend up"><i class="fa-solid fa-arrow-trend-up"></i></div>
+          </div>
+        </div>
+
+        <!-- SMART WIDGETS ROW -->
+        <div class="widgets-grid">
+          <!-- Recent Orders Widget -->
+          <div class="widget glass" id="recentOrdersWidget">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Orders</h3>
+              <a href="#" class="widget-link" data-goto="orders">View All</a>
+            </div>
+            <div class="widget-body" id="recentOrdersList">
+              <div class="empty-state">No orders yet</div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="widget glass" id="quickActionsWidget">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-bolt"></i> Quick Actions</h3>
+            </div>
+            <div class="quick-actions">
+              <button class="qa-btn" id="qaAddOrder">
+                <i class="fa-solid fa-plus"></i>
+                <span>Add Order</span>
+              </button>
+              <button class="qa-btn" id="qaExport">
+                <i class="fa-solid fa-download"></i>
+                <span>Export CSV</span>
+              </button>
+              <button class="qa-btn" id="qaAnalytics">
+                <i class="fa-solid fa-chart-bar"></i>
+                <span>Analytics</span>
+              </button>
+              <button class="qa-btn" id="qaDelayed">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Delayed</span>
+              </button>
+            </div>
+
+            <!-- Alerts Panel -->
+            <div class="alerts-panel" id="alertsPanel">
+              <!-- JS renders alerts here -->
+            </div>
+          </div>
+
+          <!-- ETA Countdown -->
+          <div class="widget glass" id="etaWidget">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-calendar-days"></i> Upcoming ETAs</h3>
+            </div>
+            <div class="widget-body" id="etaList">
+              <div class="empty-state">No upcoming orders</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTIVITY FEED -->
+        <div class="widget glass full-width" id="activityFeed">
+          <div class="widget-header">
+            <h3><i class="fa-solid fa-wave-square"></i> Activity Feed</h3>
+          </div>
+          <div class="activity-list" id="activityList">
+            <div class="empty-state">No recent activity</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ SECTION: ORDERS ═══ -->
+      <section class="section" id="section-orders">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Orders</h2>
+            <p class="section-sub">Manage all your preorders</p>
+          </div>
+          <button class="btn btn-primary" id="addOrderBtn">
+            <i class="fa-solid fa-plus"></i> Add Order
+          </button>
+        </div>
+
+        <!-- FILTERS BAR -->
+        <div class="filters-bar glass">
+          <div class="filter-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="orderSearch" placeholder="Search by name or order #..." />
+          </div>
+          <select id="filterStatus" class="filter-select">
+            <option value="">All Statuses</option>
+            <option value="Ordered">Ordered</option>
+            <option value="Processing">Processing</option>
+            <option value="Shipped">Shipped</option>
+            <option value="Delivered">Delivered</option>
+          </select>
+          <select id="filterVendor" class="filter-select">
+            <option value="">All Vendors</option>
+          </select>
+          <input type="date" id="filterDateFrom" class="filter-select" placeholder="From" />
+          <input type="date" id="filterDateTo" class="filter-select" placeholder="To" />
+          <button class="btn btn-ghost" id="clearFilters">
+            <i class="fa-solid fa-xmark"></i> Clear
+          </button>
+        </div>
+
+        <!-- ORDERS TABLE -->
+        <div class="table-wrap glass">
+          <table class="orders-table" id="ordersTable">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Order #</th>
+                <th>Vendor</th>
+                <th>Qty</th>
+                <th>Total</th>
+                <th>Paid</th>
+                <th>Pending</th>
+                <th>Status</th>
+                <th>ETA</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody">
+              <tr><td colspan="10" class="empty-row">No orders found</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ═══ SECTION: ANALYTICS ═══ -->
+      <section class="section" id="section-analytics">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Analytics</h2>
+            <p class="section-sub">Insights into your orders</p>
+          </div>
+        </div>
+
+        <div class="analytics-grid">
+          <div class="widget glass">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-store"></i> Vendor Breakdown</h3>
+            </div>
+            <div id="vendorChart" class="chart-area"></div>
+          </div>
+
+          <div class="widget glass">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-circle-half-stroke"></i> Status Distribution</h3>
+            </div>
+            <div id="statusChart" class="chart-area"></div>
+          </div>
+
+          <div class="widget glass full-width">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-calendar"></i> Monthly Spend</h3>
+            </div>
+            <div id="monthlyChart" class="chart-area tall"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ SECTION: PAYMENTS ═══ -->
+      <section class="section" id="section-payments">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Payments</h2>
+            <p class="section-sub">Track payments across all orders</p>
+          </div>
+        </div>
+        <div id="paymentsContent">
+          <div class="widget glass full-width">
+            <div class="widget-body" id="paymentsList">
+              <div class="empty-state">Loading payment data...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ SECTION: SETTINGS ═══ -->
+      <section class="section" id="section-settings">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Settings</h2>
+            <p class="section-sub">Manage your preferences</p>
+          </div>
+        </div>
+        <div class="widget glass">
+          <div class="settings-list">
+            <div class="setting-item">
+              <div>
+                <strong>Dark Mode</strong>
+                <p>Toggle between light and dark theme</p>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="settingDarkMode" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="setting-item">
+              <div>
+                <strong>Export Data</strong>
+                <p>Download all orders as CSV</p>
+              </div>
+              <button class="btn btn-primary" id="exportCsvBtn">
+                <i class="fa-solid fa-download"></i> Export CSV
+              </button>
+            </div>
+            <div class="setting-item">
+              <div>
+                <strong>Clear All Data</strong>
+                <p>Remove all orders permanently</p>
+              </div>
+              <button class="btn btn-danger" id="clearDataBtn">
+                <i class="fa-solid fa-trash"></i> Clear Data
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ═══════════════ ADD/EDIT MODAL ═══════════════ -->
+  <div class="modal-overlay hidden" id="orderModal">
+    <div class="modal glass" id="orderModalBox">
+      <div class="modal-header">
+        <h3 id="modalTitle">Add New Order</h3>
+        <button class="modal-close" id="modalClose">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="orderForm">
+          <input type="hidden" id="editOrderId" />
+
+          <div class="form-tabs">
+            <button type="button" class="form-tab active" data-tab="basic">Basic Info</button>
+            <button type="button" class="form-tab" data-tab="payment">Payment</button>
+            <button type="button" class="form-tab" data-tab="media">Media</button>
+          </div>
+
+          <!-- TAB: BASIC -->
+          <div class="tab-content active" id="tab-basic">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Product Name *</label>
+                <input type="text" id="fProductName" required />
+              </div>
+              <div class="form-group">
+                <label>Order Number *</label>
+                <input type="text" id="fOrderNumber" required />
+              </div>
+              <div class="form-group">
+                <label>Vendor *</label>
+                <input type="text" id="fVendor" required />
+              </div>
+              <div class="form-group">
+                <label>Variant</label>
+                <select id="fVariant">
+                  <option value="Box">Box</option>
+                  <option value="Blister">Blister</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Quantity *</label>
+                <input type="number" id="fQty" min="1" value="1" required />
+              </div>
+              <div class="form-group">
+                <label>Order Date</label>
+                <input type="date" id="fOrderDate" />
+              </div>
+              <div class="form-group">
+                <label>ETA</label>
+                <input type="date" id="fEta" />
+              </div>
+              <div class="form-group">
+                <label>Status</label>
+                <select id="fStatus">
+                  <option value="Ordered">Ordered</option>
+                  <option value="Processing">Processing</option>
+                  <option value="Shipped">Shipped</option>
+                  <option value="Delivered">Delivered</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: PAYMENT -->
+          <div class="tab-content" id="tab-payment">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Preorder Price (₹)</label>
+                <input type="number" id="fPreorderPrice" min="0" value="0" />
+              </div>
+              <div class="form-group">
+                <label>Actual Price (₹)</label>
+                <input type="number" id="fActualPrice" min="0" value="0" />
+              </div>
+              <div class="form-group">
+                <label>Shipping (₹)</label>
+                <input type="number" id="fShipping" min="0" value="0" />
+              </div>
+              <div class="form-group">
+                <label>Amount Paid (₹)</label>
+                <input type="number" id="fPaid" min="0" value="0" />
+              </div>
+              <div class="form-group readonly-field">
+                <label>Total (auto)</label>
+                <input type="text" id="fTotal" readonly />
+              </div>
+              <div class="form-group readonly-field">
+                <label>Pending (auto)</label>
+                <input type="text" id="fPending" readonly />
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: MEDIA -->
+          <div class="tab-content" id="tab-media">
+            <div class="image-upload-area" id="imageUploadArea">
+              <div class="image-preview" id="imagePreview">
+                <i class="fa-solid fa-image"></i>
+                <p>Click to upload image</p>
+              </div>
+              <input type="file" id="fImage" accept="image/*" hidden />
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-ghost" id="modalCancel">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="modalSave">
+              <i class="fa-solid fa-floppy-disk"></i> Save Order
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ VIEW DETAIL MODAL ═══ -->
+  <div class="modal-overlay hidden" id="viewModal">
+    <div class="modal modal-view glass" id="viewModalBox">
+      <div class="modal-header">
+        <h3 id="viewModalTitle">Order Details</h3>
+        <button class="modal-close" id="viewModalClose">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body" id="viewModalBody">
+        <!-- JS renders details -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TOAST CONTAINER ═══ -->
+  <div class="toast-container" id="toastContainer"></div>
+
+ <script type="module" src="app.js"></script>
+</body>
+</html>
