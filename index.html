@@ -118,46 +118,117 @@
 		
         <!-- STATS CARDS -->
         <div class="stats-grid" id="statsGrid">
-          <div class="stat-card glass" data-stat="total">
-            <div class="stat-icon indigo"><i class="fa-solid fa-box"></i></div>
-            <div class="stat-info">
-              <span class="stat-label">Total Orders</span>
-              <span class="stat-value" id="statTotal">0</span>
+
+          <div class="stat-card glass">
+            <div class="stat-card-top">
+              <div class="stat-icon indigo"><i class="fa-solid fa-box"></i></div>
+              <span class="stat-badge s-indigo">Catalog</span>
             </div>
-            <div class="stat-trend up"><i class="fa-solid fa-arrow-trend-up"></i></div>
+            <div class="stat-label">Total Orders</div>
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-footer"><i class="fa-solid fa-layer-group s-indigo"></i><span class="s-indigo">All tracked orders</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-indigo" style="width:100%"></div></div>
           </div>
-          <div class="stat-card glass" data-stat="investment">
-            <div class="stat-icon purple"><i class="fa-solid fa-indian-rupee-sign"></i></div>
-            <div class="stat-info">
-              <span class="stat-label">Total Investment</span>
-              <span class="stat-value" id="statInvestment">₹0</span>
+
+          <div class="stat-card glass">
+            <div class="stat-card-top">
+              <div class="stat-icon green"><i class="fa-solid fa-cubes"></i></div>
+              <span class="stat-badge s-green">Inventory</span>
             </div>
-            <div class="stat-trend up"><i class="fa-solid fa-arrow-trend-up"></i></div>
+            <div class="stat-label">Total Quantity</div>
+            <div class="stat-value" id="statQty">0</div>
+            <div class="stat-footer"><i class="fa-solid fa-check-circle s-green"></i><span class="s-green">Units ordered</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-green" id="statQtyBar" style="width:80%"></div></div>
           </div>
-          <div class="stat-card glass" data-stat="pending">
-            <div class="stat-icon pink"><i class="fa-solid fa-hourglass-half"></i></div>
-            <div class="stat-info">
-              <span class="stat-label">Pending Payments</span>
-              <span class="stat-value" id="statPending">₹0</span>
+
+          <div class="stat-card glass">
+            <div class="stat-card-top">
+              <div class="stat-icon teal"><i class="fa-solid fa-tag"></i></div>
+              <span class="stat-badge s-teal">Preorder</span>
             </div>
-            <div class="stat-trend down"><i class="fa-solid fa-arrow-trend-down"></i></div>
+            <div class="stat-label">Market Value</div>
+            <div class="stat-value" id="statMarketValue">₹0</div>
+            <div class="stat-footer"><i class="fa-solid fa-chart-line s-teal"></i><span class="s-teal">Preorder price total</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-teal" style="width:65%"></div></div>
           </div>
-          <div class="stat-card glass" data-stat="delivered">
-            <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
-            <div class="stat-info">
-              <span class="stat-label">Delivered</span>
-              <span class="stat-value" id="statDelivered">0</span>
+
+          <div class="stat-card glass">
+            <div class="stat-card-top">
+              <div class="stat-icon purple"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+              <span class="stat-badge s-purple">Finance</span>
             </div>
-            <div class="stat-trend up"><i class="fa-solid fa-arrow-trend-up"></i></div>
+            <div class="stat-label">Total Investment</div>
+            <div class="stat-value" id="statInvestment">₹0</div>
+            <div class="stat-footer"><i class="fa-solid fa-wallet s-purple"></i><span class="s-purple">Actual spend</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-purple" style="width:75%"></div></div>
           </div>
-          <div class="stat-card glass" data-stat="transit">
-            <div class="stat-icon orange"><i class="fa-solid fa-truck"></i></div>
-            <div class="stat-info">
-              <span class="stat-label">In Transit</span>
-              <span class="stat-value" id="statTransit">0</span>
+
+          <div class="stat-card glass">
+            <div class="stat-card-top">
+              <div class="stat-icon pink"><i class="fa-solid fa-hourglass-half"></i></div>
+              <span class="stat-badge s-pink">Dues</span>
             </div>
-            <div class="stat-trend up"><i class="fa-solid fa-arrow-trend-up"></i></div>
+            <div class="stat-label">Pending Payments</div>
+            <div class="stat-value" id="statPending">₹0</div>
+            <div class="stat-footer"><i class="fa-solid fa-circle-exclamation s-pink"></i><span class="s-pink">Amount due</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-pink" id="statPendingBar" style="width:0%"></div></div>
           </div>
+
+          <div class="stat-card glass">
+            <div class="stat-card-top">
+              <div class="stat-icon orange"><i class="fa-solid fa-clock"></i></div>
+              <span class="stat-badge s-orange">Pipeline</span>
+            </div>
+            <div class="stat-label">Pending PO</div>
+            <div class="stat-value" id="statPendingPO">0</div>
+            <div class="stat-footer"><i class="fa-solid fa-hourglass s-orange"></i><span class="s-orange">Upcoming arrivals</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-orange" id="statPendingPOBar" style="width:0%"></div></div>
+          </div>
+
+          <div class="stat-card glass">
+            <div class="stat-card-top">
+              <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+              <span class="stat-badge s-green">Done</span>
+            </div>
+            <div class="stat-label">Delivered</div>
+            <div class="stat-value" id="statDelivered">0</div>
+            <div class="stat-footer"><i class="fa-solid fa-box-open s-green"></i><span class="s-green">In collection now</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-green" id="statDeliveredBar" style="width:0%"></div></div>
+          </div>
+
+          <div class="stat-card glass">
+            <div class="stat-card-top">
+              <div class="stat-icon teal"><i class="fa-solid fa-truck"></i></div>
+              <span class="stat-badge s-teal">Moving</span>
+            </div>
+            <div class="stat-label">In Transit</div>
+            <div class="stat-value" id="statTransit">0</div>
+            <div class="stat-footer"><i class="fa-solid fa-location-dot s-teal"></i><span class="s-teal">Shipment pipeline</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-teal" id="statTransitBar" style="width:0%"></div></div>
+          </div>
+
+          <div class="stat-card glass">
+            <div class="stat-card-top">
+              <div class="stat-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+              <span class="stat-badge s-red">Alert</span>
+            </div>
+            <div class="stat-label">Overdue</div>
+            <div class="stat-value" id="statOverdue">0</div>
+            <div class="stat-footer"><i class="fa-solid fa-calendar-xmark s-red"></i><span class="s-red">Past ETA date</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-red" id="statOverdueBar" style="width:0%"></div></div>
+          </div>
+
+          <div class="stat-card glass">
+            <div class="stat-card-top">
+              <div class="stat-icon indigo"><i class="fa-solid fa-copy"></i></div>
+              <span class="stat-badge s-indigo">Variants</span>
+            </div>
+            <div class="stat-label">Duplicates</div>
+            <div class="stat-value" id="statDuplicates">0</div>
+            <div class="stat-footer"><i class="fa-solid fa-clone s-indigo"></i><span class="s-indigo">Duplicate variants</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-indigo" id="statDuplicatesBar" style="width:0%"></div></div>
+          </div>
+
         </div>
 
         <!-- SMART WIDGETS ROW -->
