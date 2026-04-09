@@ -95,7 +95,7 @@
         <!-- GREETING BAR -->
         <div class="greeting-bar" id="greetingBar">
           <div class="greeting-left">
-            <h2 class="greeting-text" id="greetingText">Good Morning, Daksh! 👋</h2>
+            <h2 class="greeting-text" id="greetingText">Morning, Daksh! <i class="fa-solid fa-atom"></i></h2>
             <div class="greeting-meta">
               <span id="greetingDate"></span>
               <span class="greeting-divider">•</span>
@@ -285,16 +285,28 @@
           </div>
         </div>
 
-        <!-- ACTIVITY FEED -->
-        <div class="widget glass full-width" id="activityFeed">
-          <div class="widget-header">
-            <h3><i class="fa-solid fa-wave-square"></i> Activity Feed</h3>
+        <!-- ACTIVITY + LEADERBOARD ROW -->
+        <div class="activity-row">
+
+          <div class="widget glass" id="activityFeed">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-wave-square"></i> Activity Feed</h3>
+            </div>
+            <div class="activity-list" id="activityList">
+              <div class="empty-state">No recent activity</div>
+            </div>
           </div>
-          <div class="activity-list" id="activityList">
-            <div class="empty-state">No recent activity</div>
+
+          <div class="widget glass" id="brandLeaderboard">
+            <div class="widget-header">
+              <h3><i class="fa-solid fa-trophy"></i> Brand Leaderboard</h3>
+            </div>
+            <div class="leaderboard-list" id="leaderboardList">
+              <div class="empty-state">No data yet</div>
+            </div>
           </div>
+
         </div>
-      </section>
 
       <!-- ═══ SECTION: ORDERS ═══ -->
       <section class="section" id="section-orders">
