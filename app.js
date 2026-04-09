@@ -547,7 +547,7 @@ function initGreeting() {
     const now = new Date();
     const hour = now.getHours();
 
-    const emoji = hour < 12 ? '🌅' : hour < 17 ? '☀️' : '🌙';
+    const emoji = hour < 12 ? '<i class="fa-solid fa-cloud-sun"></i>' : hour < 17 ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
     const word  = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
 
     if (greetingText) greetingText.textContent = `Good ${word}, Daksh! ${emoji}`;
