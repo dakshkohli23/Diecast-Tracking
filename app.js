@@ -591,6 +591,8 @@ function renderAll() {
   renderPayments();
   renderAnalytics();
   renderVendorFilter();
+  renderBrandLeaderboard();
+
 
   // Refresh system status after data loads
   const systemStatus = document.getElementById('systemStatus');
@@ -910,6 +912,44 @@ function renderActivityFeed() {
       <span class="activity-dot ${escHtml(a.type || 'info')}"></span>
       <span>${escHtml(a.msg || '')}</span>
       <span class="activity-time">${escHtml(a.time || '')}</span>
+    </div>
+  `).join('');
+}
+
+function renderBrandLeaderboard() {
+  const container = document.getElementById('leaderboardList');
+  if (!container) return;
+
+  if (!DB.orders.length) {
+    container.innerHTML = `<div class="empty-state">No data yet</div>`;
+    return;
+  }
+
+  const brandMap = {};
+  DB.orders.forEach(o => {
+    const key = (o.vendor || 'Unknown').trim();
+    brandMap[key] = (brandMap[key] || 0) + (o.quantity || 1);
+  });
+
+  const sorted = Object.entries(brandMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
+
+  const rankIcon = (i) => {
+    if (i === 0) return `<div class="lb-rank-icon gold"><i class="fa-solid fa-crown"></i></div>`;
+    if (i === 1) return `<div class="lb-rank-icon silver"><i class="fa-solid fa-medal"></i></div>`;
+    if (i === 2) return `<div class="lb-rank-icon bronze"><i class="fa-solid fa-award"></i></div>`;
+    return `<div class="lb-rank-icon"><i class="fa-solid fa-hashtag"></i></div>`;
+  };
+
+  container.innerHTML = sorted.map(([brand, qty], i) => `
+    <div class="lb-item">
+      ${rankIcon(i)}
+      <div class="lb-info">
+        <div class="lb-name">#${i + 1} ${escHtml(brand)}</div>
+        <div class="lb-sub">${qty} unit${qty !== 1 ? 's' : ''} tracked</div>
+      </div>
+      <span class="lb-count">${qty}</span>
     </div>
   `).join('');
 }
