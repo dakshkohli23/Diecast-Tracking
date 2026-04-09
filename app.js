@@ -142,7 +142,9 @@ function initDashboard() {
       mainWrap.classList.toggle('expanded');
     }
   });
-
+	
+	initGreeting();
+	
   sidebarOverlay?.addEventListener('click', () => {
     sidebar.classList.remove('mobile-open');
     sidebarOverlay.classList.remove('show');
@@ -535,6 +537,50 @@ function compressImage(base64, maxWidth = 300, quality = 0.7) {
   });
 }
 
+/* Wishing Function */
+function initGreeting() {
+  const greetingText = document.getElementById('greetingText');
+  const greetingDate = document.getElementById('greetingDate');
+  const systemStatus = document.getElementById('systemStatus');
+
+  function updateGreeting() {
+    const now = new Date();
+    const hour = now.getHours();
+
+    const emoji = hour < 12 ? '🌅' : hour < 17 ? '☀️' : '🌙';
+    const word  = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
+
+    if (greetingText) greetingText.textContent = `Good ${word}, Daksh! ${emoji}`;
+
+    if (greetingDate) {
+      greetingDate.textContent = now.toLocaleDateString('en-IN', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+      });
+    }
+  }
+
+  function checkSystems() {
+    if (!systemStatus) return;
+    systemStatus.innerHTML = `<span class="status-dot"></span> Checking systems...`;
+    systemStatus.className = 'system-status';
+
+    setTimeout(() => {
+      const ok = DB.orders !== undefined;
+      if (ok) {
+        systemStatus.innerHTML = `<span class="status-dot"></span> All systems live`;
+        systemStatus.className = 'system-status live';
+      } else {
+        systemStatus.innerHTML = `<span class="status-dot"></span> Connection issue`;
+        systemStatus.className = 'system-status error';
+      }
+    }, 1200);
+  }
+
+  updateGreeting();
+  checkSystems();
+  setInterval(updateGreeting, 60000); // update every minute
+}
+
 function renderAll() {
   renderStats();
   renderTable(DB.orders);
@@ -545,6 +591,16 @@ function renderAll() {
   renderPayments();
   renderAnalytics();
   renderVendorFilter();
+
+  // Refresh system status after data loads
+  const systemStatus = document.getElementById('systemStatus');
+  if (systemStatus) {
+    const ok = DB.orders !== undefined;
+    systemStatus.innerHTML = ok
+      ? `<span class="status-dot"></span> All systems live`
+      : `<span class="status-dot"></span> Connection issue`;
+    systemStatus.className = ok ? 'system-status live' : 'system-status error';
+  }
 }
 
 /* ══════════════════════════════════════
