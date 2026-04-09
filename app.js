@@ -158,30 +158,6 @@ function initDashboard() {
     document.getElementById(`section-${section}`)?.classList.add('active');
   }
 
-  /* ── DARK MODE ── */
-  const darkToggle = document.getElementById('darkModeToggle');
-  const settingDark = document.getElementById('settingDarkMode');
-  const html = document.documentElement;
-
-  const savedTheme = localStorage.getItem('pt_theme') || 'dark';
-  applyTheme(savedTheme);
-
-  function applyTheme(theme) {
-    html.setAttribute('data-theme', theme);
-    localStorage.setItem('pt_theme', theme);
-    const isDark = theme === 'dark';
-    if (darkToggle) darkToggle.querySelector('i').className = `fa-solid fa-${isDark ? 'sun' : 'moon'}`;
-    if (settingDark) settingDark.checked = isDark;
-  }
-
-  darkToggle?.addEventListener('click', () => {
-    const current = html.getAttribute('data-theme');
-    applyTheme(current === 'dark' ? 'light' : 'dark');
-  });
-
-  settingDark?.addEventListener('change', () => {
-    applyTheme(settingDark.checked ? 'dark' : 'light');
-  });
 
   /* ── LOGOUT ── */
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {
