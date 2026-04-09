@@ -130,17 +130,44 @@ function initDashboard() {
   const mainWrap = document.getElementById('mainWrap');
   const sidebarToggle = document.getElementById('sidebarToggle');
 
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  const isMobile = () => window.innerWidth <= 900;
+
   sidebarToggle?.addEventListener('click', () => {
-    sidebar.classList.toggle('collapsed');
-    mainWrap.classList.toggle('expanded');
+    if (isMobile()) {
+      sidebar.classList.toggle('mobile-open');
+      sidebarOverlay?.classList.toggle('show');
+    } else {
+      sidebar.classList.toggle('collapsed');
+      mainWrap.classList.toggle('expanded');
+    }
+  });
+
+  sidebarOverlay?.addEventListener('click', () => {
+    sidebar.classList.remove('mobile-open');
+    sidebarOverlay.classList.remove('show');
+  });
+
+  // Close sidebar on nav click (mobile)
+  document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+    item.addEventListener('click', () => {
+      if (isMobile()) {
+        sidebar.classList.remove('mobile-open');
+        sidebarOverlay?.classList.remove('show');
+      }
+    });
   });
 
   /* ── NAV ROUTING ── */
-  document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+   document.querySelectorAll('.nav-item[data-section]').forEach(item => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       const target = item.dataset.section;
       navigateTo(target);
+      if (isMobile()) {
+        sidebar.classList.remove('mobile-open');
+        sidebarOverlay?.classList.remove('show');
+      }
     });
   });
 
