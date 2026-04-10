@@ -2015,6 +2015,7 @@ input, select, textarea { color-scheme: light; }
     font-size: 13px;
     outline: none;
     transition: .2s ease;
+	font-family:inherit;
 }
 .inv-filters input { flex: 1; min-width: 160px; }
 .inv-filters select { min-width: 150px; }
