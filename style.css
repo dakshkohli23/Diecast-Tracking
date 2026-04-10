@@ -1943,6 +1943,133 @@ input, select, textarea { color-scheme: light; }
   .catalog-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ══════════════════════════════════════
+   INVENTORY = SAME STYLE AS ORDERS
+══════════════════════════════════════ */
+
+/* Remove old custom inventory wrapper feel */
+#section-inventory .widget.glass {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* Make inventory table same spacing as orders */
+#section-inventory .table-wrap.glass {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+/* Inventory table uses same order table styling */
+#section-inventory .orders-table th,
+#section-inventory .orders-table td {
+  white-space: nowrap;
+}
+
+/* Better width handling for many columns */
+#section-inventory .table-wrap {
+  width: 100%;
+}
+
+/* Product cell same visual style as orders */
+.inventory-product-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.inventory-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--grad-indigo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: white;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.inventory-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.inventory-product-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.inventory-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Inventory filters responsive like orders */
+#section-inventory .filters-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-lg);
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+#section-inventory .filter-search {
+  flex: 1;
+  min-width: 220px;
+}
+
+/* Ensure select/input sizing is consistent */
+#section-inventory .filter-select,
+#section-inventory .filter-search input {
+  min-height: 38px;
+}
+
+/* Better action buttons inside inventory */
+#section-inventory .table-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+}
+
+/* Empty row consistency */
+#section-inventory .empty-row i {
+  margin-right: 0.35rem;
+  opacity: 0.8;
+}
+
+/* Responsive for inventory section */
+@media (max-width: 1024px) {
+  #section-inventory .filters-bar {
+    padding: 0.75rem;
+  }
+
+  #section-inventory .filter-search {
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  #section-inventory .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #section-inventory .filter-search,
+  #section-inventory .filter-select,
+  #section-inventory #invClearFilters {
+    width: 100%;
+  }
+}
+
 
 /* ══════════════════════════════════════
    RESPONSIVE
