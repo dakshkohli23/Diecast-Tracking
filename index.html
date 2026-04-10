@@ -427,54 +427,91 @@
       </section>
 <!-- ═══ SECTION: INVENTORY ═══ -->
       <section class="section" id="section-inventory">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">Inventory Manager</h2>
-            <p class="section-sub">Search, filter, sort, edit all models.</p>
-          </div>
-          <button class="btn btn-primary" id="invAddBtn">
-            <i class="fa-solid fa-plus"></i> Add Model
-          </button>
-        </div>
-        <div class="widget glass">
-          <div class="inv-filters">
-            <input type="text" id="invSearch" placeholder="Search inventory..." />
-            <select id="invFilterBrand"><option value="">All Brands</option></select>
-            <select id="invFilterStatus">
-              <option value="">All Statuses</option>
-              <option>Ordered</option><option>Processing</option><option>Shipped</option>
-              <option>Delivered</option><option>Wishlist</option><option>Preorder</option>
-              <option>Owned</option><option>In Transit</option><option>Sold</option>
-            </select>
-            <select id="invFilterScale">
-              <option value="">All Scales</option>
-              <option>1:64</option><option>1:43</option><option>1:18</option>
-              <option>1:24</option><option>1:12</option><option>Other</option>
-            </select>
-            <select id="invSort">
-              <option value="name-az">Name A–Z</option>
-              <option value="name-za">Name Z–A</option>
-              <option value="price-hi">Price High</option>
-              <option value="price-lo">Price Low</option>
-              <option value="newest">Newest</option>
-            </select>
-          </div>
-          <div class="table-wrap">
-            <table class="orders-table">
-              <thead>
-                <tr>
-                  <th>PRODUCT</th><th>BRAND</th><th>SERIES</th><th>SCALE</th>
-                  <th>STATUS</th><th>QTY</th><th>BUY PRICE</th><th>MARKET VALUE</th>
-                  <th>SELLER</th><th>LOCATION</th><th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody id="inventoryTableBody">
-                <tr><td colspan="11" class="empty-row"><i class="fa-solid fa-inbox"></i> No items yet</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+  <div class="section-header">
+    <div>
+      <h2 class="section-title">Inventory Manager</h2>
+      <p class="section-sub">Search, filter, sort, edit all models.</p>
+    </div>
+    <button class="btn btn-primary" id="invAddBtn">
+      <i class="fa-solid fa-plus"></i> Add Model
+    </button>
+  </div>
+
+  <!-- SAME DESIGN AS ORDERS FILTER BAR -->
+  <div class="filters-bar glass">
+    <div class="filter-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" id="invSearch" placeholder="Search inventory..." />
+    </div>
+
+    <select id="invFilterBrand" class="filter-select">
+      <option value="">All Brands</option>
+    </select>
+
+    <select id="invFilterStatus" class="filter-select">
+      <option value="">All Statuses</option>
+      <option>Ordered</option>
+      <option>Processing</option>
+      <option>Shipped</option>
+      <option>Delivered</option>
+      <option>Wishlist</option>
+      <option>Preorder</option>
+      <option>Owned</option>
+      <option>In Transit</option>
+      <option>Sold</option>
+    </select>
+
+    <select id="invFilterScale" class="filter-select">
+      <option value="">All Scales</option>
+      <option>1:64</option>
+      <option>1:43</option>
+      <option>1:18</option>
+      <option>1:24</option>
+      <option>1:12</option>
+      <option>Other</option>
+    </select>
+
+    <select id="invSort" class="filter-select">
+      <option value="name-az">Name A–Z</option>
+      <option value="name-za">Name Z–A</option>
+      <option value="price-hi">Price High</option>
+      <option value="price-lo">Price Low</option>
+      <option value="newest">Newest</option>
+    </select>
+
+    <button class="btn btn-ghost" id="invClearFilters">
+      <i class="fa-solid fa-xmark"></i> Clear
+    </button>
+  </div>
+
+  <!-- SAME DESIGN AS ORDERS TABLE -->
+  <div class="table-wrap glass">
+    <table class="orders-table" id="inventoryTable">
+      <thead>
+        <tr>
+          <th>PRODUCT</th>
+          <th>BRAND</th>
+          <th>SERIES</th>
+          <th>SCALE</th>
+          <th>STATUS</th>
+          <th>QTY</th>
+          <th>BUY PRICE</th>
+          <th>MARKET VALUE</th>
+          <th>SELLER</th>
+          <th>LOCATION</th>
+          <th>ACTIONS</th>
+        </tr>
+      </thead>
+      <tbody id="inventoryTableBody">
+        <tr>
+          <td colspan="11" class="empty-row">
+            <i class="fa-solid fa-inbox"></i> No items yet
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 
       <!-- ═══ SECTION: CATALOG ═══ -->
       <section class="section" id="section-catalog">
