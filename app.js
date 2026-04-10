@@ -7,7 +7,9 @@ import {
 import {
   getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
+// ── FIREBASE ──
 const firebaseConfig = {
   apiKey: "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
   authDomain: "diecast-tracking-471f7.firebaseapp.com",
@@ -21,8 +23,41 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
+// ── SUPABASE ──
+// TODO: Replace these with your actual Supabase project credentials
+// Get them from: https://supabase.com/dashboard → Project Settings → API
+const SUPABASE_URL      = 'https://ifzioqfkgjkqkirmtgly.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmemlvcWZrZ2prcWtpcm10Z2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDk4ODMsImV4cCI6MjA5MTM4NTg4M30.3sRDtBjSVcOPjS817TjR6ZP1druW-WW7rxiV1Zb3NCQ';
+const SUPABASE_BUCKET   = 'order-images'; // must match your bucket name exactly
+
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/** Upload a File to Supabase Storage — returns the public URL */
+async function uploadImageToSupabase(file) {
+  const ext  = file.name.split('.').pop() || 'jpg';
+  const path = `orders/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabaseClient.storage
+    .from(SUPABASE_BUCKET)
+    .upload(path, file, { cacheControl: '3600', upsert: false });
+  if (error) throw new Error(`Supabase upload failed: ${error.message}`);
+  const { data } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+/** Delete an image from Supabase Storage by its public URL */
+async function deleteImageFromSupabase(imageUrl) {
+  if (!imageUrl || !imageUrl.includes(SUPABASE_URL)) return; // not a Supabase URL
+  const marker = `/object/public/${SUPABASE_BUCKET}/`;
+  const idx    = imageUrl.indexOf(marker);
+  if (idx === -1) return;
+  const filePath = decodeURIComponent(imageUrl.slice(idx + marker.length).split('?')[0]);
+  const { error } = await supabaseClient.storage.from(SUPABASE_BUCKET).remove([filePath]);
+  if (error) console.warn('Supabase delete failed:', error.message);
+}
+
 let DB = { orders: [], activity: [] };
-let _currentImageB64 = '';
+let _currentImageFile = null;  // raw File for Supabase upload
+let _currentImageB64  = '';    // preview only — no longer stored in Firestore
 let _authReady = false;
 
 /* ── LOGIN ── */
@@ -172,7 +207,8 @@ function initDashboard() {
     const ip = document.getElementById('imagePreview');
     if (ip) ip.innerHTML = '<i class="fa-solid fa-image"></i><p>Click to upload image</p>';
     const fi = document.getElementById('fImage'); if (fi) fi.value = '';
-    _currentImageB64 = '';
+    _currentImageFile = null;
+    _currentImageB64  = '';
     document.querySelectorAll('.form-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelector('.form-tab[data-tab="basic"]')?.classList.add('active');
@@ -222,10 +258,11 @@ function initDashboard() {
   document.getElementById('imageUploadArea')?.addEventListener('click', () => document.getElementById('fImage')?.click());
   document.getElementById('fImage')?.addEventListener('change', (e) => {
     const file = e.target.files[0]; if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { showToast('Image too large (max 2MB)', 'warning'); return; }
+    if (file.size > 5 * 1024 * 1024) { showToast('Image too large (max 5MB)', 'warning'); return; }
+    _currentImageFile = file; // store raw file for Supabase upload
     const reader = new FileReader();
-    reader.onload = async (ev) => {
-      _currentImageB64 = await compressImage(ev.target.result);
+    reader.onload = (ev) => {
+      _currentImageB64 = ev.target.result; // preview only
       const p = document.getElementById('imagePreview');
       if (p) p.innerHTML = `<img src="${_currentImageB64}" alt="preview" />`;
     };
@@ -234,6 +271,9 @@ function initDashboard() {
 
   document.getElementById('orderForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const saveBtn = document.getElementById('modalSave');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
+
     const editId   = document.getElementById('editOrderId')?.value || '';
     const price    = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
     const qty      = parseInt(document.getElementById('fQty')?.value)           || 1;
@@ -241,20 +281,30 @@ function initDashboard() {
     const paid     = parseFloat(document.getElementById('fPaid')?.value)        || 0;
     const total    = (price * qty) + ship, pending = Math.max(0, total - paid);
     const existing = DB.orders.find(o => o.id === editId);
-    const order = {
-      product_name: document.getElementById('fProductName')?.value.trim() || '',
-      order_number: document.getElementById('fOrderNumber')?.value.trim() || '',
-      vendor:       document.getElementById('fVendor')?.value.trim()      || '',
-      variant:      document.getElementById('fVariant')?.value            || '',
-      quantity: qty, order_date: document.getElementById('fOrderDate')?.value || '',
-      eta:      document.getElementById('fEta')?.value    || '',
-      status:   document.getElementById('fStatus')?.value || 'Ordered',
-      preorder_price: parseFloat(document.getElementById('fPreorderPrice')?.value) || 0,
-      actual_price: price, shipping: ship, paid, pending, total,
-      image: _currentImageB64 || existing?.image || '',
-      updatedAt: serverTimestamp()
-    };
+
     try {
+      // ── IMAGE: upload new file to Supabase, or keep existing URL ──
+      let imageUrl = existing?.image || '';
+      if (_currentImageFile) {
+        // If editing and there was an old image, delete it first
+        if (existing?.image) await deleteImageFromSupabase(existing.image);
+        imageUrl = await uploadImageToSupabase(_currentImageFile);
+      }
+
+      const order = {
+        product_name: document.getElementById('fProductName')?.value.trim() || '',
+        order_number: document.getElementById('fOrderNumber')?.value.trim() || '',
+        vendor:       document.getElementById('fVendor')?.value.trim()      || '',
+        variant:      document.getElementById('fVariant')?.value            || '',
+        quantity: qty, order_date: document.getElementById('fOrderDate')?.value || '',
+        eta:      document.getElementById('fEta')?.value    || '',
+        status:   document.getElementById('fStatus')?.value || 'Ordered',
+        preorder_price: parseFloat(document.getElementById('fPreorderPrice')?.value) || 0,
+        actual_price: price, shipping: ship, paid, pending, total,
+        image: imageUrl,  // Supabase public URL (or '' if no image)
+        updatedAt: serverTimestamp()
+      };
+
       if (editId) {
         await updateDoc(doc(db, 'orders', editId), order);
         await addActivity('info', `Order updated — ${order.product_name}`);
@@ -265,7 +315,12 @@ function initDashboard() {
         showToast('Order added!', 'success');
       }
       await fetchData(); closeModal();
-    } catch (err) { console.error(err); showToast('Failed to save order', 'warning'); }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save order: ' + err.message, 'warning');
+    } finally {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Order'; }
+    }
   });
 
   document.getElementById('qaExport')?.addEventListener('click', exportCSV);
@@ -287,12 +342,14 @@ function initDashboard() {
   }
 
   document.getElementById('clearDataBtn')?.addEventListener('click', async () => {
-    if (!confirm('Delete ALL orders?')) return;
+    if (!confirm('Delete ALL orders? This will also remove all uploaded images.')) return;
     try {
+      // Delete all Supabase images first
+      await Promise.all(DB.orders.map(o => o.image ? deleteImageFromSupabase(o.image) : Promise.resolve()));
       await Promise.all(DB.orders.map(o => deleteDoc(doc(db, 'orders', o.id))));
       await addActivity('warning', 'All orders cleared');
       await fetchData(); showToast('All data cleared', 'info');
-    } catch (e) { showToast('Failed to clear', 'warning'); }
+    } catch (e) { showToast('Failed to clear: ' + e.message, 'warning'); }
   });
 }
 
@@ -432,7 +489,8 @@ window.editOrder = function(id) {
    'fVariant,variant','fQty,quantity','fOrderDate,order_date','fEta,eta','fStatus,status',
    'fPreorderPrice,preorder_price','fActualPrice,actual_price','fShipping,shipping','fPaid,paid'
   ].forEach(pair => { const [id,key] = pair.split(','); setVal(id, key==='id'?o.id:o[key]); });
-  _currentImageB64 = '';
+  _currentImageFile = null;
+  _currentImageB64  = '';
   const ip = document.getElementById('imagePreview');
   if(ip) ip.innerHTML = o.image ? `<img src="${o.image}" alt="preview" />` : '<i class="fa-solid fa-image"></i><p>Click to upload image</p>';
   document.getElementById('orderModal')?.classList.remove('hidden'); document.body.style.overflow='hidden';
@@ -450,10 +508,12 @@ window.deleteOrder = async function(id) {
   if(!confirm('Delete this order?')) return;
   try {
     const o = DB.orders.find(x=>x.id===id);
+    // Delete image from Supabase Storage first
+    if (o?.image) await deleteImageFromSupabase(o.image);
     await deleteDoc(doc(db,'orders',id));
     await addActivity('warning',`Order deleted — ${o?.product_name||id}`);
     showToast('Order deleted','success'); await fetchData();
-  } catch(e) { showToast('Failed to delete','warning'); }
+  } catch(e) { showToast('Failed to delete: ' + e.message,'warning'); }
 };
 
 window.viewOrder = function(id) {
