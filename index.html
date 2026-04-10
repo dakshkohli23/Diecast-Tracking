@@ -22,28 +22,42 @@
       </div>
     </div>
 
-    <nav class="sidebar-nav">
-      <a href="#" class="nav-item active" data-section="dashboard" data-tooltip="Dashboard">
-        <i class="fa-solid fa-chart-pie"></i>
-        <span>Dashboard</span>
-      </a>
-      <a href="#" class="nav-item" data-section="orders" data-tooltip="Orders">
-        <i class="fa-solid fa-box"></i>
-        <span>Orders</span>
-      </a>
-      <a href="#" class="nav-item" data-section="analytics" data-tooltip="Analytics">
-        <i class="fa-solid fa-chart-line"></i>
-        <span>Analytics</span>
-      </a>
-      <a href="#" class="nav-item" data-section="payments" data-tooltip="Payments">
-        <i class="fa-solid fa-credit-card"></i>
-        <span>Payments</span>
-      </a>
-      <a href="#" class="nav-item" data-section="settings" data-tooltip="Settings">
-        <i class="fa-solid fa-gear"></i>
-        <span>Settings</span>
-      </a>
-    </nav>
+    <!-- REPLACE entire nav block -->
+<nav class="sidebar-nav">
+
+  <div class="nav-group-label">MAIN</div>
+  <a href="#" class="nav-item active" data-section="dashboard" data-tooltip="Dashboard">
+    <i class="fa-solid fa-chart-pie"></i><span>Dashboard</span>
+  </a>
+  <a href="#" class="nav-item" data-section="inventory" data-tooltip="Inventory">
+    <i class="fa-solid fa-layer-group"></i><span>Inventory</span>
+  </a>
+  <a href="#" class="nav-item" data-section="catalog" data-tooltip="Catalog">
+    <i class="fa-solid fa-table-cells"></i><span>Catalog</span>
+  </a>
+
+  <div class="nav-group-label">WORKFLOW</div>
+  <a href="#" class="nav-item" data-section="kanban" data-tooltip="Kanban">
+    <i class="fa-solid fa-table-columns"></i><span>Kanban</span>
+  </a>
+  <a href="#" class="nav-item" data-section="orders" data-tooltip="Orders">
+    <i class="fa-solid fa-truck"></i><span>Orders</span>
+  </a>
+
+  <div class="nav-group-label">REPORTS</div>
+  <a href="#" class="nav-item" data-section="analytics" data-tooltip="Analytics">
+    <i class="fa-solid fa-chart-line"></i><span>Analytics</span>
+  </a>
+
+  <div class="nav-group-label">SYSTEM</div>
+  <a href="#" class="nav-item" data-section="payments" data-tooltip="Payments">
+    <i class="fa-solid fa-credit-card"></i><span>Payments</span>
+  </a>
+  <a href="#" class="nav-item" data-section="settings" data-tooltip="Settings">
+    <i class="fa-solid fa-gear"></i><span>Settings</span>
+  </a>
+
+</nav>
 
     <div class="sidebar-footer">
       <button class="nav-item logout-btn" id="logoutBtn" data-tooltip="Logout">
@@ -411,7 +425,61 @@
           </div>
         </div>
       </section>
+<!-- ═══ SECTION: INVENTORY ═══ -->
+      <section class="section" id="section-inventory">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Inventory</h2>
+            <p class="section-sub">Your delivered collection</p>
+          </div>
+        </div>
+        <div class="catalog-grid" id="inventoryGrid">
+          <div class="empty-state">No delivered items yet</div>
+        </div>
+      </section>
 
+      <!-- ═══ SECTION: CATALOG ═══ -->
+      <section class="section" id="section-catalog">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Catalog</h2>
+            <p class="section-sub">All tracked models</p>
+          </div>
+        </div>
+        <div class="catalog-grid" id="catalogGrid">
+          <div class="empty-state">No models tracked yet</div>
+        </div>
+      </section>
+
+      <!-- ═══ SECTION: KANBAN ═══ -->
+      <section class="section" id="section-kanban">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Kanban</h2>
+            <p class="section-sub">Orders by status</p>
+          </div>
+        </div>
+        <div class="kanban-board" id="kanbanBoard">
+          <div class="kanban-col" id="kb-ordered">
+            <div class="kanban-col-header"><span class="kb-dot ordered"></span>Ordered</div>
+            <div class="kanban-cards" id="kbc-ordered"></div>
+          </div>
+          <div class="kanban-col" id="kb-processing">
+            <div class="kanban-col-header"><span class="kb-dot processing"></span>Processing</div>
+            <div class="kanban-cards" id="kbc-processing"></div>
+          </div>
+          <div class="kanban-col" id="kb-shipped">
+            <div class="kanban-col-header"><span class="kb-dot shipped"></span>Shipped</div>
+            <div class="kanban-cards" id="kbc-shipped"></div>
+          </div>
+          <div class="kanban-col" id="kb-delivered">
+            <div class="kanban-col-header"><span class="kb-dot delivered"></span>Delivered</div>
+            <div class="kanban-cards" id="kbc-delivered"></div>
+          </div>
+        </div>
+      </section>
+
+      
     </main>
   </div>
 
