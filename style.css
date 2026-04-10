@@ -1996,3 +1996,38 @@ input, select, textarea { color-scheme: light; }
 @media (max-width: 400px) {
   .stats-grid { grid-template-columns: 1fr; }
 }
+
+/* ── INVENTORY FILTERS ── */
+.inv-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 1rem 1.2rem 0.6rem;
+}
+.inv-filters input,
+.inv-filters select {
+  padding: 0.5rem 0.8rem;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color .2s;
+}
+.inv-filters input { flex: 1; min-width: 160px; }
+.inv-filters select { min-width: 130px; }
+.inv-filters input:focus,
+.inv-filters select:focus { border-color: var(--primary); }
+
+/* Extra status badge colours */
+.badge-wishlist    { background: rgba(168,85,247,.15); color: #a855f7; }
+.badge-preorder    { background: rgba(251,146,60,.15);  color: #f97316; }
+.badge-owned       { background: rgba(34,197,94,.15);   color: #22c55e; }
+.badge-in-transit  { background: rgba(56,189,248,.15);  color: #38bdf8; }
+.badge-sold        { background: rgba(239,68,68,.15);   color: #ef4444; }
+
+@media (max-width: 768px) {
+  .inv-filters input  { min-width: 100%; }
+  .inv-filters select { min-width: calc(50% - 0.3rem); flex: 1; }
+}
