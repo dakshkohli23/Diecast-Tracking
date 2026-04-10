@@ -1769,6 +1769,181 @@ input, select, textarea { color-scheme: light; }
 
 .vendor-chip { background: rgba(124,92,252,0.1); color: var(--primary); }
 
+/* ── NAV GROUP LABELS ── */
+.nav-group-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 0.85rem 0.85rem 0.25rem;
+  text-transform: uppercase;
+  opacity: 0.6;
+  white-space: nowrap;
+  transition: opacity var(--transition);
+}
+.sidebar.collapsed .nav-group-label {
+  opacity: 0;
+  height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ── CATALOG / INVENTORY GRID ── */
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.catalog-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(124,92,252,0.1);
+  box-shadow: 0 2px 12px rgba(100,80,220,0.07);
+  overflow: hidden;
+  transition: var(--transition);
+  cursor: default;
+}
+.catalog-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(100,80,220,0.14);
+}
+
+.catalog-card-img {
+  width: 100%;
+  height: 130px;
+  background: linear-gradient(135deg, rgba(124,92,252,0.08), rgba(99,102,241,0.08));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.5rem;
+  color: rgba(124,92,252,0.3);
+  overflow: hidden;
+  position: relative;
+}
+.catalog-card-img img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+
+.catalog-card-body {
+  padding: 0.85rem;
+}
+.catalog-card-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.catalog-card-vendor {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+.catalog-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.catalog-card-price {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* ── KANBAN ── */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.kanban-col {
+  background: #f7f6ff;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(124,92,252,0.1);
+  padding: 0.85rem;
+  min-height: 300px;
+}
+
+.kanban-col-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kb-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.kb-dot.ordered    { background: var(--indigo); }
+.kb-dot.processing { background: var(--orange); }
+.kb-dot.shipped    { background: var(--primary); }
+.kb-dot.delivered  { background: var(--green); }
+
+.kanban-cards { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.kb-card {
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  border: 1px solid rgba(124,92,252,0.09);
+  box-shadow: 0 1px 6px rgba(100,80,220,0.06);
+  transition: var(--transition);
+}
+.kb-card:hover {
+  box-shadow: 0 4px 16px rgba(100,80,220,0.12);
+  transform: translateY(-1px);
+}
+.kb-card-name {
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+.kb-card-meta {
+  font-size: 0.71rem;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+}
+.kb-card-price {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+.kb-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  padding: 1rem 0;
+}
+
+/* ── WISHLIST PRIORITY ── */
+.priority-high   { color: var(--red);    background: rgba(239,68,68,0.1);  }
+.priority-medium { color: var(--orange); background: rgba(249,115,22,0.1); }
+.priority-low    { color: var(--green);  background: rgba(34,197,94,0.1);  }
+
+/* RESPONSIVE */
+@media (max-width: 1100px) {
+  .kanban-board { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .kanban-board { grid-template-columns: 1fr; }
+  .catalog-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+
 /* ══════════════════════════════════════
    RESPONSIVE
 ══════════════════════════════════════ */
