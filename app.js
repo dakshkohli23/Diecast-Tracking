@@ -164,6 +164,23 @@ function initDashboard() {
     document.getElementById(id)?.addEventListener('change', applyInventoryFilters);
   });
 
+  // ✅ ADDED: Inventory clear filters button
+  document.getElementById('invClearFilters')?.addEventListener('click', () => {
+    const invSearch       = document.getElementById('invSearch');
+    const invFilterBrand  = document.getElementById('invFilterBrand');
+    const invFilterStatus = document.getElementById('invFilterStatus');
+    const invFilterScale  = document.getElementById('invFilterScale');
+    const invSort         = document.getElementById('invSort');
+
+    if (invSearch)       invSearch.value = '';
+    if (invFilterBrand)  invFilterBrand.value = '';
+    if (invFilterStatus) invFilterStatus.value = '';
+    if (invFilterScale)  invFilterScale.value = '';
+    if (invSort)         invSort.value = 'name-az';
+
+    applyInventoryFilters();
+  });
+
   // invAddBtn opens the same modal
   document.getElementById('invAddBtn')?.addEventListener('click', () => {
     document.getElementById('modalTitle').textContent = 'Add New Model'; openModal();
