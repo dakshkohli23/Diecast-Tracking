@@ -158,6 +158,17 @@ function initDashboard() {
     catch (e) { showToast('Logout failed', 'warning'); }
   });
 
+  // Inventory filters
+  ['invSearch','invFilterBrand','invFilterStatus','invFilterScale','invSort'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input',  applyInventoryFilters);
+    document.getElementById(id)?.addEventListener('change', applyInventoryFilters);
+  });
+
+  // invAddBtn opens the same modal
+  document.getElementById('invAddBtn')?.addEventListener('click', () => {
+    document.getElementById('modalTitle').textContent = 'Add New Model'; openModal();
+  });
+
   document.getElementById('globalSearch')?.addEventListener('input', (e) => {
     const q = e.target.value.trim();
     if (q.length > 0) {
@@ -294,14 +305,19 @@ function initDashboard() {
       const order = {
         product_name: document.getElementById('fProductName')?.value.trim() || '',
         order_number: document.getElementById('fOrderNumber')?.value.trim() || '',
+        brand:        document.getElementById('fBrand')?.value.trim()       || '',
+        series:       document.getElementById('fSeries')?.value.trim()      || '',
+        scale:        document.getElementById('fScale')?.value              || '1:64',
+        condition:    document.getElementById('fCondition')?.value          || 'Mint',
         vendor:       document.getElementById('fVendor')?.value.trim()      || '',
+        location:     document.getElementById('fLocation')?.value.trim()    || '',
         variant:      document.getElementById('fVariant')?.value            || '',
         quantity: qty, order_date: document.getElementById('fOrderDate')?.value || '',
         eta:      document.getElementById('fEta')?.value    || '',
         status:   document.getElementById('fStatus')?.value || 'Ordered',
         preorder_price: parseFloat(document.getElementById('fPreorderPrice')?.value) || 0,
         actual_price: price, shipping: ship, paid, pending, total,
-        image: imageUrl,  // Supabase public URL (or '' if no image)
+        image: imageUrl,
         updatedAt: serverTimestamp()
       };
 
@@ -485,10 +501,14 @@ function renderTable(orders) {
 window.editOrder = function(id) {
   const o = DB.orders.find(x=>x.id===id); if(!o) return;
   document.getElementById('modalTitle').textContent = 'Edit Order';
-  ['editOrderId,id','fProductName,product_name','fOrderNumber,order_number','fVendor,vendor',
-   'fVariant,variant','fQty,quantity','fOrderDate,order_date','fEta,eta','fStatus,status',
-   'fPreorderPrice,preorder_price','fActualPrice,actual_price','fShipping,shipping','fPaid,paid'
-  ].forEach(pair => { const [id,key] = pair.split(','); setVal(id, key==='id'?o.id:o[key]); });
+  [
+    ['editOrderId','id'],['fProductName','product_name'],['fOrderNumber','order_number'],
+    ['fBrand','brand'],['fSeries','series'],['fScale','scale'],['fCondition','condition'],
+    ['fVendor','vendor'],['fLocation','location'],['fVariant','variant'],
+    ['fQty','quantity'],['fOrderDate','order_date'],['fEta','eta'],['fStatus','status'],
+    ['fPreorderPrice','preorder_price'],['fActualPrice','actual_price'],
+    ['fShipping','shipping'],['fPaid','paid']
+  ].forEach(([fieldId, key]) => { setVal(fieldId, key==='id' ? o.id : o[key]); });
   _currentImageFile = null;
   _currentImageB64  = '';
   const ip = document.getElementById('imagePreview');
@@ -508,12 +528,21 @@ window.deleteOrder = async function(id) {
   if(!confirm('Delete this order?')) return;
   try {
     const o = DB.orders.find(x=>x.id===id);
-    // Delete image from Supabase Storage first
     if (o?.image) await deleteImageFromSupabase(o.image);
     await deleteDoc(doc(db,'orders',id));
     await addActivity('warning',`Order deleted — ${o?.product_name||id}`);
     showToast('Order deleted','success'); await fetchData();
   } catch(e) { showToast('Failed to delete: ' + e.message,'warning'); }
+};
+
+window.duplicateOrder = async function(id) {
+  const o = DB.orders.find(x=>x.id===id); if(!o) return;
+  try {
+    const { id: _id, createdAt, updatedAt, ...copy } = o;
+    await addDoc(collection(db,'orders'), { ...copy, product_name: copy.product_name + ' (Copy)', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    await addActivity('info', `Order duplicated — ${o.product_name}`);
+    showToast('Order duplicated!', 'success'); await fetchData();
+  } catch(e) { showToast('Failed to duplicate', 'warning'); }
 };
 
 window.viewOrder = function(id) {
@@ -543,21 +572,74 @@ window.viewOrder = function(id) {
 
 /* ── INVENTORY ── */
 function renderInventory() {
-  const grid = document.getElementById('inventoryGrid'); if(!grid) return;
-  const items = DB.orders.filter(o=>o.status==='Delivered');
-  if(!items.length) { grid.innerHTML=`<div class="empty-state">No delivered items yet</div>`; return; }
-  grid.innerHTML = items.map(o=>`
-    <div class="catalog-card">
-      <div class="catalog-card-img">${o.image?`<img src="${o.image}" alt="${escHtml(o.product_name)}" />`:`<i class="fa-solid fa-car-side"></i>`}</div>
-      <div class="catalog-card-body">
-        <div class="catalog-card-name">${escHtml(o.product_name)}</div>
-        <div class="catalog-card-vendor">${escHtml(o.vendor||'—')} • ${escHtml(o.variant||'Box')}</div>
-        <div class="catalog-card-footer">
-          <span class="catalog-card-price">₹${(o.total||0).toLocaleString('en-IN')}</span>
-          <span class="badge badge-delivered">Delivered</span>
+  applyInventoryFilters();
+  // Populate brand filter
+  const bf = document.getElementById('invFilterBrand');
+  if (bf) {
+    const cur = bf.value;
+    const brands = [...new Set(DB.orders.map(o => o.brand || o.vendor).filter(Boolean))];
+    bf.innerHTML = `<option value="">All Brands</option>` + brands.map(b => `<option value="${escHtml(b)}">${escHtml(b)}</option>`).join('');
+    bf.value = cur;
+  }
+}
+
+function applyInventoryFilters() {
+  const q      = (document.getElementById('invSearch')?.value || '').toLowerCase();
+  const brand  = document.getElementById('invFilterBrand')?.value  || '';
+  const status = document.getElementById('invFilterStatus')?.value || '';
+  const scale  = document.getElementById('invFilterScale')?.value  || '';
+  const sort   = document.getElementById('invSort')?.value         || 'name-az';
+
+  let items = DB.orders.filter(o => {
+    const b = o.brand || o.vendor || '';
+    const matchQ      = !q      || (o.product_name||'').toLowerCase().includes(q) || b.toLowerCase().includes(q) || (o.series||'').toLowerCase().includes(q);
+    const matchBrand  = !brand  || b === brand;
+    const matchStatus = !status || o.status === status;
+    const matchScale  = !scale  || o.scale  === scale;
+    return matchQ && matchBrand && matchStatus && matchScale;
+  });
+
+  if (sort === 'name-az')  items.sort((a,b) => (a.product_name||'').localeCompare(b.product_name||''));
+  if (sort === 'name-za')  items.sort((a,b) => (b.product_name||'').localeCompare(a.product_name||''));
+  if (sort === 'price-hi') items.sort((a,b) => (b.actual_price||0) - (a.actual_price||0));
+  if (sort === 'price-lo') items.sort((a,b) => (a.actual_price||0) - (b.actual_price||0));
+
+  const tbody = document.getElementById('inventoryTableBody');
+  if (!tbody) return;
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="11" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map(o => {
+    const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+    const thumb = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
+    const cond  = o.condition || 'Mint';
+    const track = o.order_number ? `• ${escHtml(o.order_number)}` : '• No tracking';
+    return `<tr>
+      <td><div class="order-product-cell">
+        <div class="order-thumb">${thumb}</div>
+        <div>
+          <div class="order-product-name">${escHtml(o.product_name)}</div>
+          <div class="order-variant" style="font-size:0.7rem;opacity:0.6">${escHtml(cond)} ${track}</div>
         </div>
-      </div>
-    </div>`).join('');
+      </div></td>
+      <td>${escHtml(o.brand||o.vendor||'—')}</td>
+      <td>${escHtml(o.series||'—')}</td>
+      <td><code style="font-size:0.75rem">${escHtml(o.scale||'1:64')}</code></td>
+      <td><span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></td>
+      <td>${o.quantity||1}</td>
+      <td>₹${(o.actual_price||0).toLocaleString('en-IN')}</td>
+      <td>₹${(o.preorder_price||0).toLocaleString('en-IN')}</td>
+      <td>${escHtml(o.vendor||'—')}</td>
+      <td style="font-size:0.78rem;color:var(--text-muted)">${escHtml(o.location||'—')}</td>
+      <td><div class="table-actions">
+        <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')" title="View"><i class="fa-solid fa-eye"></i></button>
+        <button class="btn btn-ghost btn-icon" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-ghost btn-icon" onclick="duplicateOrder('${o.id}')" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
+        <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+      </div></td>
+    </tr>`;
+  }).join('');
 }
 
 /* ── CATALOG ── */
