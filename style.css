@@ -2006,17 +2006,18 @@ input, select, textarea { color-scheme: light; }
 }
 .inv-filters input,
 .inv-filters select {
-  padding: 0.5rem 0.8rem;
-  border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-main);
-  font-size: 0.82rem;
-  outline: none;
-  transition: border-color .2s;
+	height: 40px;
+    padding: 0 12px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 13px;
+    outline: none;
+    transition: .2s ease;
 }
 .inv-filters input { flex: 1; min-width: 160px; }
-.inv-filters select { min-width: 130px; }
+.inv-filters select { min-width: 150px; }
 .inv-filters input:focus,
 .inv-filters select:focus { border-color: var(--primary); }
 
