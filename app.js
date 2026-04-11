@@ -276,23 +276,35 @@ function initDashboard() {
   });
 
   function calcTotals() {
-    const price = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
-    const qty   = parseInt(document.getElementById('fQty')?.value)           || 1;
-    const ship  = parseFloat(document.getElementById('fShipping')?.value)    || 0;
-    const paid  = parseFloat(document.getElementById('fPaid')?.value)        || 0;
-    const total = (price * qty) + ship;
-    const pending = Math.max(0, total - paid);
+    const price      = parseFloat(document.getElementById('fActualPrice')?.value)    || 0;
+    const qty        = parseInt(document.getElementById('fQty')?.value)              || 1;
+    const ship       = parseFloat(document.getElementById('fShipping')?.value)       || 0;
+    const paidEach   = parseFloat(document.getElementById('fPaid')?.value)           || 0;
+    // Total = (buy price per piece × qty) + shipping
+    const total      = (price * qty) + ship;
+    // Paid total = paid per piece × qty
+    const paidTotal  = paidEach * qty;
+    // Pending = total - what has been paid
+    const pending    = Math.max(0, total - paidTotal);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
-    const td = document.getElementById('fTotalDisplay'); if (td) td.textContent = fmt(total);
-    const pd = document.getElementById('fPendingDisplay'); if (pd) {
+    const td = document.getElementById('fTotalDisplay');
+    if (td) {
+      td.textContent = fmt(total);
+      td.title = `(₹${price.toLocaleString('en-IN')} × ${qty}) + ₹${ship.toLocaleString('en-IN')} shipping`;
+    }
+    const pd = document.getElementById('fPendingDisplay');
+    if (pd) {
       pd.textContent = fmt(pending);
       pd.classList.toggle('fg-calc-overdue', pending > 0);
+      if (paidTotal > 0) pd.title = `Paid ₹${paidEach.toLocaleString('en-IN')} × ${qty} = ₹${paidTotal.toLocaleString('en-IN')}`;
     }
     if (document.getElementById('fTotal'))   document.getElementById('fTotal').value   = total;
     if (document.getElementById('fPending')) document.getElementById('fPending').value = pending;
+    // Store actual paid total for Firestore
+    if (document.getElementById('fPaidTotal')) document.getElementById('fPaidTotal').value = paidTotal;
   }
 
-  ['addOrderBtn','quickAddBtn','qaAddOrder'].forEach(id => {
+  ['addOrderBtn','quickAddBtn','qaAddOrder','sidebarAddOrder'].forEach(id => {
     document.getElementById(id)?.addEventListener('click', () => {
       document.getElementById('modalTitle').textContent = 'Add New Model'; openModal();
     });
@@ -331,11 +343,13 @@ function initDashboard() {
     if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
 
     const editId   = document.getElementById('editOrderId')?.value || '';
-    const price    = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
-    const qty      = parseInt(document.getElementById('fQty')?.value)           || 1;
-    const ship     = parseFloat(document.getElementById('fShipping')?.value)    || 0;
-    const paid     = parseFloat(document.getElementById('fPaid')?.value)        || 0;
-    const total    = (price * qty) + ship, pending = Math.max(0, total - paid);
+    const price    = parseFloat(document.getElementById('fActualPrice')?.value)  || 0;
+    const qty      = parseInt(document.getElementById('fQty')?.value)            || 1;
+    const ship     = parseFloat(document.getElementById('fShipping')?.value)     || 0;
+    const paidEach = parseFloat(document.getElementById('fPaid')?.value)         || 0;
+    const paidTotal = paidEach * qty;
+    const total    = (price * qty) + ship;
+    const pending  = Math.max(0, total - paidTotal);
     const existing = DB.orders.find(o => o.id === editId);
 
     try {
@@ -360,7 +374,8 @@ function initDashboard() {
         eta:      document.getElementById('fEta')?.value    || '',
         status:   document.getElementById('fStatus')?.value || 'Ordered',
         preorder_price: parseFloat(document.getElementById('fPreorderPrice')?.value) || 0,
-        actual_price: price, shipping: ship, paid, pending, total,
+        actual_price: price, shipping: ship,
+        paid_each: paidEach, paid: paidTotal, pending, total,
         image: imageUrl, updatedAt: serverTimestamp()
       };
 
@@ -403,13 +418,43 @@ function initDashboard() {
   }
 
   document.getElementById('clearDataBtn')?.addEventListener('click', async () => {
-    if (!confirm('Delete ALL orders? This will also remove all uploaded images.')) return;
+    // Show password confirmation modal instead of simple confirm
+    const pwModal = document.getElementById('clearDataModal');
+    if (pwModal) { pwModal.classList.remove('hidden'); document.getElementById('clearDataPw')?.focus(); }
+  });
+
+  // Close X button on clear data modal
+  document.getElementById('clearDataCancelBtn')?.addEventListener('click', () => {
+    document.getElementById('clearDataModal')?.classList.add('hidden');
+    if (document.getElementById('clearDataPw')) document.getElementById('clearDataPw').value = '';
+    if (document.getElementById('clearDataPwErr')) document.getElementById('clearDataPwErr').textContent = '';
+  });
+
+  document.getElementById('clearDataConfirmBtn')?.addEventListener('click', async () => {
+    const pw = document.getElementById('clearDataPw')?.value || '';
+    const pwErr = document.getElementById('clearDataPwErr');
+    if (!pw) { if(pwErr) pwErr.textContent='Enter your password'; return; }
+    const user = auth.currentUser;
+    if (!user) { if(pwErr) pwErr.textContent='Not logged in'; return; }
     try {
+      const { signInWithEmailAndPassword: reauth } = await import("https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js");
+      await reauth(auth, user.email, pw);
+      // Password correct — proceed with deletion
+      document.getElementById('clearDataModal')?.classList.add('hidden');
+      if (document.getElementById('clearDataPw')) document.getElementById('clearDataPw').value = '';
       await Promise.all(DB.orders.map(o => o.image ? deleteImageFromSupabase(o.image) : Promise.resolve()));
       await Promise.all(DB.orders.map(o => deleteDoc(doc(db, 'orders', o.id))));
       await addActivity('warning', 'All orders cleared');
       await fetchData(); showToast('All data cleared', 'info');
-    } catch (e) { showToast('Failed to clear: ' + e.message, 'warning'); }
+    } catch(e) {
+      if(pwErr) pwErr.textContent = 'Incorrect password. Try again.';
+    }
+  });
+
+  document.getElementById('clearDataCancelBtnFooter')?.addEventListener('click', () => {
+    document.getElementById('clearDataModal')?.classList.add('hidden');
+    if (document.getElementById('clearDataPw')) document.getElementById('clearDataPw').value = '';
+    if (document.getElementById('clearDataPwErr')) document.getElementById('clearDataPwErr').textContent = '';
   });
 }
 
@@ -441,7 +486,7 @@ function initGreeting() {
     const h     = new Date().getHours();
     const emoji = h < 12 ? '<i class="fa-solid fa-cloud-sun"></i>' : h < 17 ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
     const word  = h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening';
-    if (gt) gt.innerHTML = `${word}, Mr. Dlaize! ${emoji}`;
+    if (gt) gt.innerHTML = `Good ${word}, Daksh! ${emoji}`;
     if (gd) gd.textContent = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   }
 
@@ -466,9 +511,18 @@ function renderAll() {
   renderAnalytics();
   renderBrandLeaderboard();
   renderCatalog();
+  renderSettingsInfo();
 
   const ss = document.getElementById('systemStatus');
   if (ss) { ss.innerHTML = `<span class="status-dot"></span> All systems live`; ss.className = 'system-status live'; }
+}
+
+function renderSettingsInfo() {
+  const cnt = document.getElementById('settingsModelCount');
+  if (cnt) cnt.textContent = `${DB.orders.length} model${DB.orders.length !== 1 ? 's' : ''}`;
+  const user = auth.currentUser;
+  const emailEl = document.getElementById('settingsUserEmail');
+  if (emailEl && user) emailEl.textContent = user.email || '—';
 }
 
 /* ══════════════════════════════════════ STATS ══════════════════════════════════════ */
@@ -604,8 +658,11 @@ window.editOrder = function(id) {
     ['fNotes','notes'],
     ['fQty','quantity'],['fOrderDate','order_date'],['fEta','eta'],
     ['fPreorderPrice','preorder_price'],['fActualPrice','actual_price'],
-    ['fShipping','shipping'],['fPaid','paid']
+    ['fShipping','shipping']
   ].forEach(([fieldId, key]) => { const el=document.getElementById(fieldId); if(el) el.value = key==='id' ? o.id : (o[key]??''); });
+  // fPaid should show paid per piece (paid_each), not total paid
+  const paidEachEl = document.getElementById('fPaid');
+  if (paidEachEl) paidEachEl.value = o.paid_each ?? (o.paid || 0);
 
   // Set brand dropdown
   const brandSel = document.getElementById('fBrandSelect');
@@ -646,8 +703,10 @@ window.editOrder = function(id) {
   document.getElementById('orderModal')?.classList.remove('hidden'); document.body.style.overflow='hidden';
 
   // Recalc totals display
-  const price=(parseFloat(o.actual_price)||0), qty2=(parseInt(o.quantity)||1), ship2=(parseFloat(o.shipping)||0), paid2=(parseFloat(o.paid)||0);
-  const total2=(price*qty2)+ship2, pending2=Math.max(0,total2-paid2);
+  const price2=(parseFloat(o.actual_price)||0), qty2=(parseInt(o.quantity)||1), ship2=(parseFloat(o.shipping)||0);
+  const paidEach2 = parseFloat(o.paid_each ?? o.paid) || 0;
+  const paidTotal2 = paidEach2 * qty2;
+  const total2=(price2*qty2)+ship2, pending2=Math.max(0,total2-paidTotal2);
   const fmt = v=>`₹${v.toLocaleString('en-IN')}`;
   const td=document.getElementById('fTotalDisplay'); if(td) td.textContent=fmt(total2);
   const pd=document.getElementById('fPendingDisplay'); if(pd){ pd.textContent=fmt(pending2); pd.classList.toggle('fg-calc-overdue',pending2>0); }
