@@ -2928,841 +2928,494 @@ body {
 
   <!-- FIREBASE + APP LOGIC -->
 <script type="module">
-  /* ===============================
-     PRETRACK — INLINE APP SCRIPT
-     Firebase Auth + Firestore + Supabase
-     Single-file version for combined.html
-     =============================== */
+/* =========================
+   PRETRACK FINAL SAFE SCRIPT
+   ========================= */
 
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-  import {
-    getAuth,
-    signInWithEmailAndPassword,
-    signOut,
-    onAuthStateChanged
-  } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-  import {
-    getFirestore,
-    collection,
-    getDocs,
-    addDoc,
-    updateDoc,
-    deleteDoc,
-    doc,
-    query,
-    orderBy,
-    serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
-  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-  /* ===============================
-     🔴 IMPORTANT:
-     REPLACE THESE WITH YOUR REAL KEYS
-     (use the same keys from your existing app.js)
-     =============================== */
-  const firebaseConfig = {
-    apiKey: "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
-  authDomain: "diecast-tracking-471f7.firebaseapp.com",
-  projectId: "diecast-tracking-471f7",
-  storageBucket: "diecast-tracking-471f7.firebasestorage.app",
-  messagingSenderId: "1042711268055",
-  appId: "1:1042711268055:web:9b09ded970a85532767e92"
+/* =========================
+   REPLACE WITH YOUR REAL CONFIG
+   ========================= */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.firebasestorage.app",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let ORDERS = [];
+let ACTIVITY = [];
+let currentEditId = null;
+
+/* =========================
+   SAFE DOM HELPERS
+   ========================= */
+const $ = (id) => document.getElementById(id);
+const el = (id) => document.getElementById(id) || null;
+
+function txt(id, value) {
+  const node = el(id);
+  if (node) node.textContent = value;
+}
+
+function html(id, value) {
+  const node = el(id);
+  if (node) node.innerHTML = value;
+}
+
+function show(id) {
+  const node = el(id);
+  if (node) node.classList.remove("hidden");
+}
+
+function hide(id) {
+  const node = el(id);
+  if (node) node.classList.add("hidden");
+}
+
+function num(v) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function money(v) {
+  return "₹" + num(v).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+
+function esc(v = "") {
+  return String(v)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function dateFmt(v) {
+  if (!v) return "—";
+  try {
+    if (typeof v === "string") {
+      const d = new Date(v);
+      if (!isNaN(d)) return d.toLocaleDateString("en-IN");
+    }
+    if (v?.seconds) return new Date(v.seconds * 1000).toLocaleDateString("en-IN");
+  } catch {}
+  return "—";
+}
+
+function toast(msg, type = "info") {
+  let wrap = el("toastContainer");
+  if (!wrap) {
+    wrap = document.createElement("div");
+    wrap.id = "toastContainer";
+    wrap.className = "toast-container";
+    document.body.appendChild(wrap);
+  }
+
+  const icons = {
+    success: "fa-circle-check",
+    error: "fa-circle-xmark",
+    warning: "fa-triangle-exclamation",
+    info: "fa-circle-info"
   };
 
-const SUPABASE_URL      = 'https://ifzioqfkgjkqkirmtgly.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmemlvcWZrZ2prcWtpcm10Z2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDk4ODMsImV4cCI6MjA5MTM4NTg4M30.3sRDtBjSVcOPjS817TjR6ZP1druW-WW7rxiV1Zb3NCQ';
-const SUPABASE_BUCKET   = 'order-images';
+  const t = document.createElement("div");
+  t.className = `toast ${type}`;
+  t.innerHTML = `
+    <div class="toast-icon"><i class="fa-solid ${icons[type] || icons.info}"></i></div>
+    <div class="toast-msg">${esc(msg)}</div>
+    <button class="toast-close" type="button"><i class="fa-solid fa-xmark"></i></button>
+    <div class="toast-bar"></div>
+  `;
+  wrap.appendChild(t);
 
-  /* ===============================
-     INIT
-     =============================== */
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  t.querySelector(".toast-close")?.addEventListener("click", () => removeToast(t));
+  setTimeout(() => removeToast(t), 3500);
+}
 
-  /* ===============================
-     STATE
-     =============================== */
-  let DB = { orders: [], activity: [] };
-  let editingId = null;
-  let currentUser = null;
-  let selectedImageFile = null;
+function removeToast(t) {
+  if (!t) return;
+  t.classList.add("out");
+  setTimeout(() => t.remove(), 250);
+}
 
-  /* ===============================
-     HELPERS
-     =============================== */
-  const $ = (id) => document.getElementById(id);
+/* =========================
+   SAFE FETCH (NO orderBy)
+   This avoids createdAt failures
+   ========================= */
+async function fetchOrders() {
+  const snap = await getDocs(collection(db, "orders"));
+  ORDERS = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => {
+      const A = a.createdAt?.seconds || 0;
+      const B = b.createdAt?.seconds || 0;
+      return B - A;
+    });
+}
 
-  function safeEl(id) {
-    return document.getElementById(id) || null;
-  }
-
-  function showToast(message, type = "info") {
-    let container = safeEl("toastContainer");
-    if (!container) {
-      container = document.createElement("div");
-      container.id = "toastContainer";
-      container.className = "toast-container";
-      document.body.appendChild(container);
-    }
-
-    const iconMap = {
-      success: "fa-circle-check",
-      error: "fa-circle-xmark",
-      warning: "fa-triangle-exclamation",
-      info: "fa-circle-info"
-    };
-
-    const toast = document.createElement("div");
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-      <div class="toast-icon"><i class="fa-solid ${iconMap[type] || iconMap.info}"></i></div>
-      <div class="toast-msg">${escapeHtml(message)}</div>
-      <button class="toast-close" type="button"><i class="fa-solid fa-xmark"></i></button>
-      <div class="toast-bar"></div>
-    `;
-
-    container.appendChild(toast);
-
-    const closeBtn = toast.querySelector(".toast-close");
-    closeBtn?.addEventListener("click", () => removeToast(toast));
-
-    setTimeout(() => removeToast(toast), 3500);
-  }
-
-  function removeToast(toast) {
-    if (!toast) return;
-    toast.classList.add("out");
-    setTimeout(() => toast.remove(), 280);
-  }
-
-  function escapeHtml(str = "") {
-    return String(str)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
-  function toNumber(v) {
-    const n = parseFloat(v);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  function formatCurrency(n) {
-    return `₹${toNumber(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-  }
-
-  function formatDate(value) {
-    if (!value) return "—";
-    try {
-      if (typeof value === "string") {
-        const d = new Date(value);
-        if (!isNaN(d)) return d.toLocaleDateString("en-IN");
-      }
-      if (value?.seconds) {
-        return new Date(value.seconds * 1000).toLocaleDateString("en-IN");
-      }
-      return "—";
-    } catch {
-      return "—";
-    }
-  }
-
-  function getPaymentStatus(order) {
-    const total = toNumber(order.total);
-    const paid = toNumber(order.paid);
-    if (paid <= 0) return "Pending";
-    if (paid >= total && total > 0) return "Paid";
-    return "Partial";
-  }
-
-  function paymentBadgeClass(status) {
-    if (status === "Paid") return "badge-paid";
-    if (status === "Partial") return "badge-partial";
-    return "badge-pending-b";
-  }
-
-  function statusBadgeClass(status) {
-    const s = (status || "").toLowerCase();
-    if (s.includes("deliver")) return "badge-delivered";
-    if (s.includes("ship")) return "badge-shipped";
-    if (s.includes("process")) return "badge-processing";
-    return "badge-ordered";
-  }
-
-  function resetImagePreview() {
-    const preview = safeEl("imagePreview");
-    if (!preview) return;
-    preview.innerHTML = `
-      <i class="fa-solid fa-cloud-arrow-up"></i>
-      <span>Click or drag image here</span>
-    `;
-  }
-
-  function setImagePreview(src) {
-    const preview = safeEl("imagePreview");
-    if (!preview) return;
-    preview.innerHTML = `<img src="${src}" alt="Preview" />`;
-  }
-
-  function openModal(id) {
-    const el = safeEl(id);
-    if (el) el.classList.remove("hidden");
-  }
-
-  function closeModal(id) {
-    const el = safeEl(id);
-    if (el) el.classList.add("hidden");
-  }
-
-  /* ===============================
-     SUPABASE IMAGE UPLOAD
-     =============================== */
-  async function uploadImageToSupabase(file) {
-    if (!file) return null;
-
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `orders/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-    const { error } = await supabase.storage
-      .from(SUPABASE_BUCKET)
-      .upload(path, file, {
-        cacheControl: "3600",
-        upsert: false
+async function fetchActivity() {
+  try {
+    const snap = await getDocs(collection(db, "activity"));
+    ACTIVITY = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => {
+        const A = a.createdAt?.seconds || 0;
+        const B = b.createdAt?.seconds || 0;
+        return B - A;
       });
-
-    if (error) {
-      throw new Error(`Supabase upload failed: ${error.message}`);
-    }
-
-    const { data } = supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
-    return data?.publicUrl || null;
+  } catch (e) {
+    console.warn("Activity fetch failed:", e);
+    ACTIVITY = [];
   }
+}
 
-  /* ===============================
-     FIRESTORE FETCH (FIXED)
-     This is the important database fix:
-     - fetch orders and activity separately
-     - fallback if orderBy(createdAt) fails
-     =============================== */
-  async function fetchCollectionSafe(colName) {
-    try {
-      const snap = await getDocs(query(collection(db, colName), orderBy("createdAt", "desc")));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch (orderedErr) {
-      console.warn(`${colName} ordered fetch failed, fallback used:`, orderedErr);
-
-      const snap = await getDocs(collection(db, colName));
-      return snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => {
-          const aTime = a.createdAt?.seconds ? a.createdAt.seconds : 0;
-          const bTime = b.createdAt?.seconds ? b.createdAt.seconds : 0;
-          return bTime - aTime;
-        });
-    }
-  }
-
-  async function fetchData() {
-    let orders = [];
-    let activity = [];
-
-    try {
-      orders = await fetchCollectionSafe("orders");
-    } catch (err) {
-      console.error("Orders fetch failed:", err);
-      showToast(`Orders load failed: ${err.message}`, "warning");
-      orders = [];
-    }
-
-    try {
-      activity = await fetchCollectionSafe("activity");
-    } catch (err) {
-      console.warn("Activity fetch failed:", err);
-      activity = [];
-    }
-
-    DB = { orders, activity };
+async function loadAllData() {
+  try {
+    await fetchOrders();
+    await fetchActivity();
     renderAll();
+    console.log("Firestore loaded:", { orders: ORDERS.length, activity: ACTIVITY.length });
+  } catch (err) {
+    console.error("Firestore load error:", err);
+    toast("Firestore load failed: " + err.message, "error");
+  }
+}
+
+/* =========================
+   RENDER
+   ========================= */
+function renderStats() {
+  const totalOrders = ORDERS.length;
+  const totalQty = ORDERS.reduce((s, o) => s + (num(o.qty) || 1), 0);
+  const totalValue = ORDERS.reduce((s, o) => s + num(o.total), 0);
+  const totalPaid = ORDERS.reduce((s, o) => s + num(o.paid), 0);
+  const pending = Math.max(0, totalValue - totalPaid);
+
+  txt("statTotal", totalOrders);
+  txt("statQty", totalQty);
+  txt("statMarketValue", money(totalValue));
+  txt("statInvestment", money(totalPaid));
+  txt("statPending", money(pending));
+  txt("statPendingPO", ORDERS.filter(o => !String(o.status || "").toLowerCase().includes("deliver")).length);
+  txt("statDelivered", ORDERS.filter(o => String(o.status || "").toLowerCase().includes("deliver")).length);
+  txt("statTransit", ORDERS.filter(o => String(o.status || "").toLowerCase().includes("ship")).length);
+  txt("statOverdue", 0);
+  txt("statDuplicates", 0);
+}
+
+function renderOrders() {
+  const tbody = el("ordersTableBody");
+  if (!tbody) {
+    console.warn("ordersTableBody not found");
+    return;
   }
 
-  /* ===============================
-     ACTIVITY LOG
-     =============================== */
-  async function addActivity(message, type = "info") {
-    try {
-      await addDoc(collection(db, "activity"), {
-        message,
-        type,
-        createdAt: serverTimestamp()
-      });
-    } catch (err) {
-      console.warn("Activity log failed:", err);
-    }
+  if (!ORDERS.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-row">No orders found</td></tr>`;
+    return;
   }
 
-  /* ===============================
-     RENDERERS
-     =============================== */
-  function renderOrdersTable() {
-    const tbody = safeEl("ordersTableBody");
-    if (!tbody) return;
+  tbody.innerHTML = ORDERS.map(o => `
+    <tr>
+      <td>${esc(o.productName || "Untitled")}</td>
+      <td>${esc(o.orderNumber || "—")}</td>
+      <td>${esc(o.brand || "—")}</td>
+      <td>${esc(o.status || "Ordered")}</td>
+      <td>${dateFmt(o.orderDate)}</td>
+      <td>${dateFmt(o.eta)}</td>
+      <td>${money(o.paid || 0)}</td>
+      <td>${money(o.total || 0)}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="window.editOrder('${o.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="window.deleteOrder('${o.id}')">Delete</button>
+      </td>
+    </tr>
+  `).join("");
+}
 
-    const search = (safeEl("orderSearch")?.value || "").toLowerCase().trim();
-    const status = safeEl("filterStatus")?.value || "";
-    const vendor = safeEl("filterVendor")?.value || "";
-    const from = safeEl("filterDateFrom")?.value || "";
-    const to = safeEl("filterDateTo")?.value || "";
+function renderRecent() {
+  const wrap = el("recentOrdersList");
+  if (!wrap) return;
 
-    let rows = [...DB.orders];
-
-    if (search) {
-      rows = rows.filter(o =>
-        [o.productName, o.orderNumber, o.brand, o.series, o.vendor, o.variant]
-          .some(v => String(v || "").toLowerCase().includes(search))
-      );
-    }
-
-    if (status) rows = rows.filter(o => (o.status || "") === status);
-    if (vendor) rows = rows.filter(o => (o.vendor || "") === vendor);
-
-    if (from) {
-      const fromDate = new Date(from);
-      rows = rows.filter(o => {
-        const d = new Date(o.orderDate || 0);
-        return !isNaN(d) && d >= fromDate;
-      });
-    }
-
-    if (to) {
-      const toDate = new Date(to);
-      toDate.setHours(23, 59, 59, 999);
-      rows = rows.filter(o => {
-        const d = new Date(o.orderDate || 0);
-        return !isNaN(d) && d <= toDate;
-      });
-    }
-
-    if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="9" class="empty-row">No orders found</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = rows.map(order => {
-      const payStatus = getPaymentStatus(order);
-      const payPct = Math.min(100, Math.max(0, (toNumber(order.total) ? (toNumber(order.paid) / toNumber(order.total)) * 100 : 0)));
-
-      return `
-        <tr>
-          <td>
-            <div class="order-product-cell">
-              <div class="order-thumb">
-                ${order.imageUrl ? `<img src="${order.imageUrl}" alt="${escapeHtml(order.productName || "Product")}" />` : `<i class="fa-solid fa-box"></i>`}
-              </div>
-              <div>
-                <div class="order-product-name">${escapeHtml(order.productName || "Untitled")}</div>
-                <div class="order-variant">${escapeHtml(order.variant || "—")}</div>
-              </div>
-            </div>
-          </td>
-          <td>${escapeHtml(order.orderNumber || "—")}</td>
-          <td>${escapeHtml(order.brand || "—")}</td>
-          <td>
-            <span class="badge ${statusBadgeClass(order.status)}">${escapeHtml(order.status || "Ordered")}</span>
-            <div class="status-bar"><div class="status-fill fill-${((order.status || "ordered").toLowerCase().replace(/\s+/g, "-"))}"></div></div>
-          </td>
-          <td>${formatDate(order.orderDate)}</td>
-          <td>${formatDate(order.eta)}</td>
-          <td>
-            <span class="badge ${paymentBadgeClass(payStatus)}">${payStatus}</span>
-            <div class="pay-bar-wrap">
-              <div class="pay-bar"><div class="pay-fill" style="width:${payPct}%"></div></div>
-            </div>
-          </td>
-          <td>${formatCurrency(order.total)}</td>
-          <td>
-            <div class="table-actions">
-              <button class="btn btn-ghost btn-icon" onclick="window.viewOrder('${order.id}')"><i class="fa-solid fa-eye"></i></button>
-              <button class="btn btn-ghost btn-icon" onclick="window.editOrder('${order.id}')"><i class="fa-solid fa-pen"></i></button>
-              <button class="btn btn-danger btn-icon" onclick="window.deleteOrder('${order.id}')"><i class="fa-solid fa-trash"></i></button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join("");
+  const recent = ORDERS.slice(0, 5);
+  if (!recent.length) {
+    wrap.innerHTML = `<div class="empty-state">No recent orders</div>`;
+    return;
   }
 
-  function renderInventoryTable() {
-    const tbody = safeEl("inventoryTableBody");
-    if (!tbody) return;
-
-    const delivered = DB.orders.filter(o => (o.status || "").toLowerCase().includes("deliver"));
-
-    if (!delivered.length) {
-      tbody.innerHTML = `<tr><td colspan="8" class="empty-row">No delivered inventory yet</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = delivered.map(order => `
-      <tr>
-        <td>
-          <div class="order-product-cell">
-            <div class="order-thumb">
-              ${order.imageUrl ? `<img src="${order.imageUrl}" alt="${escapeHtml(order.productName || "Product")}" />` : `<i class="fa-solid fa-cube"></i>`}
-            </div>
-            <div>
-              <div class="order-product-name">${escapeHtml(order.productName || "Untitled")}</div>
-              <div class="order-variant">${escapeHtml(order.variant || "—")}</div>
-            </div>
-          </div>
-        </td>
-        <td>${escapeHtml(order.brand || "—")}</td>
-        <td>${escapeHtml(order.series || "—")}</td>
-        <td>${escapeHtml(order.scale || "—")}</td>
-        <td>${escapeHtml(order.condition || "—")}</td>
-        <td>${escapeHtml(order.location || "—")}</td>
-        <td>${toNumber(order.qty) || 1}</td>
-        <td>${formatCurrency(order.total)}</td>
-      </tr>
-    `).join("");
-  }
-
-  function renderRecentOrders() {
-    const el = safeEl("recentOrdersList");
-    if (!el) return;
-
-    const recent = [...DB.orders].slice(0, 5);
-
-    if (!recent.length) {
-      el.innerHTML = `<div class="empty-state">No recent orders</div>`;
-      return;
-    }
-
-    el.innerHTML = recent.map(order => `
-      <div class="recent-order-item">
-        <div class="roi-thumb">
-          ${order.imageUrl ? `<img src="${order.imageUrl}" alt="${escapeHtml(order.productName || "Product")}" />` : `<i class="fa-solid fa-box"></i>`}
-        </div>
-        <div class="roi-info">
-          <div class="roi-name">${escapeHtml(order.productName || "Untitled")}</div>
-          <div class="roi-meta">${escapeHtml(order.brand || "—")} • ${formatDate(order.orderDate)}</div>
-        </div>
-        <div class="roi-status">
-          <span class="badge ${statusBadgeClass(order.status)}">${escapeHtml(order.status || "Ordered")}</span>
-        </div>
+  wrap.innerHTML = recent.map(o => `
+    <div class="recent-order-item">
+      <div class="roi-thumb"><i class="fa-solid fa-box"></i></div>
+      <div class="roi-info">
+        <div class="roi-name">${esc(o.productName || "Untitled")}</div>
+        <div class="roi-meta">${esc(o.brand || "—")} • ${dateFmt(o.orderDate)}</div>
       </div>
-    `).join("");
+    </div>
+  `).join("");
+}
+
+function renderActivityList() {
+  const wrap = el("activityList");
+  if (!wrap) return;
+
+  if (!ACTIVITY.length) {
+    wrap.innerHTML = `<div class="empty-state">No recent activity</div>`;
+    return;
   }
 
-  function renderActivity() {
-    const el = safeEl("activityList");
-    if (!el) return;
+  wrap.innerHTML = ACTIVITY.slice(0, 8).map(a => `
+    <div class="activity-item">
+      <div class="activity-dot ${esc(a.type || "info")}"></div>
+      <div>${esc(a.message || "Updated")}</div>
+      <div class="activity-time">${dateFmt(a.createdAt)}</div>
+    </div>
+  `).join("");
+}
 
-    if (!DB.activity.length) {
-      el.innerHTML = `<div class="empty-state">No recent activity</div>`;
+function renderAll() {
+  renderStats();
+  renderOrders();
+  renderRecent();
+  renderActivityList();
+}
+
+/* =========================
+   CRUD
+   ========================= */
+async function addActivity(message, type = "info") {
+  try {
+    await addDoc(collection(db, "activity"), {
+      message,
+      type,
+      createdAt: serverTimestamp()
+    });
+  } catch (e) {
+    console.warn("Activity add failed", e);
+  }
+}
+
+function getFormData() {
+  return {
+    productName: el("fProductName")?.value?.trim() || "",
+    orderNumber: el("fOrderNumber")?.value?.trim() || "",
+    brand: el("fBrand")?.value?.trim() || "",
+    series: el("fSeries")?.value?.trim() || "",
+    scale: el("fScale")?.value?.trim() || "",
+    condition: el("fCondition")?.value?.trim() || "",
+    vendor: el("fVendor")?.value?.trim() || "",
+    location: el("fLocation")?.value?.trim() || "",
+    variant: el("fVariant")?.value?.trim() || "",
+    qty: num(el("fQty")?.value || 1),
+    orderDate: el("fOrderDate")?.value || "",
+    eta: el("fEta")?.value || "",
+    status: el("fStatus")?.value || "Ordered",
+    preorderPrice: num(el("fPreorderPrice")?.value || 0),
+    actualPrice: num(el("fActualPrice")?.value || 0),
+    shipping: num(el("fShipping")?.value || 0),
+    paid: num(el("fPaid")?.value || 0),
+    total: num(el("fTotal")?.value || 0),
+    pending: num(el("fPending")?.value || 0),
+    updatedAt: serverTimestamp()
+  };
+}
+
+async function submitOrder(e) {
+  e.preventDefault();
+
+  try {
+    const data = getFormData();
+
+    if (!data.productName) {
+      toast("Product name is required", "warning");
       return;
     }
 
-    el.innerHTML = DB.activity.slice(0, 8).map(item => `
-      <div class="activity-item">
-        <div class="activity-dot ${escapeHtml(item.type || "info")}"></div>
-        <div>${escapeHtml(item.message || "Activity updated")}</div>
-        <div class="activity-time">${formatDate(item.createdAt)}</div>
-      </div>
-    `).join("");
-  }
-
-  function renderStats() {
-    const totalOrders = DB.orders.length;
-    const totalQty = DB.orders.reduce((sum, o) => sum + (toNumber(o.qty) || 1), 0);
-    const totalValue = DB.orders.reduce((sum, o) => sum + toNumber(o.total), 0);
-    const totalPaid = DB.orders.reduce((sum, o) => sum + toNumber(o.paid), 0);
-    const totalPending = Math.max(0, totalValue - totalPaid);
-    const delivered = DB.orders.filter(o => (o.status || "").toLowerCase().includes("deliver")).length;
-    const shipped = DB.orders.filter(o => (o.status || "").toLowerCase().includes("ship")).length;
-
-    const map = {
-      statTotal: totalOrders,
-      statQty: totalQty,
-      statMarketValue: formatCurrency(totalValue),
-      statInvestment: formatCurrency(totalPaid),
-      statPending: formatCurrency(totalPending),
-      statPendingPO: DB.orders.filter(o => !String(o.status || "").toLowerCase().includes("deliver")).length,
-      statDelivered: delivered,
-      statTransit: shipped,
-      statOverdue: 0,
-      statDuplicates: 0
-    };
-
-    Object.entries(map).forEach(([id, val]) => {
-      const el = safeEl(id);
-      if (el) el.textContent = val;
-    });
-  }
-
-  function renderAll() {
-    renderOrdersTable();
-    renderInventoryTable();
-    renderRecentOrders();
-    renderActivity();
-    renderStats();
-  }
-
-  /* ===============================
-     FORM
-     =============================== */
-  function clearForm() {
-    editingId = null;
-    selectedImageFile = null;
-
-    const form = safeEl("orderForm");
-    form?.reset();
-
-    if (safeEl("editOrderId")) safeEl("editOrderId").value = "";
-    if (safeEl("modalTitle")) safeEl("modalTitle").textContent = "Add Order";
-
-    resetImagePreview();
-  }
-
-  function getFormData() {
-    return {
-      productName: safeEl("fProductName")?.value?.trim() || "",
-      orderNumber: safeEl("fOrderNumber")?.value?.trim() || "",
-      brand: safeEl("fBrand")?.value?.trim() || "",
-      series: safeEl("fSeries")?.value?.trim() || "",
-      scale: safeEl("fScale")?.value?.trim() || "",
-      condition: safeEl("fCondition")?.value?.trim() || "",
-      vendor: safeEl("fVendor")?.value?.trim() || "",
-      location: safeEl("fLocation")?.value?.trim() || "",
-      variant: safeEl("fVariant")?.value?.trim() || "",
-      qty: toNumber(safeEl("fQty")?.value || 1),
-      orderDate: safeEl("fOrderDate")?.value || "",
-      eta: safeEl("fEta")?.value || "",
-      status: safeEl("fStatus")?.value || "Ordered",
-      preorderPrice: toNumber(safeEl("fPreorderPrice")?.value || 0),
-      actualPrice: toNumber(safeEl("fActualPrice")?.value || 0),
-      shipping: toNumber(safeEl("fShipping")?.value || 0),
-      paid: toNumber(safeEl("fPaid")?.value || 0),
-      total: toNumber(safeEl("fTotal")?.value || 0),
-      pending: toNumber(safeEl("fPending")?.value || 0)
-    };
-  }
-
-  function fillForm(order) {
-    if (!order) return;
-
-    editingId = order.id;
-    if (safeEl("editOrderId")) safeEl("editOrderId").value = order.id;
-    if (safeEl("modalTitle")) safeEl("modalTitle").textContent = "Edit Order";
-
-    const setVal = (id, val) => { const el = safeEl(id); if (el) el.value = val ?? ""; };
-
-    setVal("fProductName", order.productName);
-    setVal("fOrderNumber", order.orderNumber);
-    setVal("fBrand", order.brand);
-    setVal("fSeries", order.series);
-    setVal("fScale", order.scale);
-    setVal("fCondition", order.condition);
-    setVal("fVendor", order.vendor);
-    setVal("fLocation", order.location);
-    setVal("fVariant", order.variant);
-    setVal("fQty", order.qty);
-    setVal("fOrderDate", order.orderDate);
-    setVal("fEta", order.eta);
-    setVal("fStatus", order.status);
-    setVal("fPreorderPrice", order.preorderPrice);
-    setVal("fActualPrice", order.actualPrice);
-    setVal("fShipping", order.shipping);
-    setVal("fPaid", order.paid);
-    setVal("fTotal", order.total);
-    setVal("fPending", order.pending);
-
-    if (order.imageUrl) setImagePreview(order.imageUrl);
-    else resetImagePreview();
-
-    openModal("orderModal");
-  }
-
-  function updateCalculatedFields() {
-    const preorder = toNumber(safeEl("fPreorderPrice")?.value);
-    const actual = toNumber(safeEl("fActualPrice")?.value);
-    const shipping = toNumber(safeEl("fShipping")?.value);
-    const paid = toNumber(safeEl("fPaid")?.value);
-
-    const total = actual || preorder ? (actual || preorder) + shipping : shipping;
-    const pending = Math.max(0, total - paid);
-
-    if (safeEl("fTotal")) safeEl("fTotal").value = total.toFixed(2);
-    if (safeEl("fPending")) safeEl("fPending").value = pending.toFixed(2);
-  }
-
-  async function handleOrderSubmit(e) {
-    e.preventDefault();
-
-    try {
-      const order = getFormData();
-
-      if (!order.productName) {
-        showToast("Product name is required", "warning");
-        return;
-      }
-
-      let imageUrl = null;
-      const existing = editingId ? DB.orders.find(o => o.id === editingId) : null;
-
-      if (selectedImageFile) {
-        imageUrl = await uploadImageToSupabase(selectedImageFile);
-      } else if (existing?.imageUrl) {
-        imageUrl = existing.imageUrl;
-      }
-
-      const payload = {
-        ...order,
-        imageUrl: imageUrl || null,
-        updatedAt: serverTimestamp()
-      };
-
-      if (editingId) {
-        await updateDoc(doc(db, "orders", editingId), payload);
-        await addActivity(`Updated order: ${order.productName}`, "info");
-        showToast("Order updated successfully", "success");
-      } else {
-        payload.createdAt = serverTimestamp();
-        await addDoc(collection(db, "orders"), payload);
-        await addActivity(`Added order: ${order.productName}`, "success");
-        showToast("Order added successfully", "success");
-      }
-
-      closeModal("orderModal");
-      clearForm();
-      await fetchData();
-    } catch (err) {
-      console.error("Save failed:", err);
-      showToast(`Save failed: ${err.message}`, "error");
-    }
-  }
-
-  /* ===============================
-     GLOBAL ACTIONS
-     =============================== */
-  window.editOrder = function(id) {
-    const order = DB.orders.find(o => o.id === id);
-    if (!order) return;
-    fillForm(order);
-  };
-
-  window.viewOrder = function(id) {
-    const order = DB.orders.find(o => o.id === id);
-    if (!order) return;
-
-    const body = safeEl("viewModalBody");
-    if (!body) return;
-
-    body.innerHTML = `
-      ${order.imageUrl ? `<img class="view-image" src="${order.imageUrl}" alt="${escapeHtml(order.productName || "Product")}" />` : ""}
-      <div class="view-grid">
-        <div class="view-field"><label>Product</label><span>${escapeHtml(order.productName || "—")}</span></div>
-        <div class="view-field"><label>Order No.</label><span>${escapeHtml(order.orderNumber || "—")}</span></div>
-        <div class="view-field"><label>Brand</label><span>${escapeHtml(order.brand || "—")}</span></div>
-        <div class="view-field"><label>Series</label><span>${escapeHtml(order.series || "—")}</span></div>
-        <div class="view-field"><label>Scale</label><span>${escapeHtml(order.scale || "—")}</span></div>
-        <div class="view-field"><label>Status</label><span>${escapeHtml(order.status || "—")}</span></div>
-        <div class="view-field"><label>Vendor</label><span>${escapeHtml(order.vendor || "—")}</span></div>
-        <div class="view-field"><label>Location</label><span>${escapeHtml(order.location || "—")}</span></div>
-        <div class="view-field"><label>Order Date</label><span>${formatDate(order.orderDate)}</span></div>
-        <div class="view-field"><label>ETA</label><span>${formatDate(order.eta)}</span></div>
-        <div class="view-field"><label>Total</label><span>${formatCurrency(order.total)}</span></div>
-        <div class="view-field"><label>Paid</label><span>${formatCurrency(order.paid)}</span></div>
-      </div>
-    `;
-
-    openModal("viewModal");
-  };
-
-  window.deleteOrder = async function(id) {
-    const order = DB.orders.find(o => o.id === id);
-    if (!order) return;
-
-    const ok = confirm(`Delete "${order.productName}"?`);
-    if (!ok) return;
-
-    try {
-      await deleteDoc(doc(db, "orders", id));
-      await addActivity(`Deleted order: ${order.productName}`, "warning");
-      showToast("Order deleted", "success");
-      await fetchData();
-    } catch (err) {
-      console.error("Delete failed:", err);
-      showToast(`Delete failed: ${err.message}`, "error");
-    }
-  };
-
-  /* ===============================
-     AUTH
-     =============================== */
-  async function handleLogin(e) {
-    e.preventDefault();
-
-    const username = safeEl("username")?.value?.trim() || "";
-    const password = safeEl("password")?.value || "";
-
-    const loginBtn = safeEl("loginBtn");
-    const loginError = safeEl("loginError");
-    const errorMsg = safeEl("errorMsg");
-
-    try {
-      if (loginBtn) loginBtn.disabled = true;
-      if (loginError) loginError.classList.add("hidden");
-
-      // if username is not an email, append your domain
-      const email = username.includes("@") ? username : `${username}@pretrack.app`;
-
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      currentUser = cred.user;
-      showToast("Login successful", "success");
-    } catch (err) {
-      console.error("Login failed:", err);
-      if (loginError) loginError.classList.remove("hidden");
-      if (errorMsg) errorMsg.textContent = err.message;
-      showToast("Login failed", "error");
-    } finally {
-      if (loginBtn) loginBtn.disabled = false;
-    }
-  }
-
-  async function handleLogout() {
-    try {
-      await signOut(auth);
-      showToast("Logged out", "info");
-    } catch (err) {
-      console.error("Logout failed:", err);
-      showToast("Logout failed", "error");
-    }
-  }
-
-  function showDashboard(user) {
-    currentUser = user;
-
-    document.body.classList.remove("login-body");
-    document.body.classList.add("dashboard-body");
-
-    const loginView = safeEl("loginView");
-    const dashboardView = safeEl("dashboardView");
-
-    if (loginView) loginView.classList.add("hidden");
-    if (dashboardView) dashboardView.classList.remove("hidden");
-
-    const profileName = safeEl("profileName");
-    if (profileName) {
-      profileName.textContent = user?.email ? user.email.split("@")[0] : "User";
-    }
-  }
-
-  function showLogin() {
-    document.body.classList.remove("dashboard-body");
-    document.body.classList.add("login-body");
-
-    const loginView = safeEl("loginView");
-    const dashboardView = safeEl("dashboardView");
-
-    if (dashboardView) dashboardView.classList.add("hidden");
-    if (loginView) loginView.classList.remove("hidden");
-  }
-
-  /* ===============================
-     UI BINDINGS
-     =============================== */
-  function bindEvents() {
-    safeEl("loginForm")?.addEventListener("submit", handleLogin);
-    safeEl("logoutBtn")?.addEventListener("click", handleLogout);
-
-    safeEl("addOrderBtn")?.addEventListener("click", () => {
-      clearForm();
-      openModal("orderModal");
-    });
-
-    safeEl("quickAddBtn")?.addEventListener("click", () => {
-      clearForm();
-      openModal("orderModal");
-    });
-
-    safeEl("qaAddOrder")?.addEventListener("click", () => {
-      clearForm();
-      openModal("orderModal");
-    });
-
-    safeEl("modalClose")?.addEventListener("click", () => closeModal("orderModal"));
-    safeEl("modalCancel")?.addEventListener("click", () => closeModal("orderModal"));
-    safeEl("viewModalClose")?.addEventListener("click", () => closeModal("viewModal"));
-
-    safeEl("orderForm")?.addEventListener("submit", handleOrderSubmit);
-
-    ["fPreorderPrice", "fActualPrice", "fShipping", "fPaid"].forEach(id => {
-      safeEl(id)?.addEventListener("input", updateCalculatedFields);
-    });
-
-    safeEl("fImage")?.addEventListener("change", (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      selectedImageFile = file;
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result);
-      reader.readAsDataURL(file);
-    });
-
-    safeEl("imageUploadArea")?.addEventListener("click", () => {
-      safeEl("fImage")?.click();
-    });
-
-    ["orderSearch", "filterStatus", "filterVendor", "filterDateFrom", "filterDateTo"].forEach(id => {
-      safeEl(id)?.addEventListener("input", renderOrdersTable);
-      safeEl(id)?.addEventListener("change", renderOrdersTable);
-    });
-
-    safeEl("clearFilters")?.addEventListener("click", () => {
-      ["orderSearch", "filterStatus", "filterVendor", "filterDateFrom", "filterDateTo"].forEach(id => {
-        const el = safeEl(id);
-        if (el) el.value = "";
-      });
-      renderOrdersTable();
-    });
-
-    safeEl("togglePw")?.addEventListener("click", () => {
-      const pw = safeEl("password");
-      if (!pw) return;
-      pw.type = pw.type === "password" ? "text" : "password";
-    });
-
-    // Close modal on overlay click
-    ["orderModal", "viewModal"].forEach(id => {
-      const modal = safeEl(id);
-      modal?.addEventListener("click", (e) => {
-        if (e.target === modal) closeModal(id);
-      });
-    });
-  }
-
-  /* ===============================
-     AUTH STATE
-     =============================== */
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      showDashboard(user);
-      await fetchData();
+    if (currentEditId) {
+      await updateDoc(doc(db, "orders", currentEditId), data);
+      await addActivity("Updated order: " + data.productName, "info");
+      toast("Order updated", "success");
     } else {
-      showLogin();
+      data.createdAt = serverTimestamp();
+      await addDoc(collection(db, "orders"), data);
+      await addActivity("Added order: " + data.productName, "success");
+      toast("Order added", "success");
     }
+
+    hide("orderModal");
+    resetForm();
+    await loadAllData();
+  } catch (err) {
+    console.error("Save error:", err);
+    toast("Save failed: " + err.message, "error");
+  }
+}
+
+function resetForm() {
+  currentEditId = null;
+  el("orderForm")?.reset();
+  txt("modalTitle", "Add Order");
+}
+
+window.editOrder = function(id) {
+  const order = ORDERS.find(o => o.id === id);
+  if (!order) return;
+
+  currentEditId = id;
+  txt("modalTitle", "Edit Order");
+
+  const set = (id, val) => { const n = el(id); if (n) n.value = val ?? ""; };
+
+  set("fProductName", order.productName);
+  set("fOrderNumber", order.orderNumber);
+  set("fBrand", order.brand);
+  set("fSeries", order.series);
+  set("fScale", order.scale);
+  set("fCondition", order.condition);
+  set("fVendor", order.vendor);
+  set("fLocation", order.location);
+  set("fVariant", order.variant);
+  set("fQty", order.qty);
+  set("fOrderDate", order.orderDate);
+  set("fEta", order.eta);
+  set("fStatus", order.status);
+  set("fPreorderPrice", order.preorderPrice);
+  set("fActualPrice", order.actualPrice);
+  set("fShipping", order.shipping);
+  set("fPaid", order.paid);
+  set("fTotal", order.total);
+  set("fPending", order.pending);
+
+  show("orderModal");
+};
+
+window.deleteOrder = async function(id) {
+  const order = ORDERS.find(o => o.id === id);
+  if (!order) return;
+
+  if (!confirm(`Delete "${order.productName}"?`)) return;
+
+  try {
+    await deleteDoc(doc(db, "orders", id));
+    await addActivity("Deleted order: " + (order.productName || "Order"), "warning");
+    toast("Order deleted", "success");
+    await loadAllData();
+  } catch (err) {
+    console.error("Delete error:", err);
+    toast("Delete failed: " + err.message, "error");
+  }
+};
+
+/* =========================
+   LOGIN
+   ========================= */
+async function handleLogin(e) {
+  e.preventDefault();
+
+  const username = el("username")?.value?.trim() || "";
+  const password = el("password")?.value || "";
+
+  try {
+    const email = username.includes("@") ? username : `${username}@pretrack.app`;
+    await signInWithEmailAndPassword(auth, email, password);
+    toast("Login success", "success");
+  } catch (err) {
+    console.error("Login error:", err);
+    show("loginError");
+    txt("errorMsg", err.message);
+    toast("Login failed", "error");
+  }
+}
+
+async function handleLogout() {
+  try {
+    await signOut(auth);
+  } catch (err) {
+    console.error("Logout error:", err);
+  }
+}
+
+function showDashboard(user) {
+  document.body.classList.remove("login-body");
+  document.body.classList.add("dashboard-body");
+
+  hide("loginView");
+  show("dashboardView");
+
+  txt("profileName", user?.email ? user.email.split("@")[0] : "User");
+}
+
+function showLogin() {
+  document.body.classList.remove("dashboard-body");
+  document.body.classList.add("login-body");
+
+  hide("dashboardView");
+  show("loginView");
+}
+
+/* =========================
+   BINDINGS
+   ========================= */
+function bind() {
+  el("loginForm")?.addEventListener("submit", handleLogin);
+  el("logoutBtn")?.addEventListener("click", handleLogout);
+
+  el("addOrderBtn")?.addEventListener("click", () => {
+    resetForm();
+    show("orderModal");
   });
 
-  /* ===============================
-     BOOT
-     =============================== */
-  bindEvents();
-  resetImagePreview();
+  el("quickAddBtn")?.addEventListener("click", () => {
+    resetForm();
+    show("orderModal");
+  });
+
+  el("qaAddOrder")?.addEventListener("click", () => {
+    resetForm();
+    show("orderModal");
+  });
+
+  el("modalClose")?.addEventListener("click", () => hide("orderModal"));
+  el("modalCancel")?.addEventListener("click", () => hide("orderModal"));
+  el("viewModalClose")?.addEventListener("click", () => hide("viewModal"));
+
+  el("orderForm")?.addEventListener("submit", submitOrder);
+}
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    showDashboard(user);
+    await loadAllData();
+  } else {
+    showLogin();
+  }
+});
+
+window.addEventListener("DOMContentLoaded", () => {
+  bind();
+  console.log("PreTrack loaded. Waiting for auth...");
+});
 </script>
 </body>
 </html>
