@@ -2927,154 +2927,264 @@ body {
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- FIREBASE + APP LOGIC -->
+
+  <!-- FIREBASE + SUPABASE + APP LOGIC -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import {
-      getFirestore,
-      collection,
-      getDocs,
-      addDoc,
-      updateDoc,
-      deleteDoc,
-      doc,
-      getDoc,
-      writeBatch
-    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+    import { initializeApp }        from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword }
+                                     from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, writeBatch }
+                                     from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+    import { createClient }          from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-    /* =========================================
-       REPLACE WITH YOUR REAL FIREBASE CONFIG
-    ========================================= */
+    /* ─── FIREBASE CONFIG ─────────────────────── */
     const firebaseConfig = {
-      apiKey: "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
-  authDomain: "diecast-tracking-471f7.firebaseapp.com",
-  projectId: "diecast-tracking-471f7",
-  storageBucket: "diecast-tracking-471f7.firebasestorage.app",
-  messagingSenderId: "1042711268055",
-  appId: "1:1042711268055:web:9b09ded970a85532767e92"
+      apiKey:            "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
+      authDomain:        "diecast-tracking-471f7.firebaseapp.com",
+      projectId:         "diecast-tracking-471f7",
+      storageBucket:     "diecast-tracking-471f7.firebasestorage.app",
+      messagingSenderId: "1042711268055",
+      appId:             "1:1042711268055:web:9b09ded970a85532767e92"
     };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth        = getAuth(firebaseApp);
+    const db          = getFirestore(firebaseApp);
     const PRODUCTS_COLLECTION = "products";
 
-    /* =========================================
-       GLOBAL STATE
-    ========================================= */
-    let products = [];
-    let notifications = [];
-    let editingId = null;
-    let uploadedImageBase64 = "";
+    /* ─── SUPABASE CONFIG ─────────────────────── */
+    const SUPABASE_URL      = "https://ifzioqfkgjkqkirmtgly.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmemlvcWZrZ2prcWtpcm10Z2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDk4ODMsImV4cCI6MjA5MTM4NTg4M30.3sRDtBjSVcOPjS817TjR6ZP1druW-WW7rxiV1Zb3NCQ";
+    const SUPABASE_BUCKET   = "order-images";
+    const supabase          = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function uploadImageToSupabase(file) {
+      const ext  = file.name.split(".").pop() || "jpg";
+      const path = `products/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from(SUPABASE_BUCKET).upload(path, file, { cacheControl: "3600", upsert: false });
+      if (error) throw new Error(`Image upload failed: ${error.message}`);
+      const { data } = supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+      return data.publicUrl;
+    }
+
+    async function deleteImageFromSupabase(imageUrl) {
+      if (!imageUrl || !imageUrl.includes(SUPABASE_URL)) return;
+      const marker = `/object/public/${SUPABASE_BUCKET}/`;
+      const idx    = imageUrl.indexOf(marker);
+      if (idx === -1) return;
+      const filePath = decodeURIComponent(imageUrl.slice(idx + marker.length).split("?")[0]);
+      const { error } = await supabase.storage.from(SUPABASE_BUCKET).remove([filePath]);
+      if (error) console.warn("Supabase delete failed:", error.message);
+    }
+
+    /* ─── GLOBAL STATE ────────────────────────── */
+    let products            = [];
+    let notifications       = [];
+    let editingId           = null;
+    let pendingImageFile    = null;   // File object for new upload
+    let currentImageUrl     = "";     // URL already saved in Firestore / Supabase
+    let uploadedImageBase64 = "";     // preview base64 only
 
     const KANBAN_COLS = [
-      { key: "sourcing", label: "Sourcing", icon: "fa-magnifying-glass" },
-      { key: "ordered", label: "Ordered", icon: "fa-cart-shopping" },
-      { key: "transit", label: "In Transit", icon: "fa-truck-fast" },
-      { key: "received", label: "Received", icon: "fa-box-open" }
+      { key: "sourcing", label: "Sourcing",   icon: "fa-magnifying-glass" },
+      { key: "ordered",  label: "Ordered",    icon: "fa-cart-shopping"    },
+      { key: "transit",  label: "In Transit", icon: "fa-truck-fast"       },
+      { key: "received", label: "Received",   icon: "fa-box-open"         }
     ];
 
-    /* =========================================
-       UTILITIES
-    ========================================= */
+    /* ─── AUTH GUARD ──────────────────────────── */
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        // Show login overlay instead of redirect (single-file app)
+        showLoginOverlay();
+      } else {
+        hideLoginOverlay();
+        await fetchProducts();
+      }
+    });
+
+    function showLoginOverlay() {
+      let overlay = document.getElementById("authOverlay");
+      if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "authOverlay";
+        overlay.style.cssText = `
+          position:fixed;inset:0;z-index:9999;
+          background:linear-gradient(135deg,#0b1220,#121a2b);
+          display:flex;align-items:center;justify-content:center;
+          font-family:'DM Sans',sans-serif;
+        `;
+        overlay.innerHTML = `
+          <div style="
+            background:rgba(255,255,255,0.04);
+            border:1px solid rgba(255,255,255,0.1);
+            border-radius:24px;padding:2.5rem;
+            width:100%;max-width:400px;
+            backdrop-filter:blur(20px);
+            box-shadow:0 24px 60px rgba(0,0,0,0.5);
+          ">
+            <div style="text-align:center;margin-bottom:2rem">
+              <div style="
+                width:60px;height:60px;border-radius:16px;
+                background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                display:inline-flex;align-items:center;justify-content:center;
+                font-size:1.5rem;color:white;margin-bottom:1rem;
+                box-shadow:0 8px 24px rgba(99,102,241,0.5);
+              "><i class="fa-solid fa-car-side"></i></div>
+              <div style="font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;
+                background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+                PreTrack
+              </div>
+              <div style="color:rgba(255,255,255,0.45);font-size:0.82rem;margin-top:0.3rem">
+                Diecast Collection Manager
+              </div>
+            </div>
+            <div style="margin-bottom:1rem">
+              <label style="display:block;font-size:0.8rem;font-weight:600;color:rgba(255,255,255,0.6);margin-bottom:0.4rem">
+                <i class="fa-solid fa-envelope"></i> Email
+              </label>
+              <input id="authEmail" type="email" placeholder="your@email.com" style="
+                width:100%;padding:0.75rem 1rem;border-radius:10px;
+                border:1px solid rgba(255,255,255,0.15);
+                background:rgba(255,255,255,0.06);
+                color:#fff;font-size:0.9rem;outline:none;
+                transition:border-color 0.2s;
+              " onfocus="this.style.borderColor='rgba(99,102,241,0.6)'" onblur="this.style.borderColor='rgba(255,255,255,0.15)'" />
+            </div>
+            <div style="margin-bottom:1.5rem;position:relative">
+              <label style="display:block;font-size:0.8rem;font-weight:600;color:rgba(255,255,255,0.6);margin-bottom:0.4rem">
+                <i class="fa-solid fa-lock"></i> Password
+              </label>
+              <input id="authPassword" type="password" placeholder="Password" style="
+                width:100%;padding:0.75rem 1rem;border-radius:10px;
+                border:1px solid rgba(255,255,255,0.15);
+                background:rgba(255,255,255,0.06);
+                color:#fff;font-size:0.9rem;outline:none;padding-right:3rem;
+                transition:border-color 0.2s;
+              " onfocus="this.style.borderColor='rgba(99,102,241,0.6)'" onblur="this.style.borderColor='rgba(255,255,255,0.15)'"
+              onkeydown="if(event.key==='Enter')doLogin()" />
+              <button onclick="
+                const i=document.getElementById('authPassword');
+                const btn=this;
+                i.type=i.type==='password'?'text':'password';
+                btn.innerHTML=i.type==='password'?'<i class=\'fa-solid fa-eye\'></i>':'<i class=\'fa-solid fa-eye-slash\'></i>';
+              " style="
+                position:absolute;right:0.75rem;top:50%;transform:translateY(6px);
+                background:none;border:none;color:rgba(255,255,255,0.4);cursor:pointer;padding:0.25rem;font-size:0.9rem;
+              "><i class="fa-solid fa-eye"></i></button>
+            </div>
+            <div id="authError" style="
+              display:none;margin-bottom:1rem;padding:0.6rem 0.85rem;
+              border-radius:8px;background:rgba(239,68,68,0.15);
+              border:1px solid rgba(239,68,68,0.3);color:#fca5a5;font-size:0.82rem;
+            "><i class="fa-solid fa-circle-exclamation"></i> <span id="authErrMsg">Invalid credentials</span></div>
+            <button id="authLoginBtn" onclick="doLogin()" style="
+              width:100%;padding:0.85rem;border-radius:12px;border:none;
+              background:linear-gradient(135deg,#6366f1,#8b5cf6);
+              color:white;font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:700;
+              cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.5rem;
+              box-shadow:0 4px 20px rgba(99,102,241,0.4);transition:transform 0.2s,box-shadow 0.2s;
+            " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+              <span>Sign In</span><i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+      } else {
+        overlay.style.display = "flex";
+      }
+    }
+
+    function hideLoginOverlay() {
+      const overlay = document.getElementById("authOverlay");
+      if (overlay) overlay.style.display = "none";
+    }
+
+    window.doLogin = async function() {
+      const email    = document.getElementById("authEmail")?.value.trim();
+      const password = document.getElementById("authPassword")?.value;
+      const btn      = document.getElementById("authLoginBtn");
+      const err      = document.getElementById("authError");
+      const errMsg   = document.getElementById("authErrMsg");
+      if (!email || !password) { errMsg.textContent="Please enter email and password"; err.style.display="flex"; return; }
+      btn.innerHTML  = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
+      btn.disabled   = true;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        err.style.display = "none";
+      } catch (e) {
+        errMsg.textContent = "Invalid email or password";
+        err.style.display  = "flex";
+        btn.innerHTML      = '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>';
+        btn.disabled       = false;
+        setTimeout(() => { err.style.display = "none"; }, 4000);
+      }
+    };
+
+    /* ─── LOGOUT ──────────────────────────────── */
+    document.querySelector(".user-chip-side")?.addEventListener("click", async () => {
+      if (confirm("Sign out?")) {
+        try { await signOut(auth); }
+        catch(e) { showToast("Error", "Could not sign out.", "error"); }
+      }
+    });
+
+    /* ─── UTILITIES ───────────────────────────── */
     function formatCurrency(n) {
-      const num = Number(n || 0);
-      return "₹" + num.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+      return "₹" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
     }
 
     function formatDateHuman(dateStr) {
       if (!dateStr) return "—";
       const d = new Date(dateStr);
-      if (isNaN(d)) return "—";
-      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-    }
-
-    function daysUntil(dateStr) {
-      if (!dateStr) return null;
-      return Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
+      return isNaN(d) ? "—" : d.toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
     }
 
     function getStatusClass(status) {
-      const map = {
-        "Owned": "owned",
-        "Ordered": "ordered",
-        "In Transit": "transit",
-        "Preorder": "preorder",
-        "Sold": "sold"
-      };
+      const map = { "Owned":"owned","Ordered":"ordered","In Transit":"transit","Preorder":"preorder","Sold":"sold" };
       return map[status] || "normal";
     }
 
     function escapeHtml(str) {
-      return String(str ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+      return String(str ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
     }
 
     function productMatchesQuery(p, q) {
       if (!q) return true;
-      const text = [
-        p.name, p.brand, p.series, p.scale, p.status,
-        p.seller, p.notes, p.tracking
-      ].join(" ").toLowerCase();
+      const text = [p.name,p.brand,p.series,p.scale,p.status,p.seller,p.notes,p.tracking].join(" ").toLowerCase();
       return text.includes(q.toLowerCase());
     }
 
     function showToast(title, msg, type = "normal") {
-      const wrap = document.getElementById("toastContainer");
-      const colors = {
-        success: "rgba(16,185,129,.12)",
-        error: "rgba(239,68,68,.12)",
-        warning: "rgba(245,158,11,.12)",
-        normal: "rgba(99,102,241,.12)"
-      };
-      const icons = {
-        success: "fa-check",
-        error: "fa-xmark",
-        warning: "fa-triangle-exclamation",
-        normal: "fa-circle-info"
-      };
-
-      const div = document.createElement("div");
+      const wrap   = document.getElementById("toastContainer");
+      const colors = { success:"rgba(16,185,129,.12)", error:"rgba(239,68,68,.12)", warning:"rgba(245,158,11,.12)", normal:"rgba(99,102,241,.12)" };
+      const icons  = { success:"fa-check", error:"fa-xmark", warning:"fa-triangle-exclamation", normal:"fa-circle-info" };
+      const div    = document.createElement("div");
       div.className = "toast";
       div.innerHTML = `
-        <div class="toast-icon" style="background:${colors[type] || colors.normal};color:var(--accent)">
-          <i class="fa-solid ${icons[type] || icons.normal}"></i>
+        <div class="toast-icon" style="background:${colors[type]||colors.normal};color:var(--accent)">
+          <i class="fa-solid ${icons[type]||icons.normal}"></i>
         </div>
         <div class="toast-content">
           <h4>${escapeHtml(title)}</h4>
           <p>${escapeHtml(msg)}</p>
-        </div>
-      `;
+        </div>`;
       wrap.appendChild(div);
-      setTimeout(() => div.remove(), 3000);
+      setTimeout(() => div.remove(), 3500);
     }
 
     function addNotification(title, message) {
-      notifications.unshift({
-        id: Date.now(),
-        title,
-        message,
-        time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-        read: false
-      });
+      notifications.unshift({ id:Date.now(), title, message, time:new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}), read:false });
       if (notifications.length > 15) notifications = notifications.slice(0, 15);
       renderNotifications();
     }
 
     function renderNotifications() {
-      const list = document.getElementById("notifList");
-      const dot = document.getElementById("notifDot");
+      const list   = document.getElementById("notifList");
+      const dot    = document.getElementById("notifDot");
       const unread = notifications.some(n => !n.read);
-
       dot.classList.toggle("hidden", !unread);
-
-      if (!notifications.length) {
-        list.innerHTML = `<div class="empty-state">No notifications</div>`;
-        return;
-      }
-
+      if (!notifications.length) { list.innerHTML=`<div class="empty-state">No notifications</div>`; return; }
       list.innerHTML = notifications.map(n => `
         <div class="notif-item">
           <div class="notif-icon"><i class="fa-solid fa-bell"></i></div>
@@ -3083,57 +3193,39 @@ body {
             <p>${escapeHtml(n.message)}</p>
             <span>${escapeHtml(n.time)}</span>
           </div>
-        </div>
-      `).join("");
+        </div>`).join("");
     }
 
-    window.toggleNotifMenu = function () {
-      document.getElementById("notifDropdown").classList.toggle("open");
-    };
-
-    window.markAllRead = function () {
-      notifications = notifications.map(n => ({ ...n, read: true }));
+    window.toggleNotifMenu = function() { document.getElementById("notifDropdown").classList.toggle("open"); };
+    window.markAllRead     = function() {
+      notifications = notifications.map(n=>({...n,read:true}));
       renderNotifications();
     };
 
     document.addEventListener("click", (e) => {
-      const dd = document.getElementById("notifDropdown");
+      const dd   = document.getElementById("notifDropdown");
       const wrap = e.target.closest(".dropdown-wrap");
       if (!wrap) dd.classList.remove("open");
     });
 
-    /* =========================================
-       FIREBASE CRUD
-    ========================================= */
+    /* ─── FIREBASE CRUD ───────────────────────── */
     async function fetchProducts() {
       try {
-        const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
-        products = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        products.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
-
+        const snap = await getDocs(query(collection(db, PRODUCTS_COLLECTION), orderBy("createdAt","desc")));
+        products   = snap.docs.map(d => ({ id:d.id, ...d.data() }));
         renderAll();
       } catch (error) {
-        console.error(error);
-        showToast("Firebase Error", "Could not fetch products.", "error");
+        console.error("Firestore fetch error:", error);
+        showToast("Firebase Error", "Could not fetch products. Check console.", "error");
       }
     }
 
     async function addProductToFirebase(product) {
-      const payload = {
-        ...product,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
-      await addDoc(collection(db, PRODUCTS_COLLECTION), payload);
+      await addDoc(collection(db, PRODUCTS_COLLECTION), { ...product, createdAt:serverTimestamp(), updatedAt:serverTimestamp() });
     }
 
     async function updateProductInFirebase(id, product) {
-      const ref = doc(db, PRODUCTS_COLLECTION, id);
-      await updateDoc(ref, {
-        ...product,
-        updatedAt: Date.now()
-      });
+      await updateDoc(doc(db, PRODUCTS_COLLECTION, id), { ...product, updatedAt:serverTimestamp() });
     }
 
     async function deleteProductFromFirebase(id) {
@@ -3141,39 +3233,26 @@ body {
     }
 
     async function clearAllProductsFromFirebase() {
-      const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
+      const snap  = await getDocs(collection(db, PRODUCTS_COLLECTION));
       const batch = writeBatch(db);
       snap.docs.forEach(d => batch.delete(d.ref));
       await batch.commit();
     }
 
-    /* =========================================
-       PAGE / SIDEBAR
-    ========================================= */
-    window.switchPage = function (page, el) {
+    /* ─── PAGE / SIDEBAR ─────────────────────── */
+    window.switchPage = function(page, el) {
       document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
-      document.getElementById(`page-${page}`).classList.add("active");
-
+      document.getElementById(`page-${page}`)?.classList.add("active");
       document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
       if (el) el.classList.add("active");
-
       closeSidebar();
     };
 
-    window.openSidebar = function () {
-      document.getElementById("sidebar").classList.add("show");
-      document.getElementById("sidebarOverlay").classList.add("show");
-    };
+    window.openSidebar  = function() { document.getElementById("sidebar").classList.add("show"); document.getElementById("sidebarOverlay").classList.add("show"); };
+    window.closeSidebar = function() { document.getElementById("sidebar").classList.remove("show"); document.getElementById("sidebarOverlay").classList.remove("show"); };
 
-    window.closeSidebar = function () {
-      document.getElementById("sidebar").classList.remove("show");
-      document.getElementById("sidebarOverlay").classList.remove("show");
-    };
-
-    /* =========================================
-       MODAL / FORM
-    ========================================= */
-    window.openProductModal = function (id = null) {
+    /* ─── MODAL / FORM ───────────────────────── */
+    window.openProductModal = function(id = null) {
       editingId = id;
       document.getElementById("productModal").classList.remove("hidden");
 
@@ -3186,112 +3265,127 @@ body {
       const p = products.find(x => x.id === id);
       if (!p) return;
 
-      document.getElementById("modalTitle").textContent = "Edit Diecast Model";
-      document.getElementById("editingProductId").value = p.id || "";
-      document.getElementById("f_name").value = p.name || "";
-      document.getElementById("f_brand").value = p.brand || "Hot Wheels";
-      document.getElementById("f_series").value = p.series || "";
-      document.getElementById("f_scale").value = p.scale || "1:64";
-      document.getElementById("f_status").value = p.status || "Owned";
-      document.getElementById("f_qty").value = p.qty || 1;
-      document.getElementById("f_buyPrice").value = p.buyPrice || "";
-      document.getElementById("f_marketValue").value = p.marketValue || "";
-      document.getElementById("f_seller").value = p.seller || "";
-      document.getElementById("f_purchaseDate").value = p.purchaseDate || "";
-      document.getElementById("f_eta").value = p.eta || "";
-      document.getElementById("f_tracking").value = p.tracking || "";
-      document.getElementById("f_condition").value = p.condition || "Mint";
-      document.getElementById("f_notes").value = p.notes || "";
+      document.getElementById("modalTitle").textContent     = "Edit Diecast Model";
+      document.getElementById("editingProductId").value     = p.id || "";
+      document.getElementById("f_name").value              = p.name          || "";
+      document.getElementById("f_brand").value             = p.brand         || "Hot Wheels";
+      document.getElementById("f_series").value            = p.series        || "";
+      document.getElementById("f_scale").value             = p.scale         || "1:64";
+      document.getElementById("f_status").value            = p.status        || "Owned";
+      document.getElementById("f_qty").value               = p.qty           || 1;
+      document.getElementById("f_buyPrice").value          = p.buyPrice      || "";
+      document.getElementById("f_marketValue").value       = p.marketValue   || "";
+      document.getElementById("f_seller").value            = p.seller        || "";
+      document.getElementById("f_purchaseDate").value      = p.purchaseDate  || "";
+      document.getElementById("f_eta").value               = p.eta           || "";
+      document.getElementById("f_tracking").value          = p.tracking      || "";
+      document.getElementById("f_condition").value         = p.condition     || "Mint";
+      document.getElementById("f_notes").value             = p.notes         || "";
 
-      uploadedImageBase64 = p.image || "";
+      pendingImageFile    = null;
+      currentImageUrl     = p.image || "";
+      uploadedImageBase64 = p.image && p.image.startsWith("data:") ? p.image : "";
       renderImagePreview();
     };
 
-    window.closeProductModal = function () {
+    window.closeProductModal = function() {
       document.getElementById("productModal").classList.add("hidden");
       resetProductForm();
     };
 
     function resetProductForm() {
-      editingId = null;
+      editingId           = null;
+      pendingImageFile    = null;
+      currentImageUrl     = "";
       uploadedImageBase64 = "";
       document.getElementById("editingProductId").value = "";
-      document.getElementById("f_name").value = "";
-      document.getElementById("f_brand").value = "Hot Wheels";
-      document.getElementById("f_series").value = "";
-      document.getElementById("f_scale").value = "1:64";
-      document.getElementById("f_status").value = "Owned";
-      document.getElementById("f_qty").value = 1;
-      document.getElementById("f_buyPrice").value = "";
-      document.getElementById("f_marketValue").value = "";
-      document.getElementById("f_seller").value = "";
-      document.getElementById("f_purchaseDate").value = "";
-      document.getElementById("f_eta").value = "";
-      document.getElementById("f_tracking").value = "";
-      document.getElementById("f_condition").value = "Mint";
-      document.getElementById("f_notes").value = "";
-      document.getElementById("f_image").value = "";
+      document.getElementById("f_name").value           = "";
+      document.getElementById("f_brand").value          = "Hot Wheels";
+      document.getElementById("f_series").value         = "";
+      document.getElementById("f_scale").value          = "1:64";
+      document.getElementById("f_status").value         = "Owned";
+      document.getElementById("f_qty").value            = 1;
+      document.getElementById("f_buyPrice").value       = "";
+      document.getElementById("f_marketValue").value    = "";
+      document.getElementById("f_seller").value         = "";
+      document.getElementById("f_purchaseDate").value   = "";
+      document.getElementById("f_eta").value            = "";
+      document.getElementById("f_tracking").value       = "";
+      document.getElementById("f_condition").value      = "Mint";
+      document.getElementById("f_notes").value          = "";
+      document.getElementById("f_image").value          = "";
       renderImagePreview();
     }
 
     function renderImagePreview() {
       const box = document.getElementById("imagePreview");
-      if (!uploadedImageBase64) {
-        box.innerHTML = `
-          <div id="imagePreviewPlaceholder" style="text-align:center;color:var(--muted)">
-            <i class="fa-regular fa-image" style="font-size:36px"></i>
-            <p style="margin-top:8px;font-size:12px">Click to upload</p>
-          </div>
-        `;
-        return;
+      const placeholder = `
+        <div id="imagePreviewPlaceholder" style="text-align:center;color:var(--muted)">
+          <i class="fa-regular fa-image" style="font-size:36px"></i>
+          <p style="margin-top:8px;font-size:12px">Click to upload</p>
+        </div>`;
+      if (uploadedImageBase64) {
+        box.innerHTML = `<img src="${uploadedImageBase64}" alt="Preview" />`;
+      } else if (currentImageUrl) {
+        box.innerHTML = `<img src="${currentImageUrl}" alt="Preview" />`;
+      } else {
+        box.innerHTML = placeholder;
       }
-
-      box.innerHTML = `<img src="${uploadedImageBase64}" alt="Preview" />`;
     }
 
-    window.handleImageUpload = function (event) {
+    window.handleImageUpload = function(event) {
       const file = event.target.files?.[0];
       if (!file) return;
-
+      if (file.size > 5 * 1024 * 1024) { showToast("Too Large", "Max image size is 5MB.", "warning"); return; }
+      pendingImageFile = file;
       const reader = new FileReader();
-      reader.onload = () => {
-        uploadedImageBase64 = reader.result;
-        renderImagePreview();
-      };
+      reader.onload = () => { uploadedImageBase64 = reader.result; renderImagePreview(); };
       reader.readAsDataURL(file);
     };
 
-    window.clearImageUpload = function () {
+    window.clearImageUpload = function() {
+      pendingImageFile    = null;
+      currentImageUrl     = "";
       uploadedImageBase64 = "";
       document.getElementById("f_image").value = "";
       renderImagePreview();
     };
 
-    window.saveProduct = async function () {
-      const product = {
-        name: document.getElementById("f_name").value.trim(),
-        brand: document.getElementById("f_brand").value,
-        series: document.getElementById("f_series").value.trim(),
-        scale: document.getElementById("f_scale").value,
-        status: document.getElementById("f_status").value,
-        qty: Number(document.getElementById("f_qty").value || 1),
-        buyPrice: Number(document.getElementById("f_buyPrice").value || 0),
-        marketValue: Number(document.getElementById("f_marketValue").value || 0),
-        seller: document.getElementById("f_seller").value.trim(),
-        purchaseDate: document.getElementById("f_purchaseDate").value,
-        eta: document.getElementById("f_eta").value,
-        tracking: document.getElementById("f_tracking").value.trim(),
-        condition: document.getElementById("f_condition").value,
-        notes: document.getElementById("f_notes").value.trim(),
-        image: uploadedImageBase64 || ""
-      };
+    window.saveProduct = async function() {
+      const name = document.getElementById("f_name").value.trim();
+      if (!name) { showToast("Validation", "Model Name is required.", "warning"); return; }
 
-      if (!product.name) {
-        showToast("Validation", "Model Name is required.", "warning");
-        return;
-      }
+      const saveBtn = document.querySelector('#productModal .modal-footer .btn-primary');
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
 
       try {
+        let imageUrl = currentImageUrl;
+
+        // Upload new image to Supabase if user picked a new file
+        if (pendingImageFile) {
+          // Delete old image from Supabase if it was a Supabase URL
+          if (currentImageUrl) await deleteImageFromSupabase(currentImageUrl);
+          imageUrl = await uploadImageToSupabase(pendingImageFile);
+        }
+
+        const product = {
+          name,
+          brand:        document.getElementById("f_brand").value,
+          series:       document.getElementById("f_series").value.trim(),
+          scale:        document.getElementById("f_scale").value,
+          status:       document.getElementById("f_status").value,
+          qty:          Number(document.getElementById("f_qty").value || 1),
+          buyPrice:     Number(document.getElementById("f_buyPrice").value  || 0),
+          marketValue:  Number(document.getElementById("f_marketValue").value || 0),
+          seller:       document.getElementById("f_seller").value.trim(),
+          purchaseDate: document.getElementById("f_purchaseDate").value,
+          eta:          document.getElementById("f_eta").value,
+          tracking:     document.getElementById("f_tracking").value.trim(),
+          condition:    document.getElementById("f_condition").value,
+          notes:        document.getElementById("f_notes").value.trim(),
+          image:        imageUrl || ""
+        };
+
         if (editingId) {
           await updateProductInFirebase(editingId, product);
           showToast("Updated", "Product updated successfully.", "success");
@@ -3305,21 +3399,20 @@ body {
         closeProductModal();
         await fetchProducts();
       } catch (error) {
-        console.error(error);
-        showToast("Save Failed", "Could not save product to Firebase.", "error");
+        console.error("Save error:", error);
+        showToast("Save Failed", error.message || "Could not save product.", "error");
+      } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Model'; }
       }
     };
 
-    window.deleteProduct = async function (id) {
+    window.deleteProduct = async function(id) {
       const p = products.find(x => x.id === id);
-      if (!p) return;
-
-      const ok = confirm(`Delete "${p.name}"?`);
-      if (!ok) return;
-
+      if (!p || !confirm(`Delete "${p.name}"?`)) return;
       try {
+        if (p.image) await deleteImageFromSupabase(p.image);
         await deleteProductFromFirebase(id);
-        showToast("Deleted", "Product removed successfully.", "success");
+        showToast("Deleted", "Product removed.", "success");
         addNotification("Product Deleted", `${p.name} was deleted.`);
         await fetchProducts();
       } catch (error) {
@@ -3328,72 +3421,61 @@ body {
       }
     };
 
-    /* =========================================
-       FILTERS / SEARCH
-    ========================================= */
-    function getFilteredProducts(base = products, searchId = null, brandId = null, statusId = null) {
+    /* ─── FILTERS / SEARCH ────────────────────── */
+    function getFilteredProducts(base, searchId, brandId, statusId) {
       let list = [...base];
-
-      const searchVal = searchId ? document.getElementById(searchId)?.value?.trim() || "" : "";
-      const brandVal = brandId ? document.getElementById(brandId)?.value || "" : "";
-      const statusVal = statusId ? document.getElementById(statusId)?.value || "" : "";
-
-      if (searchVal) list = list.filter(p => productMatchesQuery(p, searchVal));
-      if (brandVal) list = list.filter(p => p.brand === brandVal);
-      if (statusVal) list = list.filter(p => p.status === statusVal);
-
+      const sv = searchId  ? document.getElementById(searchId)?.value?.trim() || "" : "";
+      const bv = brandId   ? document.getElementById(brandId)?.value  || ""          : "";
+      const stv= statusId  ? document.getElementById(statusId)?.value || ""          : "";
+      if (sv)  list = list.filter(p => productMatchesQuery(p, sv));
+      if (bv)  list = list.filter(p => p.brand  === bv);
+      if (stv) list = list.filter(p => p.status === stv);
       return list;
     }
 
-    window.handleGlobalSearch = function () {
-      const q = document.getElementById("globalSearch").value.trim().toLowerCase();
-      const visibleSection = document.querySelector(".section.active")?.id || "page-dashboard";
-
-      if (visibleSection === "page-inventory") {
+    window.handleGlobalSearch = function() {
+      const q           = document.getElementById("globalSearch").value.trim().toLowerCase();
+      const activeId    = document.querySelector(".section.active")?.id || "page-dashboard";
+      if (activeId === "page-inventory") {
         document.getElementById("filterSearch").value = q;
         renderInventoryTable();
-      } else if (visibleSection === "page-catalog") {
+      } else if (activeId === "page-catalog") {
         document.getElementById("productSearch").value = q;
         renderProductCards();
       }
     };
 
-    window.resetFilters = function () {
-      document.getElementById("filterSearch").value = "";
-      document.getElementById("filterBrand").value = "";
-      document.getElementById("filterStatus").value = "";
-      document.getElementById("filterScale").value = "";
+    window.resetFilters = function() {
+      ["filterSearch","filterBrand","filterStatus","filterScale"].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = "";
+      });
       document.getElementById("sortBy").value = "name-asc";
       renderInventoryTable();
     };
 
     function populateFilters() {
-      const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
-      const scales = [...new Set(products.map(p => p.scale).filter(Boolean))].sort();
-      const statuses = ["Owned", "Ordered", "In Transit", "Preorder", "Sold"];
+      const brands   = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
+      const scales   = [...new Set(products.map(p => p.scale).filter(Boolean))].sort();
+      const statuses = ["Owned","Ordered","In Transit","Preorder","Sold"];
 
       const setOptions = (id, first, arr) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const current = el.value;
-        el.innerHTML = `<option value="">${first}</option>` + arr.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
-        if (arr.includes(current)) el.value = current;
+        const el = document.getElementById(id); if (!el) return;
+        const cur = el.value;
+        el.innerHTML = `<option value="">${first}</option>` + arr.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+        if (arr.includes(cur)) el.value = cur;
       };
 
-      setOptions("filterBrand", "All Brands", brands);
-      setOptions("filterScale", "All Scales", scales);
-      setOptions("productBrandFilter", "All Brands", brands);
+      setOptions("filterBrand","All Brands", brands);
+      setOptions("filterScale","All Scales", scales);
+      setOptions("productBrandFilter","All Brands", brands);
 
-      const filterStatus = document.getElementById("filterStatus");
-      filterStatus.innerHTML = `<option value="">All Statuses</option>` + statuses.map(v => `<option value="${v}">${v}</option>`).join("");
-
-      const productStatus = document.getElementById("productStatusFilter");
-      productStatus.innerHTML = `<option value="">All Statuses</option>` + statuses.map(v => `<option value="${v}">${v}</option>`).join("");
+      const fs = document.getElementById("filterStatus");
+      if (fs) fs.innerHTML = `<option value="">All Statuses</option>` + statuses.map(v=>`<option value="${v}">${v}</option>`).join("");
+      const ps = document.getElementById("productStatusFilter");
+      if (ps) ps.innerHTML = `<option value="">All Statuses</option>` + statuses.map(v=>`<option value="${v}">${v}</option>`).join("");
     }
 
-    /* =========================================
-       RENDER HELPERS
-    ========================================= */
+    /* ─── RENDER ALL ──────────────────────────── */
     function renderAll() {
       populateFilters();
       renderDashboard();
@@ -3403,33 +3485,35 @@ body {
       renderOrders();
       renderAnalytics();
       renderNotifications();
-      document.getElementById("settingsModelCount").textContent = `${products.length} models`;
+      const sc = document.getElementById("settingsModelCount");
+      if (sc) sc.textContent = `${products.length} models`;
     }
 
+    /* ─── DASHBOARD ───────────────────────────── */
     function renderDashboard() {
-      const totalModels = products.reduce((sum, p) => sum + Number(p.qty || 0), 0);
-      const totalBuy = products.reduce((sum, p) => sum + (Number(p.buyPrice || 0) * Number(p.qty || 0)), 0);
-      const totalValue = products.reduce((sum, p) => sum + (Number(p.marketValue || 0) * Number(p.qty || 0)), 0);
+      const totalModels = products.reduce((s,p) => s + Number(p.qty||0), 0);
+      const totalBuy    = products.reduce((s,p) => s + (Number(p.buyPrice||0) * Number(p.qty||0)), 0);
+      const totalValue  = products.reduce((s,p) => s + (Number(p.marketValue||0) * Number(p.qty||0)), 0);
       const totalProfit = totalValue - totalBuy;
-      const inTransit = products.filter(p => ["Ordered", "In Transit", "Preorder"].includes(p.status)).length;
+      const inTransit   = products.filter(p => ["Ordered","In Transit","Preorder"].includes(p.status)).length;
 
       const byStatus = {
-        Owned: products.filter(p => p.status === "Owned").length,
-        Ordered: products.filter(p => p.status === "Ordered").length,
-        "In Transit": products.filter(p => p.status === "In Transit").length,
-        Preorder: products.filter(p => p.status === "Preorder").length,
-        Sold: products.filter(p => p.status === "Sold").length
+        Owned:       products.filter(p=>p.status==="Owned").length,
+        Ordered:     products.filter(p=>p.status==="Ordered").length,
+        "In Transit":products.filter(p=>p.status==="In Transit").length,
+        Preorder:    products.filter(p=>p.status==="Preorder").length,
+        Sold:        products.filter(p=>p.status==="Sold").length
       };
 
       const stats = [
-        { label: "Models", value: totalModels, icon: "fa-cubes", bg: "rgba(99,102,241,.12)" },
-        { label: "Collection Value", value: formatCurrency(totalValue), icon: "fa-sack-dollar", bg: "rgba(16,185,129,.12)" },
-        { label: "Total Buy Cost", value: formatCurrency(totalBuy), icon: "fa-wallet", bg: "rgba(245,158,11,.12)" },
-        { label: "Potential Profit", value: formatCurrency(totalProfit), icon: "fa-arrow-trend-up", bg: "rgba(6,182,212,.12)" },
-        { label: "Active Orders", value: inTransit, icon: "fa-truck-fast", bg: "rgba(244,63,94,.12)" }
+        { label:"Models",          value:totalModels,             icon:"fa-cubes",         bg:"rgba(99,102,241,.12)"  },
+        { label:"Collection Value",value:formatCurrency(totalValue), icon:"fa-sack-dollar", bg:"rgba(16,185,129,.12)"  },
+        { label:"Total Buy Cost",  value:formatCurrency(totalBuy),  icon:"fa-wallet",       bg:"rgba(245,158,11,.12)"  },
+        { label:"Potential Profit",value:formatCurrency(totalProfit),icon:"fa-arrow-trend-up",bg:"rgba(6,182,212,.12)" },
+        { label:"Active Orders",   value:inTransit,               icon:"fa-truck-fast",     bg:"rgba(244,63,94,.12)"   }
       ];
 
-      document.getElementById("dashboardStats").innerHTML = stats.map(s => `
+      document.getElementById("dashboardStats").innerHTML = stats.map(s=>`
         <div class="stat-card">
           <div class="stat-top">
             <div>
@@ -3441,36 +3525,34 @@ body {
             </div>
           </div>
           <div class="stat-sub">${products.length ? "Live Firebase data" : "No data yet"}</div>
-        </div>
-      `).join("");
+        </div>`).join("");
 
-      const recent = [...products].sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 5);
-      document.getElementById("recentActivity").innerHTML = recent.length ? recent.map(p => `
+      const recent = [...products].sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0)).slice(0,5);
+
+      document.getElementById("recentActivity").innerHTML = recent.length ? recent.map(p=>`
         <div class="mini-item">
           <div class="mini-icon" style="background:rgba(99,102,241,.12);color:var(--accent)">
             <i class="fa-solid fa-box"></i>
           </div>
           <div>
             <h4>${escapeHtml(p.name)}</h4>
-            <p>${escapeHtml(p.brand || "—")} • ${formatDateHuman(p.purchaseDate || "")}</p>
+            <p>${escapeHtml(p.brand||"—")} • ${formatDateHuman(p.purchaseDate||"")}</p>
           </div>
-        </div>
-      `).join("") : `<div class="empty-state">No recent activity</div>`;
+        </div>`).join("") : `<div class="empty-state">No recent activity</div>`;
 
-      document.getElementById("latestAdded").innerHTML = recent.length ? recent.slice(0, 4).map(p => `
+      document.getElementById("latestAdded").innerHTML = recent.slice(0,4).length ? recent.slice(0,4).map(p=>`
         <div class="mini-item">
           <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)">
             <i class="fa-solid fa-plus"></i>
           </div>
           <div>
             <h4>${escapeHtml(p.name)}</h4>
-            <p>${escapeHtml(p.status || "—")} • ${formatCurrency(p.marketValue || 0)}</p>
+            <p>${escapeHtml(p.status||"—")} • ${formatCurrency(p.marketValue||0)}</p>
           </div>
-        </div>
-      `).join("") : `<div class="empty-state">No models yet</div>`;
+        </div>`).join("") : `<div class="empty-state">No models yet</div>`;
 
-      const transitList = products.filter(p => ["Ordered", "In Transit", "Preorder"].includes(p.status));
-      document.getElementById("shippingInsights").innerHTML = transitList.length ? transitList.slice(0, 5).map(p => `
+      const transitList = products.filter(p=>["Ordered","In Transit","Preorder"].includes(p.status));
+      document.getElementById("shippingInsights").innerHTML = transitList.length ? transitList.slice(0,5).map(p=>`
         <div class="mini-item">
           <div class="mini-icon" style="background:rgba(6,182,212,.12);color:var(--accent-3)">
             <i class="fa-solid fa-truck-fast"></i>
@@ -3479,566 +3561,362 @@ body {
             <h4>${escapeHtml(p.name)}</h4>
             <p>${escapeHtml(p.status)} • ETA: ${formatDateHuman(p.eta)}</p>
           </div>
-        </div>
-      `).join("") : `<div class="empty-state">No shipping insights</div>`;
+        </div>`).join("") : `<div class="empty-state">No shipping insights</div>`;
 
-      renderSimpleList("brandDistribution", groupCounts(products, "brand"));
-      renderSimpleList("scaleBreakdown", groupCounts(products, "scale"));
+      renderSimpleList("brandDistribution",  groupCounts(products,"brand"));
+      renderSimpleList("scaleBreakdown",     groupCounts(products,"scale"));
       renderDuplicates();
       renderLowStock();
       renderProfitInsights();
       renderSimpleList("dashboardStatusMix", byStatus);
-
       renderValueBars();
     }
 
     function groupCounts(list, key) {
-      return list.reduce((acc, item) => {
-        const k = item[key] || "Unknown";
-        acc[k] = (acc[k] || 0) + 1;
-        return acc;
-      }, {});
+      return list.reduce((acc, item) => { const k=item[key]||"Unknown"; acc[k]=(acc[k]||0)+1; return acc; }, {});
     }
 
     function renderSimpleList(targetId, obj) {
-      const el = document.getElementById(targetId);
-      const entries = Object.entries(obj || {}).sort((a,b) => b[1] - a[1]);
-
-      if (!entries.length) {
-        el.innerHTML = `<div class="empty-state">No data available</div>`;
-        return;
-      }
-
-      el.innerHTML = entries.slice(0, 6).map(([k, v]) => `
+      const el = document.getElementById(targetId); if (!el) return;
+      const entries = Object.entries(obj||{}).sort((a,b)=>b[1]-a[1]);
+      if (!entries.length) { el.innerHTML=`<div class="empty-state">No data available</div>`; return; }
+      el.innerHTML = entries.slice(0,6).map(([k,v])=>`
         <div class="mini-item">
           <div class="mini-icon" style="background:rgba(99,102,241,.12);color:var(--accent)">
             <i class="fa-solid fa-layer-group"></i>
           </div>
           <div style="flex:1">
             <h4>${escapeHtml(k)}</h4>
-            <p>${v} item${v > 1 ? "s" : ""}</p>
+            <p>${v} item${v>1?"s":""}</p>
           </div>
-        </div>
-      `).join("");
+        </div>`).join("");
     }
 
     function renderDuplicates() {
-      const el = document.getElementById("duplicateList");
+      const el = document.getElementById("duplicateList"); if (!el) return;
       const map = {};
-      products.forEach(p => {
-        const key = `${(p.name || "").toLowerCase()}|${(p.brand || "").toLowerCase()}`;
-        map[key] = (map[key] || 0) + Number(p.qty || 0);
-      });
-
-      const dupes = Object.entries(map).filter(([,v]) => v > 1);
-      if (!dupes.length) {
-        el.innerHTML = `<div class="empty-state">No duplicates found</div>`;
-        return;
-      }
-
-      el.innerHTML = dupes.slice(0, 5).map(([k, v]) => {
-        const [name, brand] = k.split("|");
-        return `
-          <div class="mini-item">
-            <div class="mini-icon" style="background:rgba(245,158,11,.12);color:var(--warning)">
-              <i class="fa-solid fa-copy"></i>
-            </div>
-            <div>
-              <h4>${escapeHtml(name)}</h4>
-              <p>${escapeHtml(brand)} • Qty ${v}</p>
-            </div>
-          </div>
-        `;
+      products.forEach(p => { const key=`${(p.name||"").toLowerCase()}|${(p.brand||"").toLowerCase()}`; map[key]=(map[key]||0)+Number(p.qty||0); });
+      const dupes = Object.entries(map).filter(([,v])=>v>1);
+      if (!dupes.length) { el.innerHTML=`<div class="empty-state">No duplicates found</div>`; return; }
+      el.innerHTML = dupes.slice(0,5).map(([k,v])=>{
+        const [name,brand]=k.split("|");
+        return `<div class="mini-item">
+          <div class="mini-icon" style="background:rgba(245,158,11,.12);color:var(--warning)"><i class="fa-solid fa-copy"></i></div>
+          <div><h4>${escapeHtml(name)}</h4><p>${escapeHtml(brand)} • Qty ${v}</p></div>
+        </div>`;
       }).join("");
     }
 
     function renderLowStock() {
-      const el = document.getElementById("lowStockList");
-      const low = products.filter(p => Number(p.qty || 0) <= 1 && p.status === "Owned");
-
-      if (!low.length) {
-        el.innerHTML = `<div class="empty-state">No alerts</div>`;
-        return;
-      }
-
-      el.innerHTML = low.slice(0, 5).map(p => `
+      const el = document.getElementById("lowStockList"); if (!el) return;
+      const low = products.filter(p=>Number(p.qty||0)<=1 && p.status==="Owned");
+      if (!low.length) { el.innerHTML=`<div class="empty-state">No alerts</div>`; return; }
+      el.innerHTML = low.slice(0,5).map(p=>`
         <div class="mini-item">
-          <div class="mini-icon" style="background:rgba(239,68,68,.12);color:var(--danger)">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-          </div>
-          <div>
-            <h4>${escapeHtml(p.name)}</h4>
-            <p>Only ${Number(p.qty || 0)} left</p>
-          </div>
-        </div>
-      `).join("");
+          <div class="mini-icon" style="background:rgba(239,68,68,.12);color:var(--danger)"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div><h4>${escapeHtml(p.name)}</h4><p>Only ${Number(p.qty||0)} left</p></div>
+        </div>`).join("");
     }
 
     function renderProfitInsights() {
-      const el = document.getElementById("profitInsights");
-      const ranked = [...products]
-        .map(p => ({ ...p, profit: (Number(p.marketValue || 0) - Number(p.buyPrice || 0)) * Number(p.qty || 0) }))
-        .sort((a,b) => b.profit - a.profit)
-        .slice(0, 5);
-
-      if (!ranked.length) {
-        el.innerHTML = `<div class="empty-state">No data available</div>`;
-        return;
-      }
-
-      el.innerHTML = ranked.map(p => `
+      const el = document.getElementById("profitInsights"); if (!el) return;
+      const ranked = [...products].map(p=>({...p,profit:(Number(p.marketValue||0)-Number(p.buyPrice||0))*Number(p.qty||0)})).sort((a,b)=>b.profit-a.profit).slice(0,5);
+      if (!ranked.length) { el.innerHTML=`<div class="empty-state">No data available</div>`; return; }
+      el.innerHTML = ranked.map(p=>`
         <div class="mini-item">
-          <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)">
-            <i class="fa-solid fa-arrow-trend-up"></i>
-          </div>
-          <div>
-            <h4>${escapeHtml(p.name)}</h4>
-            <p>${formatCurrency(p.profit)} potential</p>
-          </div>
-        </div>
-      `).join("");
+          <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)"><i class="fa-solid fa-arrow-trend-up"></i></div>
+          <div><h4>${escapeHtml(p.name)}</h4><p>${formatCurrency(p.profit)} profit potential</p></div>
+        </div>`).join("");
     }
 
     function renderValueBars() {
-      const el = document.getElementById("valueBars");
-      const byBrand = products.reduce((acc, p) => {
-        const key = p.brand || "Other";
-        acc[key] = (acc[key] || 0) + (Number(p.marketValue || 0) * Number(p.qty || 0));
-        return acc;
-      }, {});
-
-      const items = Object.entries(byBrand).sort((a,b) => b[1] - a[1]).slice(0, 6);
-      if (!items.length) {
-        el.innerHTML = `<div class="empty-state" style="width:100%">No data available</div>`;
-        return;
-      }
-
-      const max = Math.max(...items.map(i => i[1]), 1);
-      el.innerHTML = items.map(([label, value]) => {
-        const h = Math.max(20, Math.round((value / max) * 140));
-        return `
-          <div class="bar-wrap">
-            <div class="bar" style="height:${h}px"><span>${Math.round(value / 1000)}k</span></div>
-            <div class="bar-label">${escapeHtml(label)}</div>
-          </div>
-        `;
+      const el = document.getElementById("valueBars"); if (!el) return;
+      const byBrand = products.reduce((acc,p)=>{ const k=p.brand||"Other"; acc[k]=(acc[k]||0)+(Number(p.marketValue||0)*Number(p.qty||0)); return acc; }, {});
+      const items = Object.entries(byBrand).sort((a,b)=>b[1]-a[1]).slice(0,6);
+      if (!items.length) { el.innerHTML=`<div class="empty-state" style="width:100%">No data</div>`; return; }
+      const max = Math.max(...items.map(i=>i[1]),1);
+      el.innerHTML = items.map(([label,value])=>{
+        const h = Math.max(20,Math.round((value/max)*140));
+        return `<div class="bar-wrap"><div class="bar" style="height:${h}px"><span>${Math.round(value/1000)}k</span></div><div class="bar-label">${escapeHtml(label)}</div></div>`;
       }).join("");
     }
 
-    /* =========================================
-       INVENTORY
-    ========================================= */
-    window.renderInventoryTable = function () {
-      let list = getFilteredProducts(products, "filterSearch", "filterBrand", "filterStatus");
-
-      const scale = document.getElementById("filterScale").value;
-      if (scale) list = list.filter(p => p.scale === scale);
-
-      const sortBy = document.getElementById("sortBy").value;
-      list.sort((a, b) => {
-        switch (sortBy) {
-          case "name-asc": return (a.name || "").localeCompare(b.name || "");
-          case "name-desc": return (b.name || "").localeCompare(a.name || "");
-          case "value-desc": return Number(b.marketValue || 0) - Number(a.marketValue || 0);
-          case "value-asc": return Number(a.marketValue || 0) - Number(b.marketValue || 0);
-          case "price-desc": return Number(b.buyPrice || 0) - Number(a.buyPrice || 0);
-          case "price-asc": return Number(a.buyPrice || 0) - Number(b.buyPrice || 0);
-          case "date-desc": return Number(b.createdAt || 0) - Number(a.createdAt || 0);
-          case "date-asc": return Number(a.createdAt || 0) - Number(b.createdAt || 0);
+    /* ─── INVENTORY TABLE ─────────────────────── */
+    window.renderInventoryTable = function() {
+      let list = getFilteredProducts(products,"filterSearch","filterBrand","filterStatus");
+      const scale  = document.getElementById("filterScale")?.value;
+      if (scale) list = list.filter(p=>p.scale===scale);
+      const sortBy = document.getElementById("sortBy")?.value;
+      list.sort((a,b)=>{
+        switch(sortBy){
+          case "name-asc":   return (a.name||"").localeCompare(b.name||"");
+          case "name-desc":  return (b.name||"").localeCompare(a.name||"");
+          case "value-desc": return Number(b.marketValue||0)-Number(a.marketValue||0);
+          case "value-asc":  return Number(a.marketValue||0)-Number(b.marketValue||0);
+          case "price-desc": return Number(b.buyPrice||0)-Number(a.buyPrice||0);
+          case "price-asc":  return Number(a.buyPrice||0)-Number(b.buyPrice||0);
+          case "date-desc":  return Number(b.createdAt||0)-Number(a.createdAt||0);
+          case "date-asc":   return Number(a.createdAt||0)-Number(b.createdAt||0);
           default: return 0;
         }
       });
-
       const tbody = document.getElementById("inventoryTableBody");
-
-      if (!list.length) {
-        tbody.innerHTML = `<tr><td colspan="10" class="empty-state">No models found</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = list.map(p => `
+      if (!list.length) { tbody.innerHTML=`<tr><td colspan="10" class="empty-state">No models found</td></tr>`; return; }
+      tbody.innerHTML = list.map(p=>`
         <tr>
           <td>
             <div class="prod-cell">
-              <div class="prod-thumb">
-                ${p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" />` : `<i class="fa-solid fa-car-side"></i>`}
-              </div>
-              <div class="prod-meta">
-                <h4>${escapeHtml(p.name)}</h4>
-                <p>${escapeHtml(p.condition || "—")}</p>
-              </div>
+              <div class="prod-thumb">${p.image?`<img src="${p.image}" alt="${escapeHtml(p.name)}" />`:`<i class="fa-solid fa-car-side"></i>`}</div>
+              <div class="prod-meta"><h4>${escapeHtml(p.name)}</h4><p>${escapeHtml(p.condition||"—")}</p></div>
             </div>
           </td>
-          <td>${escapeHtml(p.brand || "—")}</td>
-          <td>${escapeHtml(p.series || "—")}</td>
-          <td>${escapeHtml(p.scale || "—")}</td>
-          <td><span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status || "—")}</span></td>
-          <td>${Number(p.qty || 0)}</td>
-          <td>${formatCurrency(p.buyPrice || 0)}</td>
-          <td>${formatCurrency(p.marketValue || 0)}</td>
-          <td>${escapeHtml(p.seller || "—")}</td>
+          <td>${escapeHtml(p.brand||"—")}</td>
+          <td>${escapeHtml(p.series||"—")}</td>
+          <td>${escapeHtml(p.scale||"—")}</td>
+          <td><span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status||"—")}</span></td>
+          <td>${Number(p.qty||0)}</td>
+          <td>${formatCurrency(p.buyPrice||0)}</td>
+          <td>${formatCurrency(p.marketValue||0)}</td>
+          <td>${escapeHtml(p.seller||"—")}</td>
           <td>
             <div class="action-row">
-              <button class="icon-action" onclick="viewProduct('${p.id}')" title="View">
-                <i class="fa-solid fa-eye"></i>
-              </button>
-              <button class="icon-action" onclick="openProductModal('${p.id}')" title="Edit">
-                <i class="fa-solid fa-pen"></i>
-              </button>
-              <button class="icon-action" onclick="deleteProduct('${p.id}')" title="Delete">
-                <i class="fa-solid fa-trash"></i>
-              </button>
+              <button class="icon-action" onclick="viewProduct('${p.id}')" title="View"><i class="fa-solid fa-eye"></i></button>
+              <button class="icon-action" onclick="openProductModal('${p.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+              <button class="icon-action" onclick="deleteProduct('${p.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
             </div>
           </td>
-        </tr>
-      `).join("");
+        </tr>`).join("");
     };
 
-    /* =========================================
-       CATALOG
-    ========================================= */
-    window.renderProductCards = function () {
-      const list = getFilteredProducts(products, "productSearch", "productBrandFilter", "productStatusFilter");
+    /* ─── CATALOG ─────────────────────────────── */
+    window.renderProductCards = function() {
+      const list = getFilteredProducts(products,"productSearch","productBrandFilter","productStatusFilter");
       const grid = document.getElementById("productGrid");
-
-      if (!list.length) {
-        grid.innerHTML = `<div class="card" style="grid-column:1/-1"><div class="empty-state">No products found</div></div>`;
-        return;
-      }
-
-      grid.innerHTML = list.map(p => `
+      if (!list.length) { grid.innerHTML=`<div class="card" style="grid-column:1/-1"><div class="empty-state">No products found</div></div>`; return; }
+      grid.innerHTML = list.map(p=>`
         <div class="product-card">
-          <div class="product-cover">
-            ${p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" />` : `<i class="fa-solid fa-car-side" style="font-size:40px;color:var(--muted)"></i>`}
-          </div>
-
+          <div class="product-cover">${p.image?`<img src="${p.image}" alt="${escapeHtml(p.name)}" />`:`<i class="fa-solid fa-car-side" style="font-size:40px;color:var(--muted)"></i>`}</div>
           <div class="product-info">
             <div class="product-title">
               <h4>${escapeHtml(p.name)}</h4>
-              <div class="product-price">${formatCurrency(p.marketValue || 0)}</div>
+              <div class="product-price">${formatCurrency(p.marketValue||0)}</div>
             </div>
-
             <div class="product-specs">
-              <span class="chip">${escapeHtml(p.brand || "—")}</span>
-              <span class="chip">${escapeHtml(p.scale || "—")}</span>
-              <span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status || "—")}</span>
+              <span class="chip">${escapeHtml(p.brand||"—")}</span>
+              <span class="chip">${escapeHtml(p.scale||"—")}</span>
+              <span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status||"—")}</span>
             </div>
-
             <div class="toolbar">
-              <button class="btn btn-ghost btn-sm" onclick="viewProduct('${p.id}')">
-                <i class="fa-solid fa-eye"></i> View
-              </button>
-              <button class="btn btn-ghost btn-sm" onclick="openProductModal('${p.id}')">
-                <i class="fa-solid fa-pen"></i> Edit
-              </button>
+              <button class="btn btn-ghost btn-sm" onclick="viewProduct('${p.id}')"><i class="fa-solid fa-eye"></i> View</button>
+              <button class="btn btn-ghost btn-sm" onclick="openProductModal('${p.id}')"><i class="fa-solid fa-pen"></i> Edit</button>
             </div>
           </div>
-        </div>
-      `).join("");
+        </div>`).join("");
     };
 
-    window.viewProduct = function (id) {
-      const p = products.find(x => x.id === id);
-      if (!p) return;
-
-      const card = document.getElementById("productDetailCard");
+    window.viewProduct = function(id) {
+      const p = products.find(x=>x.id===id); if (!p) return;
+      const card  = document.getElementById("productDetailCard");
       const panel = document.getElementById("productDetailPanel");
-
       panel.innerHTML = `
-        <div class="detail-image">
-          ${p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" />` : `<i class="fa-solid fa-car-side" style="font-size:48px"></i>`}
-        </div>
-
+        <div class="detail-image">${p.image?`<img src="${p.image}" alt="${escapeHtml(p.name)}" />`:`<i class="fa-solid fa-car-side" style="font-size:48px"></i>`}</div>
         <div class="detail-meta">
           <h3>${escapeHtml(p.name)}</h3>
-
           <div class="detail-grid">
-            <div class="kv"><span>Brand</span><strong>${escapeHtml(p.brand || "—")}</strong></div>
-            <div class="kv"><span>Series</span><strong>${escapeHtml(p.series || "—")}</strong></div>
-            <div class="kv"><span>Scale</span><strong>${escapeHtml(p.scale || "—")}</strong></div>
-            <div class="kv"><span>Status</span><strong>${escapeHtml(p.status || "—")}</strong></div>
-            <div class="kv"><span>Quantity</span><strong>${Number(p.qty || 0)}</strong></div>
-            <div class="kv"><span>Condition</span><strong>${escapeHtml(p.condition || "—")}</strong></div>
-            <div class="kv"><span>Buy Price</span><strong>${formatCurrency(p.buyPrice || 0)}</strong></div>
-            <div class="kv"><span>Market Value</span><strong>${formatCurrency(p.marketValue || 0)}</strong></div>
-            <div class="kv"><span>Seller</span><strong>${escapeHtml(p.seller || "—")}</strong></div>
+            <div class="kv"><span>Brand</span><strong>${escapeHtml(p.brand||"—")}</strong></div>
+            <div class="kv"><span>Series</span><strong>${escapeHtml(p.series||"—")}</strong></div>
+            <div class="kv"><span>Scale</span><strong>${escapeHtml(p.scale||"—")}</strong></div>
+            <div class="kv"><span>Status</span><strong>${escapeHtml(p.status||"—")}</strong></div>
+            <div class="kv"><span>Quantity</span><strong>${Number(p.qty||0)}</strong></div>
+            <div class="kv"><span>Condition</span><strong>${escapeHtml(p.condition||"—")}</strong></div>
+            <div class="kv"><span>Buy Price</span><strong>${formatCurrency(p.buyPrice||0)}</strong></div>
+            <div class="kv"><span>Market Value</span><strong>${formatCurrency(p.marketValue||0)}</strong></div>
+            <div class="kv"><span>Seller</span><strong>${escapeHtml(p.seller||"—")}</strong></div>
             <div class="kv"><span>Purchase Date</span><strong>${formatDateHuman(p.purchaseDate)}</strong></div>
             <div class="kv"><span>ETA</span><strong>${formatDateHuman(p.eta)}</strong></div>
-            <div class="kv"><span>Tracking</span><strong>${escapeHtml(p.tracking || "—")}</strong></div>
+            <div class="kv"><span>Tracking</span><strong>${escapeHtml(p.tracking||"—")}</strong></div>
           </div>
-
-          <div class="kv">
-            <span>Notes</span>
-            <strong>${escapeHtml(p.notes || "—")}</strong>
-          </div>
-        </div>
-      `;
-
+          <div class="kv"><span>Notes</span><strong>${escapeHtml(p.notes||"—")}</strong></div>
+        </div>`;
       card.classList.remove("hidden");
-      switchPage("catalog", document.querySelector('[data-page=catalog]'));
+      switchPage("catalog", document.querySelector("[data-page=catalog]"));
     };
 
-    window.closeProductDetails = function () {
-      document.getElementById("productDetailCard").classList.add("hidden");
-    };
+    window.closeProductDetails = function() { document.getElementById("productDetailCard").classList.add("hidden"); };
 
-    /* =========================================
-       KANBAN
-    ========================================= */
+    /* ─── KANBAN ──────────────────────────────── */
     function mapStatusToKanban(status) {
-      if (status === "Ordered") return "ordered";
-      if (status === "In Transit") return "transit";
-      if (status === "Preorder") return "sourcing";
+      if (status==="Ordered")    return "ordered";
+      if (status==="In Transit") return "transit";
+      if (status==="Preorder")   return "sourcing";
       return "received";
     }
 
     function renderKanban() {
-      const board = document.getElementById("kanbanBoard");
-
-      board.innerHTML = KANBAN_COLS.map(col => {
-        const items = products.filter(p => mapStatusToKanban(p.status) === col.key);
-
+      const board = document.getElementById("kanbanBoard"); if (!board) return;
+      board.innerHTML = KANBAN_COLS.map(col=>{
+        const items = products.filter(p=>mapStatusToKanban(p.status)===col.key);
         return `
           <div class="kanban-col">
             <div class="kanban-head">
               <h4><i class="fa-solid ${col.icon}"></i> ${col.label}</h4>
               <span class="kanban-count">${items.length}</span>
             </div>
-            <div class="kanban-list">
-              ${items.length ? items.map(p => `
-                <div class="kanban-card">
-                  <h5>${escapeHtml(p.name)}</h5>
-                  <p>${escapeHtml(p.brand || "—")} • ${escapeHtml(p.scale || "—")}</p>
-                  <div class="k-meta">
-                    <span>${escapeHtml(p.status || "—")}</span>
-                    <span>${formatCurrency(p.marketValue || 0)}</span>
-                  </div>
-                </div>
-              `).join("") : `<div class="empty-state">No items</div>`}
+            <div class="kanban-list">${items.length ? items.map(p=>`
+              <div class="kanban-card">
+                <h5>${escapeHtml(p.name)}</h5>
+                <p>${escapeHtml(p.brand||"—")} • ${escapeHtml(p.scale||"—")}</p>
+                <div class="k-meta"><span>${escapeHtml(p.status||"—")}</span><span>${formatCurrency(p.marketValue||0)}</span></div>
+              </div>`).join("") : `<div class="empty-state">No items</div>`}
             </div>
-          </div>
-        `;
+          </div>`;
       }).join("");
     }
 
-    /* =========================================
-       ORDERS
-    ========================================= */
+    /* ─── ORDERS ──────────────────────────────── */
     function renderOrders() {
-      const queue = products.filter(p => ["Ordered", "In Transit", "Preorder"].includes(p.status));
-
-      const summary = {
-        Ordered: queue.filter(p => p.status === "Ordered").length,
-        "In Transit": queue.filter(p => p.status === "In Transit").length,
-        Preorder: queue.filter(p => p.status === "Preorder").length
-      };
-
-      document.getElementById("orderSummaryCards").innerHTML = Object.entries(summary).map(([k,v]) => `
+      const queue = products.filter(p=>["Ordered","In Transit","Preorder"].includes(p.status));
+      const summary = { Ordered:queue.filter(p=>p.status==="Ordered").length, "In Transit":queue.filter(p=>p.status==="In Transit").length, Preorder:queue.filter(p=>p.status==="Preorder").length };
+      document.getElementById("orderSummaryCards").innerHTML = Object.entries(summary).map(([k,v])=>`
         <div class="stat-card">
           <div class="stat-top">
-            <div>
-              <div class="stat-label">${escapeHtml(k)}</div>
-              <div class="stat-value">${v}</div>
-            </div>
-            <div class="stat-icon" style="background:rgba(99,102,241,.12)">
-              <i class="fa-solid fa-truck-fast"></i>
-            </div>
+            <div><div class="stat-label">${escapeHtml(k)}</div><div class="stat-value">${v}</div></div>
+            <div class="stat-icon" style="background:rgba(99,102,241,.12)"><i class="fa-solid fa-truck-fast"></i></div>
           </div>
-        </div>
-      `).join("");
-
+        </div>`).join("");
       const tbody = document.getElementById("ordersTableBody");
-      if (!queue.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No orders available</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = queue.map(p => `
+      if (!queue.length) { tbody.innerHTML=`<tr><td colspan="6" class="empty-state">No orders available</td></tr>`; return; }
+      tbody.innerHTML = queue.map(p=>`
         <tr>
           <td>${escapeHtml(p.name)}</td>
           <td><span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status)}</span></td>
           <td>${formatDateHuman(p.eta)}</td>
-          <td>${escapeHtml(p.seller || "—")}</td>
-          <td>${escapeHtml(p.tracking || "—")}</td>
-          <td>${formatCurrency(p.marketValue || 0)}</td>
-        </tr>
-      `).join("");
+          <td>${escapeHtml(p.seller||"—")}</td>
+          <td>${escapeHtml(p.tracking||"—")}</td>
+          <td>${formatCurrency(p.marketValue||0)}</td>
+        </tr>`).join("");
     }
 
-    /* =========================================
-       ANALYTICS
-    ========================================= */
+    /* ─── ANALYTICS ───────────────────────────── */
     function renderAnalytics() {
-      const totalBuy = products.reduce((sum, p) => sum + (Number(p.buyPrice || 0) * Number(p.qty || 0)), 0);
-      const totalValue = products.reduce((sum, p) => sum + (Number(p.marketValue || 0) * Number(p.qty || 0)), 0);
-      const roi = totalBuy ? (((totalValue - totalBuy) / totalBuy) * 100).toFixed(1) : "0.0";
-      const avgValue = products.length ? Math.round(totalValue / products.length) : 0;
+      const totalBuy   = products.reduce((s,p)=>s+(Number(p.buyPrice||0)*Number(p.qty||0)),0);
+      const totalValue = products.reduce((s,p)=>s+(Number(p.marketValue||0)*Number(p.qty||0)),0);
+      const roi        = totalBuy ? (((totalValue-totalBuy)/totalBuy)*100).toFixed(1) : "0.0";
+      const avgValue   = products.length ? Math.round(totalValue/products.length) : 0;
 
       const stats = [
-        { label: "Portfolio Value", value: formatCurrency(totalValue), icon: "fa-chart-line" },
-        { label: "Total Cost", value: formatCurrency(totalBuy), icon: "fa-wallet" },
-        { label: "ROI", value: `${roi}%`, icon: "fa-percent" },
-        { label: "Avg Model Value", value: formatCurrency(avgValue), icon: "fa-cube" }
+        { label:"Portfolio Value", value:formatCurrency(totalValue), icon:"fa-chart-line" },
+        { label:"Total Cost",      value:formatCurrency(totalBuy),   icon:"fa-wallet"     },
+        { label:"ROI",             value:`${roi}%`,                   icon:"fa-percent"    },
+        { label:"Avg Model Value", value:formatCurrency(avgValue),   icon:"fa-cube"        }
       ];
 
-      document.getElementById("analyticsStats").innerHTML = stats.map(s => `
+      document.getElementById("analyticsStats").innerHTML = stats.map(s=>`
         <div class="stat-card">
           <div class="stat-top">
-            <div>
-              <div class="stat-label">${escapeHtml(s.label)}</div>
-              <div class="stat-value">${escapeHtml(String(s.value))}</div>
-            </div>
-            <div class="stat-icon" style="background:rgba(99,102,241,.12)">
-              <i class="fa-solid ${s.icon}"></i>
-            </div>
+            <div><div class="stat-label">${escapeHtml(s.label)}</div><div class="stat-value">${escapeHtml(String(s.value))}</div></div>
+            <div class="stat-icon" style="background:rgba(99,102,241,.12)"><i class="fa-solid ${s.icon}"></i></div>
           </div>
-        </div>
-      `).join("");
+        </div>`).join("");
 
-      const brandValue = products.reduce((acc, p) => {
-        const k = p.brand || "Other";
-        acc[k] = (acc[k] || 0) + (Number(p.marketValue || 0) * Number(p.qty || 0));
-        return acc;
-      }, {});
+      const brandValue = products.reduce((acc,p)=>{ const k=p.brand||"Other"; acc[k]=(acc[k]||0)+(Number(p.marketValue||0)*Number(p.qty||0)); return acc; }, {});
       renderBars("brandValueBars", brandValue);
 
       const statusObj = {
-        Owned: products.filter(p => p.status === "Owned").length,
-        Ordered: products.filter(p => p.status === "Ordered").length,
-        "In Transit": products.filter(p => p.status === "In Transit").length,
-        Preorder: products.filter(p => p.status === "Preorder").length,
-        Sold: products.filter(p => p.status === "Sold").length
+        Owned:       products.filter(p=>p.status==="Owned").length,
+        Ordered:     products.filter(p=>p.status==="Ordered").length,
+        "In Transit":products.filter(p=>p.status==="In Transit").length,
+        Preorder:    products.filter(p=>p.status==="Preorder").length,
+        Sold:        products.filter(p=>p.status==="Sold").length
       };
-
       renderSimpleList("statusMix", statusObj);
       renderSimpleList("analyticsStatus", statusObj);
 
-      const leaderboard = [...products]
-        .map(p => ({ ...p, profit: (Number(p.marketValue || 0) - Number(p.buyPrice || 0)) * Number(p.qty || 0) }))
-        .sort((a,b) => b.profit - a.profit)
-        .slice(0, 8);
-
-      const el = document.getElementById("profitLeaderboard");
-      if (!leaderboard.length) {
-        el.innerHTML = `<div class="empty-state">No data available</div>`;
-        return;
-      }
-
-      el.innerHTML = leaderboard.map(p => `
+      const leaderboard = [...products].map(p=>({...p,profit:(Number(p.marketValue||0)-Number(p.buyPrice||0))*Number(p.qty||0)})).sort((a,b)=>b.profit-a.profit).slice(0,8);
+      const lbEl = document.getElementById("profitLeaderboard");
+      if (!leaderboard.length) { lbEl.innerHTML=`<div class="empty-state">No data available</div>`; return; }
+      lbEl.innerHTML = leaderboard.map(p=>`
         <div class="mini-item">
-          <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)">
-            <i class="fa-solid fa-trophy"></i>
-          </div>
-          <div>
-            <h4>${escapeHtml(p.name)}</h4>
-            <p>${formatCurrency(p.profit)} profit potential</p>
-          </div>
-        </div>
-      `).join("");
+          <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)"><i class="fa-solid fa-trophy"></i></div>
+          <div><h4>${escapeHtml(p.name)}</h4><p>${formatCurrency(p.profit)} profit potential</p></div>
+        </div>`).join("");
     }
 
     function renderBars(targetId, obj) {
-      const el = document.getElementById(targetId);
-      const items = Object.entries(obj).sort((a,b) => b[1] - a[1]).slice(0, 6);
-
-      if (!items.length) {
-        el.innerHTML = `<div class="empty-state" style="width:100%">No data available</div>`;
-        return;
-      }
-
-      const max = Math.max(...items.map(i => i[1]), 1);
-
-      el.innerHTML = items.map(([label, value]) => {
-        const h = Math.max(20, Math.round((value / max) * 140));
-        return `
-          <div class="bar-wrap">
-            <div class="bar" style="height:${h}px"><span>${Math.round(value / 1000)}k</span></div>
-            <div class="bar-label">${escapeHtml(label)}</div>
-          </div>
-        `;
+      const el = document.getElementById(targetId); if (!el) return;
+      const items = Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,6);
+      if (!items.length) { el.innerHTML=`<div class="empty-state" style="width:100%">No data</div>`; return; }
+      const max = Math.max(...items.map(i=>i[1]),1);
+      el.innerHTML = items.map(([label,value])=>{
+        const h=Math.max(20,Math.round((value/max)*140));
+        return `<div class="bar-wrap"><div class="bar" style="height:${h}px"><span>${Math.round(value/1000)}k</span></div><div class="bar-label">${escapeHtml(label)}</div></div>`;
       }).join("");
     }
 
-    /* =========================================
-       EXPORT / IMPORT
-    ========================================= */
-    window.exportData = function () {
-      const blob = new Blob([JSON.stringify(products, null, 2)], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
+    /* ─── EXPORT / IMPORT ────────────────────── */
+    window.exportData = function() {
+      const blob = new Blob([JSON.stringify(products,null,2)],{type:"application/json"});
+      const a    = document.createElement("a");
+      a.href     = URL.createObjectURL(blob);
       a.download = "pretrack-products.json";
       a.click();
       URL.revokeObjectURL(a.href);
-      showToast("Exported", "JSON exported successfully.", "success");
+      showToast("Exported","JSON exported successfully.","success");
     };
 
-    window.importData = async function (event) {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
+    window.importData = async function(event) {
+      const file = event.target.files?.[0]; if (!file) return;
       try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-
-        if (!Array.isArray(data)) {
-          showToast("Import Failed", "Invalid JSON format.", "error");
-          return;
-        }
-
+        const data = JSON.parse(await file.text());
+        if (!Array.isArray(data)) { showToast("Import Failed","Invalid JSON format.","error"); return; }
         for (const item of data) {
-          const payload = {
-            name: item.name || "",
-            brand: item.brand || "Other",
-            series: item.series || "",
-            scale: item.scale || "1:64",
-            status: ["Owned","Ordered","In Transit","Preorder","Sold"].includes(item.status) ? item.status : "Owned",
-            qty: Number(item.qty || 1),
-            buyPrice: Number(item.buyPrice || 0),
-            marketValue: Number(item.marketValue || 0),
-            seller: item.seller || "",
-            purchaseDate: item.purchaseDate || "",
-            eta: item.eta || "",
-            tracking: item.tracking || "",
-            condition: item.condition || "Mint",
-            notes: item.notes || "",
-            image: item.image || "",
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-          };
-          await addDoc(collection(db, PRODUCTS_COLLECTION), payload);
+          await addDoc(collection(db, PRODUCTS_COLLECTION), {
+            name:         item.name          || "",
+            brand:        item.brand         || "Other",
+            series:       item.series        || "",
+            scale:        item.scale         || "1:64",
+            status:       ["Owned","Ordered","In Transit","Preorder","Sold"].includes(item.status)?item.status:"Owned",
+            qty:          Number(item.qty||1),
+            buyPrice:     Number(item.buyPrice||0),
+            marketValue:  Number(item.marketValue||0),
+            seller:       item.seller        || "",
+            purchaseDate: item.purchaseDate  || "",
+            eta:          item.eta           || "",
+            tracking:     item.tracking      || "",
+            condition:    item.condition     || "Mint",
+            notes:        item.notes         || "",
+            image:        item.image         || "",
+            createdAt:    serverTimestamp(),
+            updatedAt:    serverTimestamp()
+          });
         }
-
-        showToast("Imported", "Products imported to Firebase.", "success");
-        addNotification("Import Complete", "Products imported successfully.");
+        showToast("Imported","Products imported to Firebase.","success");
+        addNotification("Import Complete","Products imported successfully.");
         await fetchProducts();
       } catch (error) {
         console.error(error);
-        showToast("Import Failed", "Could not import JSON.", "error");
+        showToast("Import Failed","Could not import JSON.","error");
       }
-
       event.target.value = "";
     };
 
-    window.resetAllData = async function () {
-      const ok = confirm("Delete ALL products from Firebase?");
-      if (!ok) return;
-
+    window.resetAllData = async function() {
+      if (!confirm("Delete ALL products from Firebase? This cannot be undone.")) return;
       try {
+        // Also clean up Supabase images
+        for (const p of products) { if (p.image) await deleteImageFromSupabase(p.image); }
         await clearAllProductsFromFirebase();
-        showToast("Reset Complete", "All Firebase products deleted.", "success");
-        addNotification("All Data Cleared", "All products were removed.");
+        showToast("Reset Complete","All Firebase products deleted.","success");
+        addNotification("All Data Cleared","All products were removed.");
         await fetchProducts();
       } catch (error) {
         console.error(error);
-        showToast("Reset Failed", "Could not clear Firebase data.", "error");
+        showToast("Reset Failed","Could not clear Firebase data.","error");
       }
     };
 
-    /* =========================================
-       INIT
-    ========================================= */
+    /* ─── INIT ───────────────────────────────── */
     renderNotifications();
-    fetchProducts();
   </script>
 </body>
 </html>
