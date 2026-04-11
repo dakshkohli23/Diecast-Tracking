@@ -1,4 +1,16 @@
+'use strict';
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import {
+  getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+// ── FIREBASE ──
+const firebaseConfig = {
   apiKey: "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
   authDomain: "diecast-tracking-471f7.firebaseapp.com",
   projectId: "diecast-tracking-471f7",
