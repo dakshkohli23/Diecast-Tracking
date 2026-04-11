@@ -2927,495 +2927,1118 @@ body {
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- FIREBASE + APP LOGIC -->
-<script type="module">
-/* =========================
-   PRETRACK FINAL SAFE SCRIPT
-   ========================= */
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      getDocs,
+      addDoc,
+      updateDoc,
+      deleteDoc,
+      doc,
+      getDoc,
+      writeBatch
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import {
-  getFirestore,
-  collection,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
-
-/* =========================
-   REPLACE WITH YOUR REAL CONFIG
-   ========================= */
-const firebaseConfig = {
-   apiKey: "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
+    /* =========================================
+       REPLACE WITH YOUR REAL FIREBASE CONFIG
+    ========================================= */
+    const firebaseConfig = {
+      apiKey: "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
   authDomain: "diecast-tracking-471f7.firebaseapp.com",
   projectId: "diecast-tracking-471f7",
   storageBucket: "diecast-tracking-471f7.firebasestorage.app",
   messagingSenderId: "1042711268055",
   appId: "1:1042711268055:web:9b09ded970a85532767e92"
-};
+    };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const PRODUCTS_COLLECTION = "products";
 
-let ORDERS = [];
-let ACTIVITY = [];
-let currentEditId = null;
+    /* =========================================
+       GLOBAL STATE
+    ========================================= */
+    let products = [];
+    let notifications = [];
+    let editingId = null;
+    let uploadedImageBase64 = "";
 
-/* =========================
-   SAFE DOM HELPERS
-   ========================= */
-const $ = (id) => document.getElementById(id);
-const el = (id) => document.getElementById(id) || null;
+    const KANBAN_COLS = [
+      { key: "sourcing", label: "Sourcing", icon: "fa-magnifying-glass" },
+      { key: "ordered", label: "Ordered", icon: "fa-cart-shopping" },
+      { key: "transit", label: "In Transit", icon: "fa-truck-fast" },
+      { key: "received", label: "Received", icon: "fa-box-open" }
+    ];
 
-function txt(id, value) {
-  const node = el(id);
-  if (node) node.textContent = value;
-}
-
-function html(id, value) {
-  const node = el(id);
-  if (node) node.innerHTML = value;
-}
-
-function show(id) {
-  const node = el(id);
-  if (node) node.classList.remove("hidden");
-}
-
-function hide(id) {
-  const node = el(id);
-  if (node) node.classList.add("hidden");
-}
-
-function num(v) {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function money(v) {
-  return "₹" + num(v).toLocaleString("en-IN", { maximumFractionDigits: 2 });
-}
-
-function esc(v = "") {
-  return String(v)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function dateFmt(v) {
-  if (!v) return "—";
-  try {
-    if (typeof v === "string") {
-      const d = new Date(v);
-      if (!isNaN(d)) return d.toLocaleDateString("en-IN");
+    /* =========================================
+       UTILITIES
+    ========================================= */
+    function formatCurrency(n) {
+      const num = Number(n || 0);
+      return "₹" + num.toLocaleString("en-IN", { maximumFractionDigits: 0 });
     }
-    if (v?.seconds) return new Date(v.seconds * 1000).toLocaleDateString("en-IN");
-  } catch {}
-  return "—";
-}
 
-function toast(msg, type = "info") {
-  let wrap = el("toastContainer");
-  if (!wrap) {
-    wrap = document.createElement("div");
-    wrap.id = "toastContainer";
-    wrap.className = "toast-container";
-    document.body.appendChild(wrap);
-  }
+    function formatDateHuman(dateStr) {
+      if (!dateStr) return "—";
+      const d = new Date(dateStr);
+      if (isNaN(d)) return "—";
+      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    }
 
-  const icons = {
-    success: "fa-circle-check",
-    error: "fa-circle-xmark",
-    warning: "fa-triangle-exclamation",
-    info: "fa-circle-info"
-  };
+    function daysUntil(dateStr) {
+      if (!dateStr) return null;
+      return Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
+    }
 
-  const t = document.createElement("div");
-  t.className = `toast ${type}`;
-  t.innerHTML = `
-    <div class="toast-icon"><i class="fa-solid ${icons[type] || icons.info}"></i></div>
-    <div class="toast-msg">${esc(msg)}</div>
-    <button class="toast-close" type="button"><i class="fa-solid fa-xmark"></i></button>
-    <div class="toast-bar"></div>
-  `;
-  wrap.appendChild(t);
+    function getStatusClass(status) {
+      const map = {
+        "Owned": "owned",
+        "Ordered": "ordered",
+        "In Transit": "transit",
+        "Preorder": "preorder",
+        "Sold": "sold"
+      };
+      return map[status] || "normal";
+    }
 
-  t.querySelector(".toast-close")?.addEventListener("click", () => removeToast(t));
-  setTimeout(() => removeToast(t), 3500);
-}
+    function escapeHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
 
-function removeToast(t) {
-  if (!t) return;
-  t.classList.add("out");
-  setTimeout(() => t.remove(), 250);
-}
+    function productMatchesQuery(p, q) {
+      if (!q) return true;
+      const text = [
+        p.name, p.brand, p.series, p.scale, p.status,
+        p.seller, p.notes, p.tracking
+      ].join(" ").toLowerCase();
+      return text.includes(q.toLowerCase());
+    }
 
-/* =========================
-   SAFE FETCH (NO orderBy)
-   This avoids createdAt failures
-   ========================= */
-async function fetchOrders() {
-  const snap = await getDocs(collection(db, "orders"));
-  ORDERS = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => {
-      const A = a.createdAt?.seconds || 0;
-      const B = b.createdAt?.seconds || 0;
-      return B - A;
-    });
-}
+    function showToast(title, msg, type = "normal") {
+      const wrap = document.getElementById("toastContainer");
+      const colors = {
+        success: "rgba(16,185,129,.12)",
+        error: "rgba(239,68,68,.12)",
+        warning: "rgba(245,158,11,.12)",
+        normal: "rgba(99,102,241,.12)"
+      };
+      const icons = {
+        success: "fa-check",
+        error: "fa-xmark",
+        warning: "fa-triangle-exclamation",
+        normal: "fa-circle-info"
+      };
 
-async function fetchActivity() {
-  try {
-    const snap = await getDocs(collection(db, "activity"));
-    ACTIVITY = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => {
-        const A = a.createdAt?.seconds || 0;
-        const B = b.createdAt?.seconds || 0;
-        return B - A;
+      const div = document.createElement("div");
+      div.className = "toast";
+      div.innerHTML = `
+        <div class="toast-icon" style="background:${colors[type] || colors.normal};color:var(--accent)">
+          <i class="fa-solid ${icons[type] || icons.normal}"></i>
+        </div>
+        <div class="toast-content">
+          <h4>${escapeHtml(title)}</h4>
+          <p>${escapeHtml(msg)}</p>
+        </div>
+      `;
+      wrap.appendChild(div);
+      setTimeout(() => div.remove(), 3000);
+    }
+
+    function addNotification(title, message) {
+      notifications.unshift({
+        id: Date.now(),
+        title,
+        message,
+        time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+        read: false
       });
-  } catch (e) {
-    console.warn("Activity fetch failed:", e);
-    ACTIVITY = [];
-  }
-}
+      if (notifications.length > 15) notifications = notifications.slice(0, 15);
+      renderNotifications();
+    }
 
-async function loadAllData() {
-  try {
-    await fetchOrders();
-    await fetchActivity();
-    renderAll();
-    console.log("Firestore loaded:", { orders: ORDERS.length, activity: ACTIVITY.length });
-  } catch (err) {
-    console.error("Firestore load error:", err);
-    toast("Firestore load failed: " + err.message, "error");
-  }
-}
+    function renderNotifications() {
+      const list = document.getElementById("notifList");
+      const dot = document.getElementById("notifDot");
+      const unread = notifications.some(n => !n.read);
 
-/* =========================
-   RENDER
-   ========================= */
-function renderStats() {
-  const totalOrders = ORDERS.length;
-  const totalQty = ORDERS.reduce((s, o) => s + (num(o.qty) || 1), 0);
-  const totalValue = ORDERS.reduce((s, o) => s + num(o.total), 0);
-  const totalPaid = ORDERS.reduce((s, o) => s + num(o.paid), 0);
-  const pending = Math.max(0, totalValue - totalPaid);
+      dot.classList.toggle("hidden", !unread);
 
-  txt("statTotal", totalOrders);
-  txt("statQty", totalQty);
-  txt("statMarketValue", money(totalValue));
-  txt("statInvestment", money(totalPaid));
-  txt("statPending", money(pending));
-  txt("statPendingPO", ORDERS.filter(o => !String(o.status || "").toLowerCase().includes("deliver")).length);
-  txt("statDelivered", ORDERS.filter(o => String(o.status || "").toLowerCase().includes("deliver")).length);
-  txt("statTransit", ORDERS.filter(o => String(o.status || "").toLowerCase().includes("ship")).length);
-  txt("statOverdue", 0);
-  txt("statDuplicates", 0);
-}
+      if (!notifications.length) {
+        list.innerHTML = `<div class="empty-state">No notifications</div>`;
+        return;
+      }
 
-function renderOrders() {
-  const tbody = el("ordersTableBody");
-  if (!tbody) {
-    console.warn("ordersTableBody not found");
-    return;
-  }
+      list.innerHTML = notifications.map(n => `
+        <div class="notif-item">
+          <div class="notif-icon"><i class="fa-solid fa-bell"></i></div>
+          <div class="notif-text">
+            <h4>${escapeHtml(n.title)}</h4>
+            <p>${escapeHtml(n.message)}</p>
+            <span>${escapeHtml(n.time)}</span>
+          </div>
+        </div>
+      `).join("");
+    }
 
-  if (!ORDERS.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-row">No orders found</td></tr>`;
-    return;
-  }
+    window.toggleNotifMenu = function () {
+      document.getElementById("notifDropdown").classList.toggle("open");
+    };
 
-  tbody.innerHTML = ORDERS.map(o => `
-    <tr>
-      <td>${esc(o.productName || "Untitled")}</td>
-      <td>${esc(o.orderNumber || "—")}</td>
-      <td>${esc(o.brand || "—")}</td>
-      <td>${esc(o.status || "Ordered")}</td>
-      <td>${dateFmt(o.orderDate)}</td>
-      <td>${dateFmt(o.eta)}</td>
-      <td>${money(o.paid || 0)}</td>
-      <td>${money(o.total || 0)}</td>
-      <td>
-        <button class="btn btn-ghost btn-sm" onclick="window.editOrder('${o.id}')">Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="window.deleteOrder('${o.id}')">Delete</button>
-      </td>
-    </tr>
-  `).join("");
-}
+    window.markAllRead = function () {
+      notifications = notifications.map(n => ({ ...n, read: true }));
+      renderNotifications();
+    };
 
-function renderRecent() {
-  const wrap = el("recentOrdersList");
-  if (!wrap) return;
-
-  const recent = ORDERS.slice(0, 5);
-  if (!recent.length) {
-    wrap.innerHTML = `<div class="empty-state">No recent orders</div>`;
-    return;
-  }
-
-  wrap.innerHTML = recent.map(o => `
-    <div class="recent-order-item">
-      <div class="roi-thumb"><i class="fa-solid fa-box"></i></div>
-      <div class="roi-info">
-        <div class="roi-name">${esc(o.productName || "Untitled")}</div>
-        <div class="roi-meta">${esc(o.brand || "—")} • ${dateFmt(o.orderDate)}</div>
-      </div>
-    </div>
-  `).join("");
-}
-
-function renderActivityList() {
-  const wrap = el("activityList");
-  if (!wrap) return;
-
-  if (!ACTIVITY.length) {
-    wrap.innerHTML = `<div class="empty-state">No recent activity</div>`;
-    return;
-  }
-
-  wrap.innerHTML = ACTIVITY.slice(0, 8).map(a => `
-    <div class="activity-item">
-      <div class="activity-dot ${esc(a.type || "info")}"></div>
-      <div>${esc(a.message || "Updated")}</div>
-      <div class="activity-time">${dateFmt(a.createdAt)}</div>
-    </div>
-  `).join("");
-}
-
-function renderAll() {
-  renderStats();
-  renderOrders();
-  renderRecent();
-  renderActivityList();
-}
-
-/* =========================
-   CRUD
-   ========================= */
-async function addActivity(message, type = "info") {
-  try {
-    await addDoc(collection(db, "activity"), {
-      message,
-      type,
-      createdAt: serverTimestamp()
+    document.addEventListener("click", (e) => {
+      const dd = document.getElementById("notifDropdown");
+      const wrap = e.target.closest(".dropdown-wrap");
+      if (!wrap) dd.classList.remove("open");
     });
-  } catch (e) {
-    console.warn("Activity add failed", e);
-  }
-}
 
-function getFormData() {
-  return {
-    productName: el("fProductName")?.value?.trim() || "",
-    orderNumber: el("fOrderNumber")?.value?.trim() || "",
-    brand: el("fBrand")?.value?.trim() || "",
-    series: el("fSeries")?.value?.trim() || "",
-    scale: el("fScale")?.value?.trim() || "",
-    condition: el("fCondition")?.value?.trim() || "",
-    vendor: el("fVendor")?.value?.trim() || "",
-    location: el("fLocation")?.value?.trim() || "",
-    variant: el("fVariant")?.value?.trim() || "",
-    qty: num(el("fQty")?.value || 1),
-    orderDate: el("fOrderDate")?.value || "",
-    eta: el("fEta")?.value || "",
-    status: el("fStatus")?.value || "Ordered",
-    preorderPrice: num(el("fPreorderPrice")?.value || 0),
-    actualPrice: num(el("fActualPrice")?.value || 0),
-    shipping: num(el("fShipping")?.value || 0),
-    paid: num(el("fPaid")?.value || 0),
-    total: num(el("fTotal")?.value || 0),
-    pending: num(el("fPending")?.value || 0),
-    updatedAt: serverTimestamp()
-  };
-}
+    /* =========================================
+       FIREBASE CRUD
+    ========================================= */
+    async function fetchProducts() {
+      try {
+        const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
+        products = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-async function submitOrder(e) {
-  e.preventDefault();
+        products.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
 
-  try {
-    const data = getFormData();
-
-    if (!data.productName) {
-      toast("Product name is required", "warning");
-      return;
+        renderAll();
+      } catch (error) {
+        console.error(error);
+        showToast("Firebase Error", "Could not fetch products.", "error");
+      }
     }
 
-    if (currentEditId) {
-      await updateDoc(doc(db, "orders", currentEditId), data);
-      await addActivity("Updated order: " + data.productName, "info");
-      toast("Order updated", "success");
-    } else {
-      data.createdAt = serverTimestamp();
-      await addDoc(collection(db, "orders"), data);
-      await addActivity("Added order: " + data.productName, "success");
-      toast("Order added", "success");
+    async function addProductToFirebase(product) {
+      const payload = {
+        ...product,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      await addDoc(collection(db, PRODUCTS_COLLECTION), payload);
     }
 
-    hide("orderModal");
-    resetForm();
-    await loadAllData();
-  } catch (err) {
-    console.error("Save error:", err);
-    toast("Save failed: " + err.message, "error");
-  }
-}
+    async function updateProductInFirebase(id, product) {
+      const ref = doc(db, PRODUCTS_COLLECTION, id);
+      await updateDoc(ref, {
+        ...product,
+        updatedAt: Date.now()
+      });
+    }
 
-function resetForm() {
-  currentEditId = null;
-  el("orderForm")?.reset();
-  txt("modalTitle", "Add Order");
-}
+    async function deleteProductFromFirebase(id) {
+      await deleteDoc(doc(db, PRODUCTS_COLLECTION, id));
+    }
 
-window.editOrder = function(id) {
-  const order = ORDERS.find(o => o.id === id);
-  if (!order) return;
+    async function clearAllProductsFromFirebase() {
+      const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
 
-  currentEditId = id;
-  txt("modalTitle", "Edit Order");
+    /* =========================================
+       PAGE / SIDEBAR
+    ========================================= */
+    window.switchPage = function (page, el) {
+      document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+      document.getElementById(`page-${page}`).classList.add("active");
 
-  const set = (id, val) => { const n = el(id); if (n) n.value = val ?? ""; };
+      document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+      if (el) el.classList.add("active");
 
-  set("fProductName", order.productName);
-  set("fOrderNumber", order.orderNumber);
-  set("fBrand", order.brand);
-  set("fSeries", order.series);
-  set("fScale", order.scale);
-  set("fCondition", order.condition);
-  set("fVendor", order.vendor);
-  set("fLocation", order.location);
-  set("fVariant", order.variant);
-  set("fQty", order.qty);
-  set("fOrderDate", order.orderDate);
-  set("fEta", order.eta);
-  set("fStatus", order.status);
-  set("fPreorderPrice", order.preorderPrice);
-  set("fActualPrice", order.actualPrice);
-  set("fShipping", order.shipping);
-  set("fPaid", order.paid);
-  set("fTotal", order.total);
-  set("fPending", order.pending);
+      closeSidebar();
+    };
 
-  show("orderModal");
-};
+    window.openSidebar = function () {
+      document.getElementById("sidebar").classList.add("show");
+      document.getElementById("sidebarOverlay").classList.add("show");
+    };
 
-window.deleteOrder = async function(id) {
-  const order = ORDERS.find(o => o.id === id);
-  if (!order) return;
+    window.closeSidebar = function () {
+      document.getElementById("sidebar").classList.remove("show");
+      document.getElementById("sidebarOverlay").classList.remove("show");
+    };
 
-  if (!confirm(`Delete "${order.productName}"?`)) return;
+    /* =========================================
+       MODAL / FORM
+    ========================================= */
+    window.openProductModal = function (id = null) {
+      editingId = id;
+      document.getElementById("productModal").classList.remove("hidden");
 
-  try {
-    await deleteDoc(doc(db, "orders", id));
-    await addActivity("Deleted order: " + (order.productName || "Order"), "warning");
-    toast("Order deleted", "success");
-    await loadAllData();
-  } catch (err) {
-    console.error("Delete error:", err);
-    toast("Delete failed: " + err.message, "error");
-  }
-};
+      if (!id) {
+        document.getElementById("modalTitle").textContent = "Add New Diecast Model";
+        resetProductForm();
+        return;
+      }
 
-/* =========================
-   LOGIN
-   ========================= */
-async function handleLogin(e) {
-  e.preventDefault();
+      const p = products.find(x => x.id === id);
+      if (!p) return;
 
-  const username = el("username")?.value?.trim() || "";
-  const password = el("password")?.value || "";
+      document.getElementById("modalTitle").textContent = "Edit Diecast Model";
+      document.getElementById("editingProductId").value = p.id || "";
+      document.getElementById("f_name").value = p.name || "";
+      document.getElementById("f_brand").value = p.brand || "Hot Wheels";
+      document.getElementById("f_series").value = p.series || "";
+      document.getElementById("f_scale").value = p.scale || "1:64";
+      document.getElementById("f_status").value = p.status || "Owned";
+      document.getElementById("f_qty").value = p.qty || 1;
+      document.getElementById("f_buyPrice").value = p.buyPrice || "";
+      document.getElementById("f_marketValue").value = p.marketValue || "";
+      document.getElementById("f_seller").value = p.seller || "";
+      document.getElementById("f_purchaseDate").value = p.purchaseDate || "";
+      document.getElementById("f_eta").value = p.eta || "";
+      document.getElementById("f_tracking").value = p.tracking || "";
+      document.getElementById("f_condition").value = p.condition || "Mint";
+      document.getElementById("f_notes").value = p.notes || "";
 
-  try {
-    const email = username.includes("@") ? username : `${username}@pretrack.app`;
-    await signInWithEmailAndPassword(auth, email, password);
-    toast("Login success", "success");
-  } catch (err) {
-    console.error("Login error:", err);
-    show("loginError");
-    txt("errorMsg", err.message);
-    toast("Login failed", "error");
-  }
-}
+      uploadedImageBase64 = p.image || "";
+      renderImagePreview();
+    };
 
-async function handleLogout() {
-  try {
-    await signOut(auth);
-  } catch (err) {
-    console.error("Logout error:", err);
-  }
-}
+    window.closeProductModal = function () {
+      document.getElementById("productModal").classList.add("hidden");
+      resetProductForm();
+    };
 
-function showDashboard(user) {
-  document.body.classList.remove("login-body");
-  document.body.classList.add("dashboard-body");
+    function resetProductForm() {
+      editingId = null;
+      uploadedImageBase64 = "";
+      document.getElementById("editingProductId").value = "";
+      document.getElementById("f_name").value = "";
+      document.getElementById("f_brand").value = "Hot Wheels";
+      document.getElementById("f_series").value = "";
+      document.getElementById("f_scale").value = "1:64";
+      document.getElementById("f_status").value = "Owned";
+      document.getElementById("f_qty").value = 1;
+      document.getElementById("f_buyPrice").value = "";
+      document.getElementById("f_marketValue").value = "";
+      document.getElementById("f_seller").value = "";
+      document.getElementById("f_purchaseDate").value = "";
+      document.getElementById("f_eta").value = "";
+      document.getElementById("f_tracking").value = "";
+      document.getElementById("f_condition").value = "Mint";
+      document.getElementById("f_notes").value = "";
+      document.getElementById("f_image").value = "";
+      renderImagePreview();
+    }
 
-  hide("loginView");
-  show("dashboardView");
+    function renderImagePreview() {
+      const box = document.getElementById("imagePreview");
+      if (!uploadedImageBase64) {
+        box.innerHTML = `
+          <div id="imagePreviewPlaceholder" style="text-align:center;color:var(--muted)">
+            <i class="fa-regular fa-image" style="font-size:36px"></i>
+            <p style="margin-top:8px;font-size:12px">Click to upload</p>
+          </div>
+        `;
+        return;
+      }
 
-  txt("profileName", user?.email ? user.email.split("@")[0] : "User");
-}
+      box.innerHTML = `<img src="${uploadedImageBase64}" alt="Preview" />`;
+    }
 
-function showLogin() {
-  document.body.classList.remove("dashboard-body");
-  document.body.classList.add("login-body");
+    window.handleImageUpload = function (event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-  hide("dashboardView");
-  show("loginView");
-}
+      const reader = new FileReader();
+      reader.onload = () => {
+        uploadedImageBase64 = reader.result;
+        renderImagePreview();
+      };
+      reader.readAsDataURL(file);
+    };
 
-/* =========================
-   BINDINGS
-   ========================= */
-function bind() {
-  el("loginForm")?.addEventListener("submit", handleLogin);
-  el("logoutBtn")?.addEventListener("click", handleLogout);
+    window.clearImageUpload = function () {
+      uploadedImageBase64 = "";
+      document.getElementById("f_image").value = "";
+      renderImagePreview();
+    };
 
-  el("addOrderBtn")?.addEventListener("click", () => {
-    resetForm();
-    show("orderModal");
-  });
+    window.saveProduct = async function () {
+      const product = {
+        name: document.getElementById("f_name").value.trim(),
+        brand: document.getElementById("f_brand").value,
+        series: document.getElementById("f_series").value.trim(),
+        scale: document.getElementById("f_scale").value,
+        status: document.getElementById("f_status").value,
+        qty: Number(document.getElementById("f_qty").value || 1),
+        buyPrice: Number(document.getElementById("f_buyPrice").value || 0),
+        marketValue: Number(document.getElementById("f_marketValue").value || 0),
+        seller: document.getElementById("f_seller").value.trim(),
+        purchaseDate: document.getElementById("f_purchaseDate").value,
+        eta: document.getElementById("f_eta").value,
+        tracking: document.getElementById("f_tracking").value.trim(),
+        condition: document.getElementById("f_condition").value,
+        notes: document.getElementById("f_notes").value.trim(),
+        image: uploadedImageBase64 || ""
+      };
 
-  el("quickAddBtn")?.addEventListener("click", () => {
-    resetForm();
-    show("orderModal");
-  });
+      if (!product.name) {
+        showToast("Validation", "Model Name is required.", "warning");
+        return;
+      }
 
-  el("qaAddOrder")?.addEventListener("click", () => {
-    resetForm();
-    show("orderModal");
-  });
+      try {
+        if (editingId) {
+          await updateProductInFirebase(editingId, product);
+          showToast("Updated", "Product updated successfully.", "success");
+          addNotification("Product Updated", `${product.name} was updated.`);
+        } else {
+          await addProductToFirebase(product);
+          showToast("Added", "Product added successfully.", "success");
+          addNotification("New Product Added", `${product.name} was added.`);
+        }
 
-  el("modalClose")?.addEventListener("click", () => hide("orderModal"));
-  el("modalCancel")?.addEventListener("click", () => hide("orderModal"));
-  el("viewModalClose")?.addEventListener("click", () => hide("viewModal"));
+        closeProductModal();
+        await fetchProducts();
+      } catch (error) {
+        console.error(error);
+        showToast("Save Failed", "Could not save product to Firebase.", "error");
+      }
+    };
 
-  el("orderForm")?.addEventListener("submit", submitOrder);
-}
+    window.deleteProduct = async function (id) {
+      const p = products.find(x => x.id === id);
+      if (!p) return;
 
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    showDashboard(user);
-    await loadAllData();
-  } else {
-    showLogin();
-  }
-});
+      const ok = confirm(`Delete "${p.name}"?`);
+      if (!ok) return;
 
-window.addEventListener("DOMContentLoaded", () => {
-  bind();
-  console.log("PreTrack loaded. Waiting for auth...");
-});
-</script>
+      try {
+        await deleteProductFromFirebase(id);
+        showToast("Deleted", "Product removed successfully.", "success");
+        addNotification("Product Deleted", `${p.name} was deleted.`);
+        await fetchProducts();
+      } catch (error) {
+        console.error(error);
+        showToast("Delete Failed", "Could not delete product.", "error");
+      }
+    };
+
+    /* =========================================
+       FILTERS / SEARCH
+    ========================================= */
+    function getFilteredProducts(base = products, searchId = null, brandId = null, statusId = null) {
+      let list = [...base];
+
+      const searchVal = searchId ? document.getElementById(searchId)?.value?.trim() || "" : "";
+      const brandVal = brandId ? document.getElementById(brandId)?.value || "" : "";
+      const statusVal = statusId ? document.getElementById(statusId)?.value || "" : "";
+
+      if (searchVal) list = list.filter(p => productMatchesQuery(p, searchVal));
+      if (brandVal) list = list.filter(p => p.brand === brandVal);
+      if (statusVal) list = list.filter(p => p.status === statusVal);
+
+      return list;
+    }
+
+    window.handleGlobalSearch = function () {
+      const q = document.getElementById("globalSearch").value.trim().toLowerCase();
+      const visibleSection = document.querySelector(".section.active")?.id || "page-dashboard";
+
+      if (visibleSection === "page-inventory") {
+        document.getElementById("filterSearch").value = q;
+        renderInventoryTable();
+      } else if (visibleSection === "page-catalog") {
+        document.getElementById("productSearch").value = q;
+        renderProductCards();
+      }
+    };
+
+    window.resetFilters = function () {
+      document.getElementById("filterSearch").value = "";
+      document.getElementById("filterBrand").value = "";
+      document.getElementById("filterStatus").value = "";
+      document.getElementById("filterScale").value = "";
+      document.getElementById("sortBy").value = "name-asc";
+      renderInventoryTable();
+    };
+
+    function populateFilters() {
+      const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
+      const scales = [...new Set(products.map(p => p.scale).filter(Boolean))].sort();
+      const statuses = ["Owned", "Ordered", "In Transit", "Preorder", "Sold"];
+
+      const setOptions = (id, first, arr) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const current = el.value;
+        el.innerHTML = `<option value="">${first}</option>` + arr.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+        if (arr.includes(current)) el.value = current;
+      };
+
+      setOptions("filterBrand", "All Brands", brands);
+      setOptions("filterScale", "All Scales", scales);
+      setOptions("productBrandFilter", "All Brands", brands);
+
+      const filterStatus = document.getElementById("filterStatus");
+      filterStatus.innerHTML = `<option value="">All Statuses</option>` + statuses.map(v => `<option value="${v}">${v}</option>`).join("");
+
+      const productStatus = document.getElementById("productStatusFilter");
+      productStatus.innerHTML = `<option value="">All Statuses</option>` + statuses.map(v => `<option value="${v}">${v}</option>`).join("");
+    }
+
+    /* =========================================
+       RENDER HELPERS
+    ========================================= */
+    function renderAll() {
+      populateFilters();
+      renderDashboard();
+      renderInventoryTable();
+      renderProductCards();
+      renderKanban();
+      renderOrders();
+      renderAnalytics();
+      renderNotifications();
+      document.getElementById("settingsModelCount").textContent = `${products.length} models`;
+    }
+
+    function renderDashboard() {
+      const totalModels = products.reduce((sum, p) => sum + Number(p.qty || 0), 0);
+      const totalBuy = products.reduce((sum, p) => sum + (Number(p.buyPrice || 0) * Number(p.qty || 0)), 0);
+      const totalValue = products.reduce((sum, p) => sum + (Number(p.marketValue || 0) * Number(p.qty || 0)), 0);
+      const totalProfit = totalValue - totalBuy;
+      const inTransit = products.filter(p => ["Ordered", "In Transit", "Preorder"].includes(p.status)).length;
+
+      const byStatus = {
+        Owned: products.filter(p => p.status === "Owned").length,
+        Ordered: products.filter(p => p.status === "Ordered").length,
+        "In Transit": products.filter(p => p.status === "In Transit").length,
+        Preorder: products.filter(p => p.status === "Preorder").length,
+        Sold: products.filter(p => p.status === "Sold").length
+      };
+
+      const stats = [
+        { label: "Models", value: totalModels, icon: "fa-cubes", bg: "rgba(99,102,241,.12)" },
+        { label: "Collection Value", value: formatCurrency(totalValue), icon: "fa-sack-dollar", bg: "rgba(16,185,129,.12)" },
+        { label: "Total Buy Cost", value: formatCurrency(totalBuy), icon: "fa-wallet", bg: "rgba(245,158,11,.12)" },
+        { label: "Potential Profit", value: formatCurrency(totalProfit), icon: "fa-arrow-trend-up", bg: "rgba(6,182,212,.12)" },
+        { label: "Active Orders", value: inTransit, icon: "fa-truck-fast", bg: "rgba(244,63,94,.12)" }
+      ];
+
+      document.getElementById("dashboardStats").innerHTML = stats.map(s => `
+        <div class="stat-card">
+          <div class="stat-top">
+            <div>
+              <div class="stat-label">${escapeHtml(s.label)}</div>
+              <div class="stat-value">${escapeHtml(String(s.value))}</div>
+            </div>
+            <div class="stat-icon" style="background:${s.bg}">
+              <i class="fa-solid ${s.icon}"></i>
+            </div>
+          </div>
+          <div class="stat-sub">${products.length ? "Live Firebase data" : "No data yet"}</div>
+        </div>
+      `).join("");
+
+      const recent = [...products].sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 5);
+      document.getElementById("recentActivity").innerHTML = recent.length ? recent.map(p => `
+        <div class="mini-item">
+          <div class="mini-icon" style="background:rgba(99,102,241,.12);color:var(--accent)">
+            <i class="fa-solid fa-box"></i>
+          </div>
+          <div>
+            <h4>${escapeHtml(p.name)}</h4>
+            <p>${escapeHtml(p.brand || "—")} • ${formatDateHuman(p.purchaseDate || "")}</p>
+          </div>
+        </div>
+      `).join("") : `<div class="empty-state">No recent activity</div>`;
+
+      document.getElementById("latestAdded").innerHTML = recent.length ? recent.slice(0, 4).map(p => `
+        <div class="mini-item">
+          <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)">
+            <i class="fa-solid fa-plus"></i>
+          </div>
+          <div>
+            <h4>${escapeHtml(p.name)}</h4>
+            <p>${escapeHtml(p.status || "—")} • ${formatCurrency(p.marketValue || 0)}</p>
+          </div>
+        </div>
+      `).join("") : `<div class="empty-state">No models yet</div>`;
+
+      const transitList = products.filter(p => ["Ordered", "In Transit", "Preorder"].includes(p.status));
+      document.getElementById("shippingInsights").innerHTML = transitList.length ? transitList.slice(0, 5).map(p => `
+        <div class="mini-item">
+          <div class="mini-icon" style="background:rgba(6,182,212,.12);color:var(--accent-3)">
+            <i class="fa-solid fa-truck-fast"></i>
+          </div>
+          <div>
+            <h4>${escapeHtml(p.name)}</h4>
+            <p>${escapeHtml(p.status)} • ETA: ${formatDateHuman(p.eta)}</p>
+          </div>
+        </div>
+      `).join("") : `<div class="empty-state">No shipping insights</div>`;
+
+      renderSimpleList("brandDistribution", groupCounts(products, "brand"));
+      renderSimpleList("scaleBreakdown", groupCounts(products, "scale"));
+      renderDuplicates();
+      renderLowStock();
+      renderProfitInsights();
+      renderSimpleList("dashboardStatusMix", byStatus);
+
+      renderValueBars();
+    }
+
+    function groupCounts(list, key) {
+      return list.reduce((acc, item) => {
+        const k = item[key] || "Unknown";
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    function renderSimpleList(targetId, obj) {
+      const el = document.getElementById(targetId);
+      const entries = Object.entries(obj || {}).sort((a,b) => b[1] - a[1]);
+
+      if (!entries.length) {
+        el.innerHTML = `<div class="empty-state">No data available</div>`;
+        return;
+      }
+
+      el.innerHTML = entries.slice(0, 6).map(([k, v]) => `
+        <div class="mini-item">
+          <div class="mini-icon" style="background:rgba(99,102,241,.12);color:var(--accent)">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div style="flex:1">
+            <h4>${escapeHtml(k)}</h4>
+            <p>${v} item${v > 1 ? "s" : ""}</p>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderDuplicates() {
+      const el = document.getElementById("duplicateList");
+      const map = {};
+      products.forEach(p => {
+        const key = `${(p.name || "").toLowerCase()}|${(p.brand || "").toLowerCase()}`;
+        map[key] = (map[key] || 0) + Number(p.qty || 0);
+      });
+
+      const dupes = Object.entries(map).filter(([,v]) => v > 1);
+      if (!dupes.length) {
+        el.innerHTML = `<div class="empty-state">No duplicates found</div>`;
+        return;
+      }
+
+      el.innerHTML = dupes.slice(0, 5).map(([k, v]) => {
+        const [name, brand] = k.split("|");
+        return `
+          <div class="mini-item">
+            <div class="mini-icon" style="background:rgba(245,158,11,.12);color:var(--warning)">
+              <i class="fa-solid fa-copy"></i>
+            </div>
+            <div>
+              <h4>${escapeHtml(name)}</h4>
+              <p>${escapeHtml(brand)} • Qty ${v}</p>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderLowStock() {
+      const el = document.getElementById("lowStockList");
+      const low = products.filter(p => Number(p.qty || 0) <= 1 && p.status === "Owned");
+
+      if (!low.length) {
+        el.innerHTML = `<div class="empty-state">No alerts</div>`;
+        return;
+      }
+
+      el.innerHTML = low.slice(0, 5).map(p => `
+        <div class="mini-item">
+          <div class="mini-icon" style="background:rgba(239,68,68,.12);color:var(--danger)">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <h4>${escapeHtml(p.name)}</h4>
+            <p>Only ${Number(p.qty || 0)} left</p>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderProfitInsights() {
+      const el = document.getElementById("profitInsights");
+      const ranked = [...products]
+        .map(p => ({ ...p, profit: (Number(p.marketValue || 0) - Number(p.buyPrice || 0)) * Number(p.qty || 0) }))
+        .sort((a,b) => b.profit - a.profit)
+        .slice(0, 5);
+
+      if (!ranked.length) {
+        el.innerHTML = `<div class="empty-state">No data available</div>`;
+        return;
+      }
+
+      el.innerHTML = ranked.map(p => `
+        <div class="mini-item">
+          <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)">
+            <i class="fa-solid fa-arrow-trend-up"></i>
+          </div>
+          <div>
+            <h4>${escapeHtml(p.name)}</h4>
+            <p>${formatCurrency(p.profit)} potential</p>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderValueBars() {
+      const el = document.getElementById("valueBars");
+      const byBrand = products.reduce((acc, p) => {
+        const key = p.brand || "Other";
+        acc[key] = (acc[key] || 0) + (Number(p.marketValue || 0) * Number(p.qty || 0));
+        return acc;
+      }, {});
+
+      const items = Object.entries(byBrand).sort((a,b) => b[1] - a[1]).slice(0, 6);
+      if (!items.length) {
+        el.innerHTML = `<div class="empty-state" style="width:100%">No data available</div>`;
+        return;
+      }
+
+      const max = Math.max(...items.map(i => i[1]), 1);
+      el.innerHTML = items.map(([label, value]) => {
+        const h = Math.max(20, Math.round((value / max) * 140));
+        return `
+          <div class="bar-wrap">
+            <div class="bar" style="height:${h}px"><span>${Math.round(value / 1000)}k</span></div>
+            <div class="bar-label">${escapeHtml(label)}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    /* =========================================
+       INVENTORY
+    ========================================= */
+    window.renderInventoryTable = function () {
+      let list = getFilteredProducts(products, "filterSearch", "filterBrand", "filterStatus");
+
+      const scale = document.getElementById("filterScale").value;
+      if (scale) list = list.filter(p => p.scale === scale);
+
+      const sortBy = document.getElementById("sortBy").value;
+      list.sort((a, b) => {
+        switch (sortBy) {
+          case "name-asc": return (a.name || "").localeCompare(b.name || "");
+          case "name-desc": return (b.name || "").localeCompare(a.name || "");
+          case "value-desc": return Number(b.marketValue || 0) - Number(a.marketValue || 0);
+          case "value-asc": return Number(a.marketValue || 0) - Number(b.marketValue || 0);
+          case "price-desc": return Number(b.buyPrice || 0) - Number(a.buyPrice || 0);
+          case "price-asc": return Number(a.buyPrice || 0) - Number(b.buyPrice || 0);
+          case "date-desc": return Number(b.createdAt || 0) - Number(a.createdAt || 0);
+          case "date-asc": return Number(a.createdAt || 0) - Number(b.createdAt || 0);
+          default: return 0;
+        }
+      });
+
+      const tbody = document.getElementById("inventoryTableBody");
+
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="10" class="empty-state">No models found</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(p => `
+        <tr>
+          <td>
+            <div class="prod-cell">
+              <div class="prod-thumb">
+                ${p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" />` : `<i class="fa-solid fa-car-side"></i>`}
+              </div>
+              <div class="prod-meta">
+                <h4>${escapeHtml(p.name)}</h4>
+                <p>${escapeHtml(p.condition || "—")}</p>
+              </div>
+            </div>
+          </td>
+          <td>${escapeHtml(p.brand || "—")}</td>
+          <td>${escapeHtml(p.series || "—")}</td>
+          <td>${escapeHtml(p.scale || "—")}</td>
+          <td><span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status || "—")}</span></td>
+          <td>${Number(p.qty || 0)}</td>
+          <td>${formatCurrency(p.buyPrice || 0)}</td>
+          <td>${formatCurrency(p.marketValue || 0)}</td>
+          <td>${escapeHtml(p.seller || "—")}</td>
+          <td>
+            <div class="action-row">
+              <button class="icon-action" onclick="viewProduct('${p.id}')" title="View">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+              <button class="icon-action" onclick="openProductModal('${p.id}')" title="Edit">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              <button class="icon-action" onclick="deleteProduct('${p.id}')" title="Delete">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+    };
+
+    /* =========================================
+       CATALOG
+    ========================================= */
+    window.renderProductCards = function () {
+      const list = getFilteredProducts(products, "productSearch", "productBrandFilter", "productStatusFilter");
+      const grid = document.getElementById("productGrid");
+
+      if (!list.length) {
+        grid.innerHTML = `<div class="card" style="grid-column:1/-1"><div class="empty-state">No products found</div></div>`;
+        return;
+      }
+
+      grid.innerHTML = list.map(p => `
+        <div class="product-card">
+          <div class="product-cover">
+            ${p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" />` : `<i class="fa-solid fa-car-side" style="font-size:40px;color:var(--muted)"></i>`}
+          </div>
+
+          <div class="product-info">
+            <div class="product-title">
+              <h4>${escapeHtml(p.name)}</h4>
+              <div class="product-price">${formatCurrency(p.marketValue || 0)}</div>
+            </div>
+
+            <div class="product-specs">
+              <span class="chip">${escapeHtml(p.brand || "—")}</span>
+              <span class="chip">${escapeHtml(p.scale || "—")}</span>
+              <span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status || "—")}</span>
+            </div>
+
+            <div class="toolbar">
+              <button class="btn btn-ghost btn-sm" onclick="viewProduct('${p.id}')">
+                <i class="fa-solid fa-eye"></i> View
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="openProductModal('${p.id}')">
+                <i class="fa-solid fa-pen"></i> Edit
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join("");
+    };
+
+    window.viewProduct = function (id) {
+      const p = products.find(x => x.id === id);
+      if (!p) return;
+
+      const card = document.getElementById("productDetailCard");
+      const panel = document.getElementById("productDetailPanel");
+
+      panel.innerHTML = `
+        <div class="detail-image">
+          ${p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" />` : `<i class="fa-solid fa-car-side" style="font-size:48px"></i>`}
+        </div>
+
+        <div class="detail-meta">
+          <h3>${escapeHtml(p.name)}</h3>
+
+          <div class="detail-grid">
+            <div class="kv"><span>Brand</span><strong>${escapeHtml(p.brand || "—")}</strong></div>
+            <div class="kv"><span>Series</span><strong>${escapeHtml(p.series || "—")}</strong></div>
+            <div class="kv"><span>Scale</span><strong>${escapeHtml(p.scale || "—")}</strong></div>
+            <div class="kv"><span>Status</span><strong>${escapeHtml(p.status || "—")}</strong></div>
+            <div class="kv"><span>Quantity</span><strong>${Number(p.qty || 0)}</strong></div>
+            <div class="kv"><span>Condition</span><strong>${escapeHtml(p.condition || "—")}</strong></div>
+            <div class="kv"><span>Buy Price</span><strong>${formatCurrency(p.buyPrice || 0)}</strong></div>
+            <div class="kv"><span>Market Value</span><strong>${formatCurrency(p.marketValue || 0)}</strong></div>
+            <div class="kv"><span>Seller</span><strong>${escapeHtml(p.seller || "—")}</strong></div>
+            <div class="kv"><span>Purchase Date</span><strong>${formatDateHuman(p.purchaseDate)}</strong></div>
+            <div class="kv"><span>ETA</span><strong>${formatDateHuman(p.eta)}</strong></div>
+            <div class="kv"><span>Tracking</span><strong>${escapeHtml(p.tracking || "—")}</strong></div>
+          </div>
+
+          <div class="kv">
+            <span>Notes</span>
+            <strong>${escapeHtml(p.notes || "—")}</strong>
+          </div>
+        </div>
+      `;
+
+      card.classList.remove("hidden");
+      switchPage("catalog", document.querySelector('[data-page=catalog]'));
+    };
+
+    window.closeProductDetails = function () {
+      document.getElementById("productDetailCard").classList.add("hidden");
+    };
+
+    /* =========================================
+       KANBAN
+    ========================================= */
+    function mapStatusToKanban(status) {
+      if (status === "Ordered") return "ordered";
+      if (status === "In Transit") return "transit";
+      if (status === "Preorder") return "sourcing";
+      return "received";
+    }
+
+    function renderKanban() {
+      const board = document.getElementById("kanbanBoard");
+
+      board.innerHTML = KANBAN_COLS.map(col => {
+        const items = products.filter(p => mapStatusToKanban(p.status) === col.key);
+
+        return `
+          <div class="kanban-col">
+            <div class="kanban-head">
+              <h4><i class="fa-solid ${col.icon}"></i> ${col.label}</h4>
+              <span class="kanban-count">${items.length}</span>
+            </div>
+            <div class="kanban-list">
+              ${items.length ? items.map(p => `
+                <div class="kanban-card">
+                  <h5>${escapeHtml(p.name)}</h5>
+                  <p>${escapeHtml(p.brand || "—")} • ${escapeHtml(p.scale || "—")}</p>
+                  <div class="k-meta">
+                    <span>${escapeHtml(p.status || "—")}</span>
+                    <span>${formatCurrency(p.marketValue || 0)}</span>
+                  </div>
+                </div>
+              `).join("") : `<div class="empty-state">No items</div>`}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    /* =========================================
+       ORDERS
+    ========================================= */
+    function renderOrders() {
+      const queue = products.filter(p => ["Ordered", "In Transit", "Preorder"].includes(p.status));
+
+      const summary = {
+        Ordered: queue.filter(p => p.status === "Ordered").length,
+        "In Transit": queue.filter(p => p.status === "In Transit").length,
+        Preorder: queue.filter(p => p.status === "Preorder").length
+      };
+
+      document.getElementById("orderSummaryCards").innerHTML = Object.entries(summary).map(([k,v]) => `
+        <div class="stat-card">
+          <div class="stat-top">
+            <div>
+              <div class="stat-label">${escapeHtml(k)}</div>
+              <div class="stat-value">${v}</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(99,102,241,.12)">
+              <i class="fa-solid fa-truck-fast"></i>
+            </div>
+          </div>
+        </div>
+      `).join("");
+
+      const tbody = document.getElementById("ordersTableBody");
+      if (!queue.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No orders available</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = queue.map(p => `
+        <tr>
+          <td>${escapeHtml(p.name)}</td>
+          <td><span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status)}</span></td>
+          <td>${formatDateHuman(p.eta)}</td>
+          <td>${escapeHtml(p.seller || "—")}</td>
+          <td>${escapeHtml(p.tracking || "—")}</td>
+          <td>${formatCurrency(p.marketValue || 0)}</td>
+        </tr>
+      `).join("");
+    }
+
+    /* =========================================
+       ANALYTICS
+    ========================================= */
+    function renderAnalytics() {
+      const totalBuy = products.reduce((sum, p) => sum + (Number(p.buyPrice || 0) * Number(p.qty || 0)), 0);
+      const totalValue = products.reduce((sum, p) => sum + (Number(p.marketValue || 0) * Number(p.qty || 0)), 0);
+      const roi = totalBuy ? (((totalValue - totalBuy) / totalBuy) * 100).toFixed(1) : "0.0";
+      const avgValue = products.length ? Math.round(totalValue / products.length) : 0;
+
+      const stats = [
+        { label: "Portfolio Value", value: formatCurrency(totalValue), icon: "fa-chart-line" },
+        { label: "Total Cost", value: formatCurrency(totalBuy), icon: "fa-wallet" },
+        { label: "ROI", value: `${roi}%`, icon: "fa-percent" },
+        { label: "Avg Model Value", value: formatCurrency(avgValue), icon: "fa-cube" }
+      ];
+
+      document.getElementById("analyticsStats").innerHTML = stats.map(s => `
+        <div class="stat-card">
+          <div class="stat-top">
+            <div>
+              <div class="stat-label">${escapeHtml(s.label)}</div>
+              <div class="stat-value">${escapeHtml(String(s.value))}</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(99,102,241,.12)">
+              <i class="fa-solid ${s.icon}"></i>
+            </div>
+          </div>
+        </div>
+      `).join("");
+
+      const brandValue = products.reduce((acc, p) => {
+        const k = p.brand || "Other";
+        acc[k] = (acc[k] || 0) + (Number(p.marketValue || 0) * Number(p.qty || 0));
+        return acc;
+      }, {});
+      renderBars("brandValueBars", brandValue);
+
+      const statusObj = {
+        Owned: products.filter(p => p.status === "Owned").length,
+        Ordered: products.filter(p => p.status === "Ordered").length,
+        "In Transit": products.filter(p => p.status === "In Transit").length,
+        Preorder: products.filter(p => p.status === "Preorder").length,
+        Sold: products.filter(p => p.status === "Sold").length
+      };
+
+      renderSimpleList("statusMix", statusObj);
+      renderSimpleList("analyticsStatus", statusObj);
+
+      const leaderboard = [...products]
+        .map(p => ({ ...p, profit: (Number(p.marketValue || 0) - Number(p.buyPrice || 0)) * Number(p.qty || 0) }))
+        .sort((a,b) => b.profit - a.profit)
+        .slice(0, 8);
+
+      const el = document.getElementById("profitLeaderboard");
+      if (!leaderboard.length) {
+        el.innerHTML = `<div class="empty-state">No data available</div>`;
+        return;
+      }
+
+      el.innerHTML = leaderboard.map(p => `
+        <div class="mini-item">
+          <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)">
+            <i class="fa-solid fa-trophy"></i>
+          </div>
+          <div>
+            <h4>${escapeHtml(p.name)}</h4>
+            <p>${formatCurrency(p.profit)} profit potential</p>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderBars(targetId, obj) {
+      const el = document.getElementById(targetId);
+      const items = Object.entries(obj).sort((a,b) => b[1] - a[1]).slice(0, 6);
+
+      if (!items.length) {
+        el.innerHTML = `<div class="empty-state" style="width:100%">No data available</div>`;
+        return;
+      }
+
+      const max = Math.max(...items.map(i => i[1]), 1);
+
+      el.innerHTML = items.map(([label, value]) => {
+        const h = Math.max(20, Math.round((value / max) * 140));
+        return `
+          <div class="bar-wrap">
+            <div class="bar" style="height:${h}px"><span>${Math.round(value / 1000)}k</span></div>
+            <div class="bar-label">${escapeHtml(label)}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    /* =========================================
+       EXPORT / IMPORT
+    ========================================= */
+    window.exportData = function () {
+      const blob = new Blob([JSON.stringify(products, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "pretrack-products.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast("Exported", "JSON exported successfully.", "success");
+    };
+
+    window.importData = async function (event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        if (!Array.isArray(data)) {
+          showToast("Import Failed", "Invalid JSON format.", "error");
+          return;
+        }
+
+        for (const item of data) {
+          const payload = {
+            name: item.name || "",
+            brand: item.brand || "Other",
+            series: item.series || "",
+            scale: item.scale || "1:64",
+            status: ["Owned","Ordered","In Transit","Preorder","Sold"].includes(item.status) ? item.status : "Owned",
+            qty: Number(item.qty || 1),
+            buyPrice: Number(item.buyPrice || 0),
+            marketValue: Number(item.marketValue || 0),
+            seller: item.seller || "",
+            purchaseDate: item.purchaseDate || "",
+            eta: item.eta || "",
+            tracking: item.tracking || "",
+            condition: item.condition || "Mint",
+            notes: item.notes || "",
+            image: item.image || "",
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          };
+          await addDoc(collection(db, PRODUCTS_COLLECTION), payload);
+        }
+
+        showToast("Imported", "Products imported to Firebase.", "success");
+        addNotification("Import Complete", "Products imported successfully.");
+        await fetchProducts();
+      } catch (error) {
+        console.error(error);
+        showToast("Import Failed", "Could not import JSON.", "error");
+      }
+
+      event.target.value = "";
+    };
+
+    window.resetAllData = async function () {
+      const ok = confirm("Delete ALL products from Firebase?");
+      if (!ok) return;
+
+      try {
+        await clearAllProductsFromFirebase();
+        showToast("Reset Complete", "All Firebase products deleted.", "success");
+        addNotification("All Data Cleared", "All products were removed.");
+        await fetchProducts();
+      } catch (error) {
+        console.error(error);
+        showToast("Reset Failed", "Could not clear Firebase data.", "error");
+      }
+    };
+
+    /* =========================================
+       INIT
+    ========================================= */
+    renderNotifications();
+    fetchProducts();
+  </script>
 </body>
 </html>
