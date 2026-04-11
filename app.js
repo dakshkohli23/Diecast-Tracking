@@ -1,16 +1,4 @@
-'use strict';
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import {
-  getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
-
-// ── FIREBASE ──
-const firebaseConfig = {
   apiKey: "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
   authDomain: "diecast-tracking-471f7.firebaseapp.com",
   projectId: "diecast-tracking-471f7",
@@ -393,7 +381,6 @@ function renderAll() {
   renderAnalytics();
   renderBrandLeaderboard();
   renderCatalog();
-  renderKanban();
 
   const ss = document.getElementById('systemStatus');
   if (ss) { ss.innerHTML = `<span class="status-dot"></span> All systems live`; ss.className = 'system-status live'; }
@@ -688,13 +675,150 @@ function renderPayments() {
 }
 
 function renderAnalytics() {
-  const vc=document.getElementById('vendorChart'), sc=document.getElementById('statusChart'), mc=document.getElementById('monthlyChart');
-  if(vc){const vm={};DB.orders.forEach(o=>{const k=o.brand||o.vendor||'Unknown';vm[k]=(vm[k]||0)+1;});
-    vc.innerHTML=Object.entries(vm).map(([k,v])=>`<div class="mini-bar-row"><span>${escHtml(k)}</span><div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,v*20)}%"></div></div><strong>${v}</strong></div>`).join('')||`<div class="empty-state">No data</div>`;}
-  if(sc){const sm={};DB.orders.forEach(o=>{const k=o.status||'Unknown';sm[k]=(sm[k]||0)+1;});
-    sc.innerHTML=Object.entries(sm).map(([k,v])=>`<div class="mini-bar-row"><span>${escHtml(k)}</span><div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,v*20)}%"></div></div><strong>${v}</strong></div>`).join('')||`<div class="empty-state">No data</div>`;}
-  if(mc){const mm={};DB.orders.forEach(o=>{if(!o.order_date)return;const d=new Date(o.order_date),k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;mm[k]=(mm[k]||0)+(o.total||0);});
-    mc.innerHTML=Object.entries(mm).sort().map(([k,v])=>`<div class="mini-bar-row"><span>${escHtml(k)}</span><div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,Math.round(v/500))}%"></div></div><strong>₹${v.toLocaleString('en-IN')}</strong></div>`).join('')||`<div class="empty-state">No data</div>`;}
+  // ── ROI SUMMARY CARDS ──
+  const totalCost      = DB.orders.reduce((s,o)=>(s+(o.total||0)),0);
+  const portfolioValue = DB.orders.reduce((s,o)=>(s+(o.preorder_price||o.actual_price||0)*(o.quantity||1)),0);
+  const roi            = totalCost > 0 ? Math.round(((portfolioValue - totalCost)/totalCost)*100) : 0;
+  const avgValue       = DB.orders.length ? Math.round(portfolioValue / DB.orders.length) : 0;
+
+  const fmt = v => `₹${v.toLocaleString('en-IN')}`;
+  setText('roiPortfolioValue', fmt(portfolioValue));
+  setText('roiTotalCost',      fmt(totalCost));
+  setText('roiPercent',        `${roi >= 0 ? '+' : ''}${roi}%`);
+  setText('roiAvgValue',       fmt(avgValue));
+  const roiEl = document.getElementById('roiPercent');
+  if (roiEl) roiEl.style.color = roi >= 0 ? 'var(--green)' : 'var(--red)';
+
+  // ── BRAND VALUE COMPARISON ──
+  const bvc = document.getElementById('brandValueChart');
+  if (bvc) {
+    const bv = {};
+    DB.orders.forEach(o => {
+      const k = (o.brand||o.vendor||'Unknown').trim();
+      bv[k] = (bv[k]||0) + (o.preorder_price||o.actual_price||0)*(o.quantity||1);
+    });
+    const entries = Object.entries(bv).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const maxVal  = entries[0]?.[1] || 1;
+    bvc.innerHTML = entries.length
+      ? entries.map(([brand,val]) => `
+        <div class="bv-bar-row">
+          <div class="bv-bar-label">${escHtml(brand)}</div>
+          <div class="bv-bar-track">
+            <div class="bv-bar-fill" style="width:${Math.max(8,Math.round((val/maxVal)*100))}%">
+              <span>${fmt(val)}</span>
+            </div>
+          </div>
+        </div>`).join('')
+      : `<div class="empty-state">No data yet</div>`;
+  }
+
+  // ── STATUS DISTRIBUTION (list, Image 1 style) ──
+  const sdEl = document.getElementById('statusDistList');
+  if (sdEl) {
+    const sm = {};
+    DB.orders.forEach(o => { const k=o.status||'Unknown'; sm[k]=(sm[k]||0)+1; });
+    const statusIcons = {
+      'Owned':'fa-box-open','Ordered':'fa-cart-shopping','In Transit':'fa-truck-moving',
+      'Preorder':'fa-clock','Sold':'fa-tag','Delivered':'fa-circle-check',
+      'Shipped':'fa-plane-departure','Processing':'fa-gear','Wishlist':'fa-heart','Unknown':'fa-circle-question'
+    };
+    const allStatuses = ['Owned','Ordered','In Transit','Preorder','Sold','Delivered','Shipped','Processing','Wishlist'];
+    sdEl.innerHTML = allStatuses.map(s => {
+      const count = sm[s]||0;
+      const icon  = statusIcons[s]||'fa-circle';
+      return `<div class="sd-item">
+        <div class="sd-icon"><i class="fa-solid ${icon}"></i></div>
+        <div class="sd-info">
+          <div class="sd-name">${s}</div>
+          <div class="sd-count">${count} item${count!==1?'s':''}</div>
+        </div>
+        <span class="sd-badge">${count}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── STATUS MIX (same data, slightly different display) ──
+  const smEl = document.getElementById('statusMixList');
+  if (smEl) {
+    const sm = {};
+    DB.orders.forEach(o => { const k=o.status||'Unknown'; sm[k]=(sm[k]||0)+1; });
+    const total = DB.orders.length||1;
+    const statusColors = {
+      'Owned':'var(--green)','Ordered':'var(--indigo)','In Transit':'var(--teal)',
+      'Preorder':'var(--orange)','Sold':'var(--red)','Delivered':'var(--green)',
+      'Shipped':'var(--primary)','Processing':'var(--orange)','Wishlist':'var(--pink)'
+    };
+    smEl.innerHTML = Object.entries(sm).sort((a,b)=>b[1]-a[1]).map(([s,c])=>`
+      <div class="sd-item">
+        <div class="sd-icon" style="background:${statusColors[s]||'var(--primary)'}20">
+          <i class="fa-solid fa-layer-group" style="color:${statusColors[s]||'var(--primary)'}"></i>
+        </div>
+        <div class="sd-info">
+          <div class="sd-name">${escHtml(s)}</div>
+          <div class="sd-count">${c} item${c!==1?'s':''} · ${Math.round((c/total)*100)}%</div>
+        </div>
+        <span class="sd-badge">${c}</span>
+      </div>`).join('') || `<div class="empty-state">No data</div>`;
+  }
+
+  // ── PROFIT LEADERBOARD ──
+  const plbEl = document.getElementById('profitLeaderboard');
+  if (plbEl && DB.orders.length) {
+    const bm = {};
+    DB.orders.forEach(o => {
+      const k = (o.brand||o.vendor||'Unknown').trim();
+      if (!bm[k]) bm[k] = { cost:0, value:0 };
+      bm[k].cost  += o.total||0;
+      bm[k].value += (o.preorder_price||o.actual_price||0)*(o.quantity||1);
+    });
+    const sorted = Object.entries(bm).sort((a,b)=>(b[1].value-b[1].cost)-(a[1].value-a[1].cost)).slice(0,8);
+    const ranks = ['gold','silver','bronze'];
+    plbEl.innerHTML = sorted.map(([brand,d],i) => {
+      const profit = d.value - d.cost;
+      const cls = i < 3 ? ranks[i] : 'other';
+      const sign = profit >= 0 ? '+' : '';
+      return `<div class="plb-item">
+        <div class="plb-rank ${cls}">${i+1}</div>
+        <div class="plb-info">
+          <div class="plb-brand">${escHtml(brand)}</div>
+          <div class="plb-profit ${profit>=0?'positive':'negative'}">${sign}${fmt(Math.abs(profit))} profit potential</div>
+        </div>
+        <span class="plb-value">${fmt(d.value)}</span>
+      </div>`;
+    }).join('');
+  } else if (plbEl) {
+    plbEl.innerHTML = `<div class="empty-state">No data yet</div>`;
+  }
+
+  // ── BRAND BREAKDOWN ──
+  const vc = document.getElementById('vendorChart');
+  if (vc) {
+    const vm = {};
+    DB.orders.forEach(o => { const k=o.brand||o.vendor||'Unknown'; vm[k]=(vm[k]||0)+1; });
+    vc.innerHTML = Object.entries(vm).map(([k,v])=>`
+      <div class="mini-bar-row">
+        <span>${escHtml(k)}</span>
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,v*20)}%"></div></div>
+        <strong>${v}</strong>
+      </div>`).join('') || `<div class="empty-state">No data</div>`;
+  }
+
+  // ── MONTHLY SPEND ──
+  const mc = document.getElementById('monthlyChart');
+  if (mc) {
+    const mm = {};
+    DB.orders.forEach(o => {
+      if (!o.order_date) return;
+      const d=new Date(o.order_date), k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      mm[k] = (mm[k]||0) + (o.total||0);
+    });
+    mc.innerHTML = Object.entries(mm).sort().map(([k,v])=>`
+      <div class="mini-bar-row">
+        <span>${escHtml(k)}</span>
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,Math.round(v/500))}%"></div></div>
+        <strong>₹${v.toLocaleString('en-IN')}</strong>
+      </div>`).join('') || `<div class="empty-state">No data</div>`;
+  }
 }
 
 function renderCatalog() {
@@ -713,29 +837,6 @@ function renderCatalog() {
         </div>
       </div>
     </div>`;}).join('');
-}
-
-function renderKanban() {
-  const allStatuses = ['Ordered','Processing','Shipped','In Transit','Delivered','Owned','Preorder','Wishlist','Sold'];
-  const cols = { 'Ordered':'kbc-ordered', 'Processing':'kbc-processing', 'Shipped':'kbc-shipped', 'Delivered':'kbc-delivered' };
-  Object.entries(cols).forEach(([status,colId])=>{
-    const col=document.getElementById(colId); if(!col) return;
-    // Include "In Transit" in Shipped column, "Owned" in Delivered
-    let items;
-    if (status === 'Shipped')    items = DB.orders.filter(o=>o.status==='Shipped'||o.status==='In Transit');
-    else if (status === 'Delivered') items = DB.orders.filter(o=>o.status==='Delivered'||o.status==='Owned');
-    else items = DB.orders.filter(o=>o.status===status);
-    if(!items.length){col.innerHTML=`<div class="kb-empty">No orders</div>`;return;}
-    col.innerHTML=items.map(o=>`
-      <div class="kb-card" onclick="viewOrder('${o.id}')">
-        <div class="kb-card-name">${escHtml(o.product_name)}</div>
-        <div style="font-size:0.71rem;color:var(--text-muted);margin-bottom:0.3rem">${escHtml(o.brand||o.vendor||'—')} • ${escHtml(o.scale||'1:64')}</div>
-        <div class="kb-card-meta">
-          <span class="kb-card-price">₹${(o.total||0).toLocaleString('en-IN')}</span>
-          <span style="font-size:0.7rem;color:var(--text-muted)">${o.eta?formatDate(o.eta):'No ETA'}</span>
-        </div>
-      </div>`).join('');
-  });
 }
 
 /* ══════════════════════════════════════ HELPERS ══════════════════════════════════════ */
