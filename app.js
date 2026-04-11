@@ -18,35 +18,27 @@ const firebaseConfig = {
   messagingSenderId: "1042711268055",
   appId: "1:1042711268055:web:9b09ded970a85532767e92"
 };
-
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
 // ── SUPABASE ──
-// TODO: Replace these with your actual Supabase project credentials
-// Get them from: https://supabase.com/dashboard → Project Settings → API
 const SUPABASE_URL      = 'https://ifzioqfkgjkqkirmtgly.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmemlvcWZrZ2prcWtpcm10Z2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDk4ODMsImV4cCI6MjA5MTM4NTg4M30.3sRDtBjSVcOPjS817TjR6ZP1druW-WW7rxiV1Zb3NCQ';
-const SUPABASE_BUCKET   = 'order-images'; // must match your bucket name exactly
+const SUPABASE_BUCKET   = 'order-images';
+const supabaseClient    = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-/** Upload a File to Supabase Storage — returns the public URL */
 async function uploadImageToSupabase(file) {
   const ext  = file.name.split('.').pop() || 'jpg';
   const path = `orders/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-  const { error } = await supabaseClient.storage
-    .from(SUPABASE_BUCKET)
-    .upload(path, file, { cacheControl: '3600', upsert: false });
+  const { error } = await supabaseClient.storage.from(SUPABASE_BUCKET).upload(path, file, { cacheControl: '3600', upsert: false });
   if (error) throw new Error(`Supabase upload failed: ${error.message}`);
   const { data } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
 
-/** Delete an image from Supabase Storage by its public URL */
 async function deleteImageFromSupabase(imageUrl) {
-  if (!imageUrl || !imageUrl.includes(SUPABASE_URL)) return; // not a Supabase URL
+  if (!imageUrl || !imageUrl.includes(SUPABASE_URL)) return;
   const marker = `/object/public/${SUPABASE_BUCKET}/`;
   const idx    = imageUrl.indexOf(marker);
   if (idx === -1) return;
@@ -55,12 +47,13 @@ async function deleteImageFromSupabase(imageUrl) {
   if (error) console.warn('Supabase delete failed:', error.message);
 }
 
+// ── STATE ──
 let DB = { orders: [], activity: [] };
-let _currentImageFile = null;  // raw File for Supabase upload
-let _currentImageB64  = '';    // preview only — no longer stored in Firestore
+let _currentImageFile = null;
+let _currentImageB64  = '';
 let _authReady = false;
 
-/* ── LOGIN ── */
+/* ══════════════════════════════════════ LOGIN ══════════════════════════════════════ */
 if (document.getElementById('loginForm')) initLoginPage();
 
 function initLoginPage() {
@@ -98,7 +91,7 @@ function initLoginPage() {
   });
 }
 
-/* ── DASHBOARD AUTH ── */
+/* ══════════════════════════════════════ DASHBOARD ══════════════════════════════════════ */
 if (document.getElementById('pageContent')) {
   onAuthStateChanged(auth, async (user) => {
     _authReady = true;
@@ -134,6 +127,7 @@ function initDashboard() {
 
   initGreeting();
 
+  // ── NAV ──
   function navigateTo(section) {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -158,72 +152,31 @@ function initDashboard() {
     catch (e) { showToast('Logout failed', 'warning'); }
   });
 
-  // Inventory filters
-  ['invSearch','invFilterBrand','invFilterStatus','invFilterScale','invSort'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input',  applyInventoryFilters);
-    document.getElementById(id)?.addEventListener('change', applyInventoryFilters);
-  });
-
-  // ✅ ADDED: Inventory clear filters button
-  document.getElementById('invClearFilters')?.addEventListener('click', () => {
-    const invSearch       = document.getElementById('invSearch');
-    const invFilterBrand  = document.getElementById('invFilterBrand');
-    const invFilterStatus = document.getElementById('invFilterStatus');
-    const invFilterScale  = document.getElementById('invFilterScale');
-    const invSort         = document.getElementById('invSort');
-
-    if (invSearch)       invSearch.value = '';
-    if (invFilterBrand)  invFilterBrand.value = '';
-    if (invFilterStatus) invFilterStatus.value = '';
-    if (invFilterScale)  invFilterScale.value = '';
-    if (invSort)         invSort.value = 'name-az';
-
-    applyInventoryFilters();
-  });
-
-  // invAddBtn opens the same modal
-  document.getElementById('invAddBtn')?.addEventListener('click', () => {
-    document.getElementById('modalTitle').textContent = 'Add New Model'; openModal();
-  });
-
+  // ── GLOBAL SEARCH → goes to orders ──
   document.getElementById('globalSearch')?.addEventListener('input', (e) => {
     const q = e.target.value.trim();
     if (q.length > 0) {
       navigateTo('orders');
-      const s = document.getElementById('orderSearch');
-      if (s) { s.value = q; applyFilters(); }
+      const s = document.getElementById('invSearch');
+      if (s) { s.value = q; applyCollectionFilters(); }
     }
   });
 
-  document.getElementById('orderSearch')?.addEventListener('input',   applyFilters);
-  document.getElementById('filterStatus')?.addEventListener('change', applyFilters);
-  document.getElementById('filterVendor')?.addEventListener('change', applyFilters);
-  document.getElementById('filterDateFrom')?.addEventListener('change', applyFilters);
-  document.getElementById('filterDateTo')?.addEventListener('change',   applyFilters);
-
-  document.getElementById('clearFilters')?.addEventListener('click', () => {
-    ['orderSearch','filterStatus','filterVendor','filterDateFrom','filterDateTo'].forEach(id => {
-      const el = document.getElementById(id); if (el) el.value = '';
-    });
-    renderTable(DB.orders);
+  // ── UNIFIED COLLECTION FILTERS ──
+  ['invSearch','invFilterBrand','invFilterStatus','invFilterScale','invSort'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input',  applyCollectionFilters);
+    document.getElementById(id)?.addEventListener('change', applyCollectionFilters);
   });
 
-  function applyFilters() {
-    const q      = (document.getElementById('orderSearch')?.value   || '').toLowerCase();
-    const status = document.getElementById('filterStatus')?.value   || '';
-    const vendor = document.getElementById('filterVendor')?.value   || '';
-    const from   = document.getElementById('filterDateFrom')?.value;
-    const to     = document.getElementById('filterDateTo')?.value;
-    renderTable(DB.orders.filter(o => {
-      const matchQ      = !q      || (o.product_name || '').toLowerCase().includes(q) || (o.order_number || '').toLowerCase().includes(q);
-      const matchStatus = !status || o.status === status;
-      const matchVendor = !vendor || o.vendor === vendor;
-      const matchFrom   = !from   || new Date(o.order_date) >= new Date(from);
-      const matchTo     = !to     || new Date(o.order_date) <= new Date(to);
-      return matchQ && matchStatus && matchVendor && matchFrom && matchTo;
-    }));
-  }
+  document.getElementById('invClearFilters')?.addEventListener('click', () => {
+    ['invSearch','invFilterBrand','invFilterStatus','invFilterScale'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    const sort = document.getElementById('invSort'); if (sort) sort.value = 'newest';
+    applyCollectionFilters();
+  });
 
+  // ── MODAL ──
   const orderModal = document.getElementById('orderModal');
   const viewModal  = document.getElementById('viewModal');
 
@@ -235,8 +188,7 @@ function initDashboard() {
     const ip = document.getElementById('imagePreview');
     if (ip) ip.innerHTML = '<i class="fa-solid fa-image"></i><p>Click to upload image</p>';
     const fi = document.getElementById('fImage'); if (fi) fi.value = '';
-    _currentImageFile = null;
-    _currentImageB64  = '';
+    _currentImageFile = null; _currentImageB64 = '';
     document.querySelectorAll('.form-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelector('.form-tab[data-tab="basic"]')?.classList.add('active');
@@ -246,7 +198,7 @@ function initDashboard() {
 
   ['addOrderBtn','quickAddBtn','qaAddOrder'].forEach(id => {
     document.getElementById(id)?.addEventListener('click', () => {
-      document.getElementById('modalTitle').textContent = 'Add New Order'; openModal();
+      document.getElementById('modalTitle').textContent = 'Add New Model'; openModal();
     });
   });
   document.getElementById('modalClose')?.addEventListener('click',  closeModal);
@@ -260,6 +212,7 @@ function initDashboard() {
     if (e.target === viewModal) { viewModal.classList.add('hidden'); document.body.style.overflow = ''; }
   });
 
+  // ── FORM TABS ──
   document.querySelectorAll('.form-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.form-tab').forEach(t => t.classList.remove('active'));
@@ -269,6 +222,7 @@ function initDashboard() {
     });
   });
 
+  // ── PAYMENT CALC ──
   ['fPreorderPrice','fActualPrice','fShipping','fPaid','fQty'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', calcTotals);
   });
@@ -283,20 +237,22 @@ function initDashboard() {
     if (document.getElementById('fPending')) document.getElementById('fPending').value = `₹${pending.toLocaleString('en-IN')}`;
   }
 
+  // ── IMAGE UPLOAD ──
   document.getElementById('imageUploadArea')?.addEventListener('click', () => document.getElementById('fImage')?.click());
   document.getElementById('fImage')?.addEventListener('change', (e) => {
     const file = e.target.files[0]; if (!file) return;
     if (file.size > 5 * 1024 * 1024) { showToast('Image too large (max 5MB)', 'warning'); return; }
-    _currentImageFile = file; // store raw file for Supabase upload
+    _currentImageFile = file;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      _currentImageB64 = ev.target.result; // preview only
+      _currentImageB64 = ev.target.result;
       const p = document.getElementById('imagePreview');
       if (p) p.innerHTML = `<img src="${_currentImageB64}" alt="preview" />`;
     };
     reader.readAsDataURL(file);
   });
 
+  // ── SAVE ORDER ──
   document.getElementById('orderForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const saveBtn = document.getElementById('modalSave');
@@ -311,10 +267,8 @@ function initDashboard() {
     const existing = DB.orders.find(o => o.id === editId);
 
     try {
-      // ── IMAGE: upload new file to Supabase, or keep existing URL ──
       let imageUrl = existing?.image || '';
       if (_currentImageFile) {
-        // If editing and there was an old image, delete it first
         if (existing?.image) await deleteImageFromSupabase(existing.image);
         imageUrl = await uploadImageToSupabase(_currentImageFile);
       }
@@ -334,41 +288,42 @@ function initDashboard() {
         status:   document.getElementById('fStatus')?.value || 'Ordered',
         preorder_price: parseFloat(document.getElementById('fPreorderPrice')?.value) || 0,
         actual_price: price, shipping: ship, paid, pending, total,
-        image: imageUrl,
-        updatedAt: serverTimestamp()
+        image: imageUrl, updatedAt: serverTimestamp()
       };
 
       if (editId) {
         await updateDoc(doc(db, 'orders', editId), order);
-        await addActivity('info', `Order updated — ${order.product_name}`);
+        await addActivity('info', `Updated — ${order.product_name}`);
         showToast('Order updated!', 'success');
       } else {
         await addDoc(collection(db, 'orders'), { ...order, createdAt: serverTimestamp() });
-        await addActivity('success', `New order added — ${order.product_name}`);
+        await addActivity('success', `Added — ${order.product_name}`);
         showToast('Order added!', 'success');
       }
       await fetchData(); closeModal();
     } catch (err) {
-      console.error(err);
-      showToast('Failed to save order: ' + err.message, 'warning');
+      console.error(err); showToast('Failed to save: ' + err.message, 'warning');
     } finally {
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Order'; }
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save'; }
     }
   });
 
+  // ── QUICK ACTIONS ──
   document.getElementById('qaExport')?.addEventListener('click', exportCSV);
   document.getElementById('qaAnalytics')?.addEventListener('click', () => navigateTo('analytics'));
   document.getElementById('qaDelayed')?.addEventListener('click', () => {
     navigateTo('orders');
     const delayed = DB.orders.filter(o => o.eta && new Date(o.eta) < new Date() && o.status !== 'Delivered');
-    delayed.length === 0 ? showToast('No delayed orders!', 'info') : (renderTable(delayed), showToast(`${delayed.length} delayed shown`, 'warning'));
+    delayed.length === 0
+      ? showToast('No delayed orders!', 'info')
+      : (renderTable(delayed), showToast(`${delayed.length} delayed shown`, 'warning'));
   });
   document.getElementById('exportCsvBtn')?.addEventListener('click', exportCSV);
 
   function exportCSV() {
     if (!DB.orders.length) { showToast('No orders to export', 'warning'); return; }
-    const headers = ['ID','Product','Order#','Vendor','Variant','Qty','Preorder Price','Actual Price','Shipping','Paid','Pending','Total','Status','ETA','Order Date'];
-    const rows    = DB.orders.map(o => [o.id,o.product_name,o.order_number,o.vendor,o.variant,o.quantity,o.preorder_price,o.actual_price,o.shipping,o.paid,o.pending,o.total,o.status,o.eta,o.order_date]);
+    const headers = ['ID','Product','Brand','Series','Scale','Condition','Order#','Vendor','Location','Variant','Qty','Buy Price','Market Value','Shipping','Paid','Pending','Total','Status','ETA','Order Date'];
+    const rows    = DB.orders.map(o => [o.id,o.product_name,o.brand,o.series,o.scale,o.condition,o.order_number,o.vendor,o.location,o.variant,o.quantity,o.actual_price,o.preorder_price,o.shipping,o.paid,o.pending,o.total,o.status,o.eta,o.order_date]);
     const csv     = [headers,...rows].map(r => r.map(c=>`"${c??''}"`).join(',')).join('\n');
     const a       = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv],{type:'text/csv'})), download: `pretrack_${Date.now()}.csv` });
     a.click(); showToast('CSV exported!', 'success');
@@ -377,7 +332,6 @@ function initDashboard() {
   document.getElementById('clearDataBtn')?.addEventListener('click', async () => {
     if (!confirm('Delete ALL orders? This will also remove all uploaded images.')) return;
     try {
-      // Delete all Supabase images first
       await Promise.all(DB.orders.map(o => o.image ? deleteImageFromSupabase(o.image) : Promise.resolve()));
       await Promise.all(DB.orders.map(o => deleteDoc(doc(db, 'orders', o.id))));
       await addActivity('warning', 'All orders cleared');
@@ -386,7 +340,7 @@ function initDashboard() {
   });
 }
 
-/* ── FIRESTORE ── */
+/* ══════════════════════════════════════ FIRESTORE ══════════════════════════════════════ */
 async function fetchData() {
   try {
     const os = await getDocs(query(collection(db,'orders'),   orderBy('createdAt','desc')));
@@ -404,28 +358,14 @@ async function addActivity(type, msg) {
   catch (e) { console.error(e); }
 }
 
-function compressImage(base64, maxWidth=300, quality=0.7) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      const s = Math.min(1, maxWidth/img.width);
-      const c = document.createElement('canvas');
-      c.width = img.width*s; c.height = img.height*s;
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      resolve(c.toDataURL('image/jpeg', quality));
-    };
-    img.src = base64;
-  });
-}
-
-/* ── GREETING ── */
+/* ══════════════════════════════════════ GREETING ══════════════════════════════════════ */
 function initGreeting() {
   const gt = document.getElementById('greetingText');
   const gd = document.getElementById('greetingDate');
   const ss = document.getElementById('systemStatus');
 
   function update() {
-    const h = new Date().getHours();
+    const h     = new Date().getHours();
     const emoji = h < 12 ? '<i class="fa-solid fa-cloud-sun"></i>' : h < 17 ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
     const word  = h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening';
     if (gt) gt.innerHTML = `Good ${word}, Daksh! ${emoji}`;
@@ -437,30 +377,39 @@ function initGreeting() {
     ss.innerHTML = `<span class="status-dot"></span> Checking systems...`; ss.className = 'system-status';
     setTimeout(() => { ss.innerHTML = `<span class="status-dot"></span> All systems live`; ss.className = 'system-status live'; }, 1200);
   }
-
   update(); checkSys(); setInterval(update, 60000);
 }
 
-/* ── RENDER ALL ── */
+/* ══════════════════════════════════════ RENDER ALL ══════════════════════════════════════ */
 function renderAll() {
-  renderStats(); renderTable(DB.orders); renderRecentOrders(); renderEtaWidget();
-  renderActivityFeed(); renderAlerts(); renderPayments(); renderAnalytics();
-  renderVendorFilter(); renderBrandLeaderboard(); renderInventory(); renderCatalog(); renderKanban();
+  renderStats();
+  applyCollectionFilters(); // renders the unified collection table
+  populateBrandFilter();
+  renderRecentOrders();
+  renderEtaWidget();
+  renderActivityFeed();
+  renderAlerts();
+  renderPayments();
+  renderAnalytics();
+  renderBrandLeaderboard();
+  renderCatalog();
+  renderKanban();
+
   const ss = document.getElementById('systemStatus');
   if (ss) { ss.innerHTML = `<span class="status-dot"></span> All systems live`; ss.className = 'system-status live'; }
 }
 
-/* ── STATS ── */
+/* ══════════════════════════════════════ STATS ══════════════════════════════════════ */
 function renderStats() {
   const o = DB.orders, n = o.length;
   const totalQty   = o.reduce((s,x) => s+(x.quantity||1), 0);
   const marketVal  = o.reduce((s,x) => s+((x.preorder_price||0)*(x.quantity||1)), 0);
   const investment = o.reduce((s,x) => s+(x.total||0), 0);
   const pendingAmt = o.reduce((s,x) => s+(x.pending||0), 0);
-  const pendingPO  = o.filter(x => x.status==='Ordered'||x.status==='Processing').length;
-  const delivered  = o.filter(x => x.status==='Delivered').length;
-  const transit    = o.filter(x => x.status==='Shipped').length;
-  const overdue    = o.filter(x => x.eta && new Date(x.eta)<new Date() && x.status!=='Delivered').length;
+  const pendingPO  = o.filter(x => x.status==='Ordered'||x.status==='Processing'||x.status==='Preorder').length;
+  const delivered  = o.filter(x => x.status==='Delivered'||x.status==='Owned').length;
+  const transit    = o.filter(x => x.status==='Shipped'||x.status==='In Transit').length;
+  const overdue    = o.filter(x => x.eta && new Date(x.eta)<new Date() && x.status!=='Delivered' && x.status!=='Owned').length;
   const nc = {}; o.forEach(x => { const k=(x.product_name||'').toLowerCase().trim(); nc[k]=(nc[k]||0)+1; });
   const dups = Object.values(nc).filter(v=>v>1).length;
 
@@ -481,43 +430,101 @@ function renderStats() {
   if(dot) dot.classList.toggle('show',pendingAmt>0||overdue>0);
 }
 
-/* ── TABLE ── */
+/* ══════════════════════════════════════ UNIFIED COLLECTION FILTERS ══════════════════════════════════════ */
+function applyCollectionFilters() {
+  const q      = (document.getElementById('invSearch')?.value      || '').toLowerCase();
+  const brand  = document.getElementById('invFilterBrand')?.value  || '';
+  const status = document.getElementById('invFilterStatus')?.value || '';
+  const scale  = document.getElementById('invFilterScale')?.value  || '';
+  const sort   = document.getElementById('invSort')?.value         || 'newest';
+
+  let items = DB.orders.filter(o => {
+    const b = o.brand || o.vendor || '';
+    const matchQ      = !q      || (o.product_name||'').toLowerCase().includes(q) || b.toLowerCase().includes(q) || (o.series||'').toLowerCase().includes(q);
+    const matchBrand  = !brand  || b === brand;
+    const matchStatus = !status || o.status === status;
+    const matchScale  = !scale  || o.scale  === scale;
+    return matchQ && matchBrand && matchStatus && matchScale;
+  });
+
+  if (sort === 'name-az')  items.sort((a,b) => (a.product_name||'').localeCompare(b.product_name||''));
+  if (sort === 'name-za')  items.sort((a,b) => (b.product_name||'').localeCompare(a.product_name||''));
+  if (sort === 'price-hi') items.sort((a,b) => (b.actual_price||0) - (a.actual_price||0));
+  if (sort === 'price-lo') items.sort((a,b) => (a.actual_price||0) - (b.actual_price||0));
+  // newest = default Firestore ordering (createdAt desc)
+
+  renderTable(items);
+}
+
+function populateBrandFilter() {
+  const bf = document.getElementById('invFilterBrand');
+  if (!bf) return;
+  const cur    = bf.value;
+  const brands = [...new Set(DB.orders.map(o => o.brand || o.vendor).filter(Boolean))].sort();
+  bf.innerHTML = `<option value="">All Brands</option>` + brands.map(b => `<option value="${escHtml(b)}">${escHtml(b)}</option>`).join('');
+  bf.value = cur;
+}
+
+/* ══════════════════════════════════════ TABLE — FULL COLUMNS ══════════════════════════════════════ */
 function renderTable(orders) {
   const tbody = document.getElementById('ordersTableBody');
   if (!tbody) return;
-  if (!orders?.length) { tbody.innerHTML=`<tr><td colspan="10" class="empty-row"><i class="fa-solid fa-inbox"></i> No orders found</td></tr>`; return; }
+  if (!orders?.length) {
+    tbody.innerHTML = `<tr><td colspan="14" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>`;
+    return;
+  }
+
   tbody.innerHTML = orders.map(o => {
+    const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+    const thumb = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
+    const cond  = o.condition || '';
     const payPct = o.total ? Math.min(100,Math.round((o.paid/o.total)*100)) : 0;
-    const sc     = (o.status||'').toLowerCase().replace(/\s+/g,'-');
-    const pb     = o.pending<=0?'badge-paid':(o.paid>0?'badge-partial':'badge-pending-b');
-    const pl     = o.pending<=0?'Paid':(o.paid>0?'Partial':'Pending');
-    const thumb  = o.image?`<img src="${o.image}" alt="${escHtml(o.product_name)}" />`:`<i class="fa-solid fa-cube"></i>`;
+    const pb    = o.pending<=0?'badge-paid':(o.paid>0?'badge-partial':'badge-pending-b');
+    const pl    = o.pending<=0?'Paid':(o.paid>0?'Partial':'Pending');
+
     return `<tr>
-      <td><div class="order-product-cell"><div class="order-thumb">${thumb}</div><div>
-        <div class="order-product-name">${escHtml(o.product_name)}</div>
-        <div class="order-variant">${escHtml(o.variant||'')}</div>
-      </div></div></td>
-      <td><code style="font-size:0.75rem;opacity:0.8">${escHtml(o.order_number||o.id)}</code></td>
-      <td>${escHtml(o.vendor||'—')}</td>
+      <td>
+        <div class="order-product-cell">
+          <div class="order-thumb">${thumb}</div>
+          <div>
+            <div class="order-product-name">${escHtml(o.product_name)}</div>
+            <div class="order-variant" style="font-size:0.7rem;opacity:0.65">${escHtml(cond)}${o.order_number ? ` • ${escHtml(o.order_number)}` : ''}</div>
+          </div>
+        </div>
+      </td>
+      <td>${escHtml(o.brand||o.vendor||'—')}</td>
+      <td>${escHtml(o.series||'—')}</td>
+      <td><code style="font-size:0.72rem">${escHtml(o.scale||'1:64')}</code></td>
+      <td><span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></td>
       <td>${o.quantity||1}</td>
+      <td>₹${(o.actual_price||0).toLocaleString('en-IN')}</td>
+      <td>₹${(o.preorder_price||0).toLocaleString('en-IN')}</td>
       <td><strong>₹${(o.total||0).toLocaleString('en-IN')}</strong></td>
       <td style="color:var(--green)">₹${(o.paid||0).toLocaleString('en-IN')}</td>
-      <td><div class="pay-bar-wrap"><span class="badge ${pb}">${pl}</span><div class="pay-bar"><div class="pay-fill" style="width:${payPct}%"></div></div></div></td>
-      <td><span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span><div class="status-bar"><div class="status-fill fill-${sc}"></div></div></td>
-      <td style="font-size:0.78rem;color:var(--text-muted)">${o.eta?formatDate(o.eta):'—'}</td>
-      <td><div class="table-actions">
-        <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')" title="View"><i class="fa-solid fa-eye"></i></button>
-        <button class="btn btn-ghost btn-icon" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
-      </div></td>
+      <td>
+        <div class="pay-bar-wrap">
+          <span class="badge ${pb}">${pl}</span>
+          <div class="pay-bar"><div class="pay-fill" style="width:${payPct}%"></div></div>
+        </div>
+      </td>
+      <td style="font-size:0.76rem;color:var(--text-muted)">${o.eta?formatDate(o.eta):'—'}</td>
+      <td style="font-size:0.76rem;color:var(--text-muted)">${escHtml(o.location||'—')}</td>
+      <td>
+        <div class="table-actions">
+          <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')" title="View"><i class="fa-solid fa-eye"></i></button>
+          <button class="btn btn-ghost btn-icon" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-ghost btn-icon" onclick="duplicateOrder('${o.id}')" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
+          <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
 
-/* ── GLOBAL ACTIONS ── */
+/* ══════════════════════════════════════ GLOBAL ACTIONS ══════════════════════════════════════ */
 window.editOrder = function(id) {
   const o = DB.orders.find(x=>x.id===id); if(!o) return;
-  document.getElementById('modalTitle').textContent = 'Edit Order';
+  document.getElementById('modalTitle').textContent = 'Edit Model';
   [
     ['editOrderId','id'],['fProductName','product_name'],['fOrderNumber','order_number'],
     ['fBrand','brand'],['fSeries','series'],['fScale','scale'],['fCondition','condition'],
@@ -526,8 +533,7 @@ window.editOrder = function(id) {
     ['fPreorderPrice','preorder_price'],['fActualPrice','actual_price'],
     ['fShipping','shipping'],['fPaid','paid']
   ].forEach(([fieldId, key]) => { setVal(fieldId, key==='id' ? o.id : o[key]); });
-  _currentImageFile = null;
-  _currentImageB64  = '';
+  _currentImageFile = null; _currentImageB64 = '';
   const ip = document.getElementById('imagePreview');
   if(ip) ip.innerHTML = o.image ? `<img src="${o.image}" alt="preview" />` : '<i class="fa-solid fa-image"></i><p>Click to upload image</p>';
   document.getElementById('orderModal')?.classList.remove('hidden'); document.body.style.overflow='hidden';
@@ -547,7 +553,7 @@ window.deleteOrder = async function(id) {
     const o = DB.orders.find(x=>x.id===id);
     if (o?.image) await deleteImageFromSupabase(o.image);
     await deleteDoc(doc(db,'orders',id));
-    await addActivity('warning',`Order deleted — ${o?.product_name||id}`);
+    await addActivity('warning',`Deleted — ${o?.product_name||id}`);
     showToast('Order deleted','success'); await fetchData();
   } catch(e) { showToast('Failed to delete: ' + e.message,'warning'); }
 };
@@ -557,7 +563,7 @@ window.duplicateOrder = async function(id) {
   try {
     const { id: _id, createdAt, updatedAt, ...copy } = o;
     await addDoc(collection(db,'orders'), { ...copy, product_name: copy.product_name + ' (Copy)', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-    await addActivity('info', `Order duplicated — ${o.product_name}`);
+    await addActivity('info', `Duplicated — ${o.product_name}`);
     showToast('Order duplicated!', 'success'); await fetchData();
   } catch(e) { showToast('Failed to duplicate', 'warning'); }
 };
@@ -566,19 +572,24 @@ window.viewOrder = function(id) {
   const o=DB.orders.find(x=>x.id===id); if(!o) return;
   const body=document.getElementById('viewModalBody'), modal=document.getElementById('viewModal');
   if(!body||!modal) return;
+  const sc=(o.status||'').toLowerCase().replace(/\s+/g,'-');
   body.innerHTML = `
     ${o.image?`<img src="${o.image}" alt="${escHtml(o.product_name)}" class="view-image" />`:''}
     <div class="view-grid">
       <div><strong>Product:</strong> ${escHtml(o.product_name||'—')}</div>
-      <div><strong>Order #:</strong> ${escHtml(o.order_number||o.id)}</div>
-      <div><strong>Vendor:</strong> ${escHtml(o.vendor||'—')}</div>
-      <div><strong>Variant:</strong> ${escHtml(o.variant||'—')}</div>
+      <div><strong>Brand:</strong> ${escHtml(o.brand||o.vendor||'—')}</div>
+      <div><strong>Series:</strong> ${escHtml(o.series||'—')}</div>
+      <div><strong>Scale:</strong> ${escHtml(o.scale||'1:64')}</div>
+      <div><strong>Condition:</strong> ${escHtml(o.condition||'—')}</div>
+      <div><strong>Status:</strong> <span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></div>
+      <div><strong>Order #:</strong> ${escHtml(o.order_number||'—')}</div>
+      <div><strong>Seller:</strong> ${escHtml(o.vendor||'—')}</div>
+      <div><strong>Location:</strong> ${escHtml(o.location||'—')}</div>
       <div><strong>Qty:</strong> ${o.quantity||1}</div>
-      <div><strong>Status:</strong> ${escHtml(o.status||'Ordered')}</div>
       <div><strong>Order Date:</strong> ${formatDate(o.order_date)}</div>
       <div><strong>ETA:</strong> ${formatDate(o.eta)}</div>
-      <div><strong>Preorder Price:</strong> ₹${(o.preorder_price||0).toLocaleString('en-IN')}</div>
-      <div><strong>Actual Price:</strong> ₹${(o.actual_price||0).toLocaleString('en-IN')}</div>
+      <div><strong>Buy Price:</strong> ₹${(o.actual_price||0).toLocaleString('en-IN')}</div>
+      <div><strong>Market Value:</strong> ₹${(o.preorder_price||0).toLocaleString('en-IN')}</div>
       <div><strong>Shipping:</strong> ₹${(o.shipping||0).toLocaleString('en-IN')}</div>
       <div><strong>Paid:</strong> ₹${(o.paid||0).toLocaleString('en-IN')}</div>
       <div><strong>Pending:</strong> ₹${(o.pending||0).toLocaleString('en-IN')}</div>
@@ -587,117 +598,7 @@ window.viewOrder = function(id) {
   modal.classList.remove('hidden'); document.body.style.overflow='hidden';
 };
 
-/* ── INVENTORY ── */
-function renderInventory() {
-  applyInventoryFilters();
-  // Populate brand filter
-  const bf = document.getElementById('invFilterBrand');
-  if (bf) {
-    const cur = bf.value;
-    const brands = [...new Set(DB.orders.map(o => o.brand || o.vendor).filter(Boolean))];
-    bf.innerHTML = `<option value="">All Brands</option>` + brands.map(b => `<option value="${escHtml(b)}">${escHtml(b)}</option>`).join('');
-    bf.value = cur;
-  }
-}
-
-function applyInventoryFilters() {
-  const q      = (document.getElementById('invSearch')?.value || '').toLowerCase();
-  const brand  = document.getElementById('invFilterBrand')?.value  || '';
-  const status = document.getElementById('invFilterStatus')?.value || '';
-  const scale  = document.getElementById('invFilterScale')?.value  || '';
-  const sort   = document.getElementById('invSort')?.value         || 'name-az';
-
-  let items = DB.orders.filter(o => {
-    const b = o.brand || o.vendor || '';
-    const matchQ      = !q      || (o.product_name||'').toLowerCase().includes(q) || b.toLowerCase().includes(q) || (o.series||'').toLowerCase().includes(q);
-    const matchBrand  = !brand  || b === brand;
-    const matchStatus = !status || o.status === status;
-    const matchScale  = !scale  || o.scale  === scale;
-    return matchQ && matchBrand && matchStatus && matchScale;
-  });
-
-  if (sort === 'name-az')  items.sort((a,b) => (a.product_name||'').localeCompare(b.product_name||''));
-  if (sort === 'name-za')  items.sort((a,b) => (b.product_name||'').localeCompare(a.product_name||''));
-  if (sort === 'price-hi') items.sort((a,b) => (b.actual_price||0) - (a.actual_price||0));
-  if (sort === 'price-lo') items.sort((a,b) => (a.actual_price||0) - (b.actual_price||0));
-
-  const tbody = document.getElementById('inventoryTableBody');
-  if (!tbody) return;
-  if (!items.length) {
-    tbody.innerHTML = `<tr><td colspan="11" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = items.map(o => {
-    const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
-    const thumb = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
-    const cond  = o.condition || 'Mint';
-    const track = o.order_number ? `• ${escHtml(o.order_number)}` : '• No tracking';
-    return `<tr>
-      <td><div class="order-product-cell">
-        <div class="order-thumb">${thumb}</div>
-        <div>
-          <div class="order-product-name">${escHtml(o.product_name)}</div>
-          <div class="order-variant" style="font-size:0.7rem;opacity:0.6">${escHtml(cond)} ${track}</div>
-        </div>
-      </div></td>
-      <td>${escHtml(o.brand||o.vendor||'—')}</td>
-      <td>${escHtml(o.series||'—')}</td>
-      <td><code style="font-size:0.75rem">${escHtml(o.scale||'1:64')}</code></td>
-      <td><span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></td>
-      <td>${o.quantity||1}</td>
-      <td>₹${(o.actual_price||0).toLocaleString('en-IN')}</td>
-      <td>₹${(o.preorder_price||0).toLocaleString('en-IN')}</td>
-      <td>${escHtml(o.vendor||'—')}</td>
-      <td style="font-size:0.78rem;color:var(--text-muted)">${escHtml(o.location||'—')}</td>
-      <td><div class="table-actions">
-        <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')" title="View"><i class="fa-solid fa-eye"></i></button>
-        <button class="btn btn-ghost btn-icon" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn btn-ghost btn-icon" onclick="duplicateOrder('${o.id}')" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
-        <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
-      </div></td>
-    </tr>`;
-  }).join('');
-}
-
-/* ── CATALOG ── */
-function renderCatalog() {
-  const grid = document.getElementById('catalogGrid'); if(!grid) return;
-  if(!DB.orders.length) { grid.innerHTML=`<div class="empty-state">No models tracked yet</div>`; return; }
-  grid.innerHTML = DB.orders.map(o=>{
-    const sc=(o.status||'').toLowerCase().replace(/\s+/g,'-');
-    return `<div class="catalog-card">
-      <div class="catalog-card-img">${o.image?`<img src="${o.image}" alt="${escHtml(o.product_name)}" />`:`<i class="fa-solid fa-car-side"></i>`}</div>
-      <div class="catalog-card-body">
-        <div class="catalog-card-name">${escHtml(o.product_name)}</div>
-        <div class="catalog-card-vendor">${escHtml(o.vendor||'—')} • ${escHtml(o.variant||'Box')}</div>
-        <div class="catalog-card-footer">
-          <span class="catalog-card-price">₹${(o.total||0).toLocaleString('en-IN')}</span>
-          <span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span>
-        </div>
-      </div>
-    </div>`;}).join('');
-}
-
-/* ── KANBAN ── */
-function renderKanban() {
-  const cols={'Ordered':'kbc-ordered','Processing':'kbc-processing','Shipped':'kbc-shipped','Delivered':'kbc-delivered'};
-  Object.entries(cols).forEach(([status,colId])=>{
-    const col=document.getElementById(colId); if(!col) return;
-    const items=DB.orders.filter(o=>o.status===status);
-    if(!items.length) { col.innerHTML=`<div class="kb-empty">No orders</div>`; return; }
-    col.innerHTML=items.map(o=>`
-      <div class="kb-card" onclick="viewOrder('${o.id}')">
-        <div class="kb-card-name">${escHtml(o.product_name)}</div>
-        <div style="font-size:0.71rem;color:var(--text-muted);margin-bottom:0.3rem">${escHtml(o.vendor||'—')}</div>
-        <div class="kb-card-meta">
-          <span class="kb-card-price">₹${(o.total||0).toLocaleString('en-IN')}</span>
-          <span style="font-size:0.7rem;color:var(--text-muted)">${o.eta?formatDate(o.eta):'No ETA'}</span>
-        </div>
-      </div>`).join('');
-  });
-}
-
-/* ── WIDGETS ── */
+/* ══════════════════════════════════════ WIDGETS ══════════════════════════════════════ */
 function renderRecentOrders() {
   const c=document.getElementById('recentOrdersList'); if(!c) return;
   const items=DB.orders.slice(0,5);
@@ -707,7 +608,7 @@ function renderRecentOrders() {
       <div class="roi-thumb">${o.image?`<img src="${o.image}" alt="${escHtml(o.product_name)}" />`:`<i class="fa-solid fa-cube"></i>`}</div>
       <div class="roi-info">
         <div class="roi-name">${escHtml(o.product_name)}</div>
-        <div class="roi-meta">${escHtml(o.order_number||o.id)} • ${escHtml(o.vendor||'—')}</div>
+        <div class="roi-meta">${escHtml(o.brand||o.vendor||'—')} • ${escHtml(o.scale||'1:64')}</div>
       </div>
       <div class="roi-status"><span class="badge badge-${(o.status||'').toLowerCase().replace(/\s+/g,'-')}">${escHtml(o.status||'Ordered')}</span></div>
     </div>`).join('');
@@ -715,7 +616,7 @@ function renderRecentOrders() {
 
 function renderEtaWidget() {
   const c=document.getElementById('etaList'); if(!c) return;
-  const upcoming=DB.orders.filter(o=>o.eta&&o.status!=='Delivered').sort((a,b)=>new Date(a.eta)-new Date(b.eta)).slice(0,6);
+  const upcoming=DB.orders.filter(o=>o.eta&&o.status!=='Delivered'&&o.status!=='Owned').sort((a,b)=>new Date(a.eta)-new Date(b.eta)).slice(0,6);
   if(!upcoming.length){c.innerHTML=`<div class="empty-state">No upcoming deliveries</div>`;return;}
   const today=new Date();
   c.innerHTML=upcoming.map(o=>{
@@ -726,10 +627,10 @@ function renderEtaWidget() {
       <div class="delivery-icon"><i class="fa-solid fa-truck"></i></div>
       <div class="delivery-info">
         <div class="delivery-name">${escHtml(o.product_name)}</div>
-        <div class="delivery-meta">${escHtml(o.vendor||'—')} • ETA ${escHtml(o.eta)}</div>
+        <div class="delivery-meta">${escHtml(o.brand||o.vendor||'—')} • ETA ${escHtml(o.eta)}</div>
         <div class="delivery-chips">
           <span class="delivery-chip eta-chip ${dc}"><i class="fa-solid fa-calendar-days"></i> ${dl}</span>
-          <span class="delivery-chip vendor-chip"><i class="fa-solid fa-store"></i> ${escHtml(o.vendor||'—')}</span>
+          <span class="delivery-chip vendor-chip"><i class="fa-solid fa-store"></i> ${escHtml(o.brand||o.vendor||'—')}</span>
         </div>
       </div>
     </div>`;}).join('');
@@ -751,7 +652,7 @@ function renderBrandLeaderboard() {
   const c=document.getElementById('leaderboardList'); if(!c) return;
   if(!DB.orders.length){c.innerHTML=`<div class="empty-state">No data yet</div>`;return;}
   const bm={};
-  DB.orders.forEach(o=>{const k=(o.vendor||'Unknown').trim();bm[k]=(bm[k]||0)+(o.quantity||1);});
+  DB.orders.forEach(o=>{const k=(o.brand||o.vendor||'Unknown').trim();bm[k]=(bm[k]||0)+(o.quantity||1);});
   const sorted=Object.entries(bm).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const ri=(i)=>i===0?`<div class="lb-rank-icon gold"><i class="fa-solid fa-crown"></i></div>`:i===1?`<div class="lb-rank-icon silver"><i class="fa-solid fa-medal"></i></div>`:i===2?`<div class="lb-rank-icon bronze"><i class="fa-solid fa-award"></i></div>`:`<div class="lb-rank-icon"><i class="fa-solid fa-hashtag"></i></div>`;
   c.innerHTML=sorted.map(([brand,qty],i)=>`
@@ -764,7 +665,7 @@ function renderBrandLeaderboard() {
 function renderAlerts() {
   const c=document.getElementById('alertsPanel'); if(!c) return;
   const alerts=[];
-  const delayed=DB.orders.filter(o=>o.eta&&new Date(o.eta)<new Date()&&o.status!=='Delivered');
+  const delayed=DB.orders.filter(o=>o.eta&&new Date(o.eta)<new Date()&&o.status!=='Delivered'&&o.status!=='Owned');
   const unpaid=DB.orders.filter(o=>(o.pending||0)>0);
   if(delayed.length>0) alerts.push({type:'warning',msg:`${delayed.length} delayed order(s)`});
   if(unpaid.length>0)  alerts.push({type:'danger', msg:`${unpaid.length} order(s) with pending payment`});
@@ -776,18 +677,19 @@ function renderPayments() {
   const c=document.getElementById('paymentsContent'); if(!c) return;
   if(!DB.orders.length){c.innerHTML=`<div class="widget glass full-width"><div class="widget-body"><div class="empty-state">No payment data yet</div></div></div>`;return;}
   const rows=DB.orders.map(o=>`<tr>
-    <td>${escHtml(o.product_name||'—')}</td><td>${escHtml(o.order_number||o.id)}</td>
+    <td>${escHtml(o.product_name||'—')}</td>
+    <td>${escHtml(o.brand||o.vendor||'—')}</td>
     <td>₹${(o.total||0).toLocaleString('en-IN')}</td>
     <td style="color:var(--green)">₹${(o.paid||0).toLocaleString('en-IN')}</td>
     <td style="color:${(o.pending||0)>0?'var(--orange)':'var(--green)'}">₹${(o.pending||0).toLocaleString('en-IN')}</td>
-    <td>${escHtml(o.status||'Ordered')}</td>
+    <td><span class="badge badge-${(o.status||'').toLowerCase().replace(/\s+/g,'-')}">${escHtml(o.status||'Ordered')}</span></td>
   </tr>`).join('');
-  c.innerHTML=`<div class="widget glass full-width"><div class="widget-header"><h3><i class="fa-solid fa-credit-card"></i> Payment Overview</h3></div><div class="table-wrap"><table class="orders-table"><thead><tr><th>Product</th><th>Order #</th><th>Total</th><th>Paid</th><th>Pending</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  c.innerHTML=`<div class="widget glass full-width"><div class="widget-header"><h3><i class="fa-solid fa-credit-card"></i> Payment Overview</h3></div><div class="table-wrap"><table class="orders-table"><thead><tr><th>Product</th><th>Brand</th><th>Total</th><th>Paid</th><th>Pending</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 
 function renderAnalytics() {
   const vc=document.getElementById('vendorChart'), sc=document.getElementById('statusChart'), mc=document.getElementById('monthlyChart');
-  if(vc){const vm={};DB.orders.forEach(o=>{const k=o.vendor||'Unknown';vm[k]=(vm[k]||0)+1;});
+  if(vc){const vm={};DB.orders.forEach(o=>{const k=o.brand||o.vendor||'Unknown';vm[k]=(vm[k]||0)+1;});
     vc.innerHTML=Object.entries(vm).map(([k,v])=>`<div class="mini-bar-row"><span>${escHtml(k)}</span><div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,v*20)}%"></div></div><strong>${v}</strong></div>`).join('')||`<div class="empty-state">No data</div>`;}
   if(sc){const sm={};DB.orders.forEach(o=>{const k=o.status||'Unknown';sm[k]=(sm[k]||0)+1;});
     sc.innerHTML=Object.entries(sm).map(([k,v])=>`<div class="mini-bar-row"><span>${escHtml(k)}</span><div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,v*20)}%"></div></div><strong>${v}</strong></div>`).join('')||`<div class="empty-state">No data</div>`;}
@@ -795,14 +697,48 @@ function renderAnalytics() {
     mc.innerHTML=Object.entries(mm).sort().map(([k,v])=>`<div class="mini-bar-row"><span>${escHtml(k)}</span><div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,Math.round(v/500))}%"></div></div><strong>₹${v.toLocaleString('en-IN')}</strong></div>`).join('')||`<div class="empty-state">No data</div>`;}
 }
 
-function renderVendorFilter() {
-  const s=document.getElementById('filterVendor'); if(!s) return;
-  const cur=s.value, vendors=[...new Set(DB.orders.map(o=>o.vendor).filter(Boolean))];
-  s.innerHTML=`<option value="">All Vendors</option>`+vendors.map(v=>`<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
-  s.value=cur;
+function renderCatalog() {
+  const grid=document.getElementById('catalogGrid'); if(!grid) return;
+  if(!DB.orders.length){grid.innerHTML=`<div class="empty-state">No models tracked yet</div>`;return;}
+  grid.innerHTML=DB.orders.map(o=>{
+    const sc=(o.status||'').toLowerCase().replace(/\s+/g,'-');
+    return `<div class="catalog-card">
+      <div class="catalog-card-img">${o.image?`<img src="${o.image}" alt="${escHtml(o.product_name)}" />`:`<i class="fa-solid fa-car-side"></i>`}</div>
+      <div class="catalog-card-body">
+        <div class="catalog-card-name">${escHtml(o.product_name)}</div>
+        <div class="catalog-card-vendor">${escHtml(o.brand||o.vendor||'—')} • ${escHtml(o.scale||'1:64')}</div>
+        <div class="catalog-card-footer">
+          <span class="catalog-card-price">₹${(o.actual_price||0).toLocaleString('en-IN')}</span>
+          <span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span>
+        </div>
+      </div>
+    </div>`;}).join('');
 }
 
-/* ── HELPERS ── */
+function renderKanban() {
+  const allStatuses = ['Ordered','Processing','Shipped','In Transit','Delivered','Owned','Preorder','Wishlist','Sold'];
+  const cols = { 'Ordered':'kbc-ordered', 'Processing':'kbc-processing', 'Shipped':'kbc-shipped', 'Delivered':'kbc-delivered' };
+  Object.entries(cols).forEach(([status,colId])=>{
+    const col=document.getElementById(colId); if(!col) return;
+    // Include "In Transit" in Shipped column, "Owned" in Delivered
+    let items;
+    if (status === 'Shipped')    items = DB.orders.filter(o=>o.status==='Shipped'||o.status==='In Transit');
+    else if (status === 'Delivered') items = DB.orders.filter(o=>o.status==='Delivered'||o.status==='Owned');
+    else items = DB.orders.filter(o=>o.status===status);
+    if(!items.length){col.innerHTML=`<div class="kb-empty">No orders</div>`;return;}
+    col.innerHTML=items.map(o=>`
+      <div class="kb-card" onclick="viewOrder('${o.id}')">
+        <div class="kb-card-name">${escHtml(o.product_name)}</div>
+        <div style="font-size:0.71rem;color:var(--text-muted);margin-bottom:0.3rem">${escHtml(o.brand||o.vendor||'—')} • ${escHtml(o.scale||'1:64')}</div>
+        <div class="kb-card-meta">
+          <span class="kb-card-price">₹${(o.total||0).toLocaleString('en-IN')}</span>
+          <span style="font-size:0.7rem;color:var(--text-muted)">${o.eta?formatDate(o.eta):'No ETA'}</span>
+        </div>
+      </div>`).join('');
+  });
+}
+
+/* ══════════════════════════════════════ HELPERS ══════════════════════════════════════ */
 function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 function setVal(id,val){const el=document.getElementById(id);if(el)el.value=val??'';}
 function escHtml(str=''){return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');}
