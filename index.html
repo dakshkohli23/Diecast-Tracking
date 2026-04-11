@@ -24,32 +24,27 @@
     <nav class="sidebar-nav">
       <div class="nav-group-label">MAIN</div>
       <a href="#" class="nav-item active" data-section="dashboard" data-tooltip="Dashboard">
-        <i class="fa-solid fa-chart-pie"></i><span>Dashboard</span>
+        <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
       </a>
       <!-- Inventory now points to orders (merged) -->
       <a href="#" class="nav-item" data-section="orders" data-tooltip="Collection">
-        <i class="fa-solid fa-layer-group"></i><span>Collection</span>
+        <i class="fa-solid fa-car-side"></i><span>Collection</span>
       </a>
       <a href="#" class="nav-item" data-section="catalog" data-tooltip="Catalog">
-        <i class="fa-solid fa-table-cells"></i><span>Catalog</span>
-      </a>
-
-      <div class="nav-group-label">WORKFLOW</div>
-      <a href="#" class="nav-item" data-section="kanban" data-tooltip="Kanban">
-        <i class="fa-solid fa-table-columns"></i><span>Kanban</span>
+        <i class="fa-solid fa-shop"></i><span>Catalog</span>
       </a>
 
       <div class="nav-group-label">REPORTS</div>
       <a href="#" class="nav-item" data-section="analytics" data-tooltip="Analytics">
-        <i class="fa-solid fa-chart-line"></i><span>Analytics</span>
+        <i class="fa-solid fa-chart-mixed"></i><span>Analytics</span>
       </a>
 
       <div class="nav-group-label">SYSTEM</div>
       <a href="#" class="nav-item" data-section="payments" data-tooltip="Payments">
-        <i class="fa-solid fa-credit-card"></i><span>Payments</span>
+        <i class="fa-solid fa-wallet"></i><span>Payments</span>
       </a>
       <a href="#" class="nav-item" data-section="settings" data-tooltip="Settings">
-        <i class="fa-solid fa-gear"></i><span>Settings</span>
+        <i class="fa-solid fa-sliders"></i><span>Settings</span>
       </a>
     </nav>
 
@@ -125,24 +120,24 @@
         <!-- STATS CARDS -->
         <div class="stats-grid" id="statsGrid">
           <div class="stat-card glass">
-            <div class="stat-card-top"><div class="stat-icon indigo"><i class="fa-solid fa-box"></i></div><span class="stat-badge s-indigo">Catalog</span></div>
+            <div class="stat-card-top"><div class="stat-icon indigo"><i class="fa-solid fa-hashtag"></i></div><span class="stat-badge s-indigo">Catalog</span></div>
             <div class="stat-label">Total Orders</div>
             <div class="stat-value" id="statTotal">0</div>
             <div class="stat-footer"><i class="fa-solid fa-layer-group s-indigo"></i><span class="s-indigo">All tracked</span></div>
             <div class="stat-bar"><div class="stat-bar-fill s-indigo" style="width:100%"></div></div>
           </div>
           <div class="stat-card glass">
-            <div class="stat-card-top"><div class="stat-icon green"><i class="fa-solid fa-cubes"></i></div><span class="stat-badge s-green">Inventory</span></div>
+            <div class="stat-card-top"><div class="stat-icon green"><i class="fa-solid fa-boxes-stacked"></i></div><span class="stat-badge s-green">Inventory</span></div>
             <div class="stat-label">Total Quantity</div>
             <div class="stat-value" id="statQty">0</div>
             <div class="stat-footer"><i class="fa-solid fa-check-circle s-green"></i><span class="s-green">Units ordered</span></div>
             <div class="stat-bar"><div class="stat-bar-fill s-green" id="statQtyBar" style="width:80%"></div></div>
           </div>
           <div class="stat-card glass">
-            <div class="stat-card-top"><div class="stat-icon teal"><i class="fa-solid fa-tag"></i></div><span class="stat-badge s-teal">Preorder</span></div>
+            <div class="stat-card-top"><div class="stat-icon teal"><i class="fa-solid fa-chart-line"></i></div><span class="stat-badge s-teal">Market</span></div>
             <div class="stat-label">Market Value</div>
             <div class="stat-value" id="statMarketValue">₹0</div>
-            <div class="stat-footer"><i class="fa-solid fa-chart-line s-teal"></i><span class="s-teal">Preorder total</span></div>
+            <div class="stat-footer"><i class="fa-solid fa-arrow-trend-up s-teal"></i><span class="s-teal">Portfolio worth</span></div>
             <div class="stat-bar"><div class="stat-bar-fill s-teal" style="width:65%"></div></div>
           </div>
           <div class="stat-card glass">
@@ -153,14 +148,14 @@
             <div class="stat-bar"><div class="stat-bar-fill s-purple" style="width:75%"></div></div>
           </div>
           <div class="stat-card glass">
-            <div class="stat-card-top"><div class="stat-icon pink"><i class="fa-solid fa-hourglass-half"></i></div><span class="stat-badge s-pink">Dues</span></div>
+            <div class="stat-card-top"><div class="stat-icon pink"><i class="fa-solid fa-file-invoice-dollar"></i></div><span class="stat-badge s-pink">Dues</span></div>
             <div class="stat-label">Pending Payments</div>
             <div class="stat-value" id="statPending">₹0</div>
             <div class="stat-footer"><i class="fa-solid fa-circle-exclamation s-pink"></i><span class="s-pink">Amount due</span></div>
             <div class="stat-bar"><div class="stat-bar-fill s-pink" id="statPendingBar" style="width:0%"></div></div>
           </div>
           <div class="stat-card glass">
-            <div class="stat-card-top"><div class="stat-icon orange"><i class="fa-solid fa-clock"></i></div><span class="stat-badge s-orange">Pipeline</span></div>
+            <div class="stat-card-top"><div class="stat-icon orange"><i class="fa-solid fa-list-check"></i></div><span class="stat-badge s-orange">Pipeline</span></div>
             <div class="stat-label">Pending PO</div>
             <div class="stat-value" id="statPendingPO">0</div>
             <div class="stat-footer"><i class="fa-solid fa-hourglass s-orange"></i><span class="s-orange">Upcoming arrivals</span></div>
@@ -174,24 +169,24 @@
             <div class="stat-bar"><div class="stat-bar-fill s-green" id="statDeliveredBar" style="width:0%"></div></div>
           </div>
           <div class="stat-card glass">
-            <div class="stat-card-top"><div class="stat-icon teal"><i class="fa-solid fa-truck"></i></div><span class="stat-badge s-teal">Moving</span></div>
+            <div class="stat-card-top"><div class="stat-icon teal"><i class="fa-solid fa-truck-moving"></i></div><span class="stat-badge s-teal">Moving</span></div>
             <div class="stat-label">In Transit</div>
             <div class="stat-value" id="statTransit">0</div>
             <div class="stat-footer"><i class="fa-solid fa-location-dot s-teal"></i><span class="s-teal">Shipment pipeline</span></div>
             <div class="stat-bar"><div class="stat-bar-fill s-teal" id="statTransitBar" style="width:0%"></div></div>
           </div>
           <div class="stat-card glass">
-            <div class="stat-card-top"><div class="stat-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div><span class="stat-badge s-red">Alert</span></div>
+            <div class="stat-card-top"><div class="stat-icon red"><i class="fa-solid fa-calendar-xmark"></i></div><span class="stat-badge s-red">Alert</span></div>
             <div class="stat-label">Overdue</div>
             <div class="stat-value" id="statOverdue">0</div>
-            <div class="stat-footer"><i class="fa-solid fa-calendar-xmark s-red"></i><span class="s-red">Past ETA</span></div>
+            <div class="stat-footer"><i class="fa-solid fa-clock-rotate-left s-red"></i><span class="s-red">Past ETA</span></div>
             <div class="stat-bar"><div class="stat-bar-fill s-red" id="statOverdueBar" style="width:0%"></div></div>
           </div>
           <div class="stat-card glass">
-            <div class="stat-card-top"><div class="stat-icon indigo"><i class="fa-solid fa-copy"></i></div><span class="stat-badge s-indigo">Variants</span></div>
+            <div class="stat-card-top"><div class="stat-icon indigo"><i class="fa-solid fa-clone"></i></div><span class="stat-badge s-indigo">Variants</span></div>
             <div class="stat-label">Duplicates</div>
             <div class="stat-value" id="statDuplicates">0</div>
-            <div class="stat-footer"><i class="fa-solid fa-clone s-indigo"></i><span class="s-indigo">Duplicate variants</span></div>
+            <div class="stat-footer"><i class="fa-solid fa-copy s-indigo"></i><span class="s-indigo">Duplicate variants</span></div>
             <div class="stat-bar"><div class="stat-bar-fill s-indigo" id="statDuplicatesBar" style="width:0%"></div></div>
           </div>
         </div>
@@ -332,53 +327,74 @@
         </div>
       </section>
 
-      <!-- ═══ SECTION: KANBAN ═══ -->
-      <section class="section" id="section-kanban">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">Kanban</h2>
-            <p class="section-sub">Orders by status</p>
-          </div>
-        </div>
-        <div class="kanban-board" id="kanbanBoard">
-          <div class="kanban-col" id="kb-ordered">
-            <div class="kanban-col-header"><span class="kb-dot ordered"></span>Ordered</div>
-            <div class="kanban-cards" id="kbc-ordered"></div>
-          </div>
-          <div class="kanban-col" id="kb-processing">
-            <div class="kanban-col-header"><span class="kb-dot processing"></span>Processing</div>
-            <div class="kanban-cards" id="kbc-processing"></div>
-          </div>
-          <div class="kanban-col" id="kb-shipped">
-            <div class="kanban-col-header"><span class="kb-dot shipped"></span>Shipped</div>
-            <div class="kanban-cards" id="kbc-shipped"></div>
-          </div>
-          <div class="kanban-col" id="kb-delivered">
-            <div class="kanban-col-header"><span class="kb-dot delivered"></span>Delivered</div>
-            <div class="kanban-cards" id="kbc-delivered"></div>
-          </div>
-        </div>
-      </section>
-
       <!-- ═══ SECTION: ANALYTICS ═══ -->
       <section class="section" id="section-analytics">
         <div class="section-header">
           <div>
             <h2 class="section-title">Analytics</h2>
-            <p class="section-sub">Insights into your orders</p>
+            <p class="section-sub">Value, ROI, brand and performance insights</p>
           </div>
         </div>
+
+        <!-- ROI SUMMARY CARDS (from Image 1) -->
+        <div class="roi-stats-grid" id="roiStatsGrid">
+          <div class="roi-stat-card glass">
+            <div class="roi-stat-label"><i class="fa-solid fa-chart-line"></i> Portfolio Value</div>
+            <div class="roi-stat-value" id="roiPortfolioValue">₹0</div>
+            <div class="roi-stat-sub">Current market value</div>
+          </div>
+          <div class="roi-stat-card glass">
+            <div class="roi-stat-label"><i class="fa-solid fa-receipt"></i> Total Cost</div>
+            <div class="roi-stat-value" id="roiTotalCost">₹0</div>
+            <div class="roi-stat-sub">Total amount spent</div>
+          </div>
+          <div class="roi-stat-card glass">
+            <div class="roi-stat-label"><i class="fa-solid fa-percent"></i> ROI</div>
+            <div class="roi-stat-value" id="roiPercent">0%</div>
+            <div class="roi-stat-sub">Return on investment</div>
+          </div>
+          <div class="roi-stat-card glass">
+            <div class="roi-stat-label"><i class="fa-solid fa-box-open"></i> Avg Model Value</div>
+            <div class="roi-stat-value" id="roiAvgValue">₹0</div>
+            <div class="roi-stat-sub">Per item average</div>
+          </div>
+        </div>
+
+        <!-- MAIN ANALYTICS GRID -->
         <div class="analytics-grid">
+          <!-- Brand Value Comparison (bar chart, from Image 1) -->
+          <div class="widget glass analytics-brand-value">
+            <div class="widget-header"><h3><i class="fa-solid fa-ranking-star"></i> Brand Value Comparison</h3></div>
+            <div id="brandValueChart" class="brand-value-chart-area"></div>
+          </div>
+
+          <!-- Status Distribution (list style, from Image 1) -->
+          <div class="widget glass">
+            <div class="widget-header"><h3><i class="fa-solid fa-layer-group"></i> Status Distribution</h3></div>
+            <div id="statusDistList" class="status-dist-list"></div>
+          </div>
+
+          <!-- Brand Breakdown (existing bar chart) -->
           <div class="widget glass">
             <div class="widget-header"><h3><i class="fa-solid fa-store"></i> Brand Breakdown</h3></div>
             <div id="vendorChart" class="chart-area"></div>
           </div>
+
+          <!-- Status Mix (from Image 1 - bottom right) -->
           <div class="widget glass">
-            <div class="widget-header"><h3><i class="fa-solid fa-circle-half-stroke"></i> Status Distribution</h3></div>
-            <div id="statusChart" class="chart-area"></div>
+            <div class="widget-header"><h3><i class="fa-solid fa-chart-pie"></i> Status Mix</h3></div>
+            <div id="statusMixList" class="status-dist-list"></div>
           </div>
+
+          <!-- Profit Leaderboard (from Image 1) -->
+          <div class="widget glass analytics-profit-lb">
+            <div class="widget-header"><h3><i class="fa-solid fa-trophy"></i> Profit Leaderboard</h3></div>
+            <div id="profitLeaderboard" class="profit-lb-list"></div>
+          </div>
+
+          <!-- Monthly Spend (existing) -->
           <div class="widget glass full-width">
-            <div class="widget-header"><h3><i class="fa-solid fa-calendar"></i> Monthly Spend</h3></div>
+            <div class="widget-header"><h3><i class="fa-solid fa-calendar-days"></i> Monthly Spend</h3></div>
             <div id="monthlyChart" class="chart-area tall"></div>
           </div>
         </div>
