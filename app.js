@@ -112,18 +112,24 @@ function initDashboard() {
 
   sidebarToggle?.addEventListener('click', () => {
     if (isMobile()) {
-      sidebar.classList.toggle('mobile-open');
-      sidebarOverlay?.classList.toggle('show');
+      const isOpen = sidebar.classList.contains('mobile-open');
+      sidebar.classList.toggle('mobile-open', !isOpen);
+      sidebarOverlay?.classList.toggle('show', !isOpen);
+      // Prevent body scroll when sidebar open on mobile
+      document.body.style.overflow = isOpen ? '' : 'hidden';
     } else {
       sidebar.classList.toggle('collapsed');
       mainWrap.classList.toggle('expanded');
     }
   });
 
-  sidebarOverlay?.addEventListener('click', () => {
+  function closeMobileSidebar() {
     sidebar.classList.remove('mobile-open');
-    sidebarOverlay.classList.remove('show');
-  });
+    sidebarOverlay?.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+
+  sidebarOverlay?.addEventListener('click', closeMobileSidebar);
 
   initGreeting();
 
@@ -139,7 +145,11 @@ function initDashboard() {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       navigateTo(item.dataset.section);
-      if (isMobile()) { sidebar.classList.remove('mobile-open'); sidebarOverlay?.classList.remove('show'); }
+      if (isMobile()) {
+        closeMobileSidebar();
+        // Scroll page to top on section change
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     });
   });
 
@@ -248,9 +258,13 @@ function initDashboard() {
   document.querySelector('.status-pill')?.classList.add('active');
 
   // ── MODAL OPEN/CLOSE ──
-  function openModal() { orderModal?.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+  function openModal() {
+    orderModal?.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
   function closeModal() {
-    orderModal?.classList.add('hidden'); document.body.style.overflow = '';
+    orderModal?.classList.add('hidden');
+    document.body.style.overflow = '';
     document.getElementById('orderForm')?.reset();
     if (document.getElementById('editOrderId')) document.getElementById('editOrderId').value = '';
     const ip = document.getElementById('imagePreview');
@@ -264,10 +278,10 @@ function initDashboard() {
     // Reset status pills
     document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
     document.querySelector('.status-pill')?.classList.add('active');
-    const fStatus = document.getElementById('fStatus'); if (fStatus) fStatus.value = 'Ordered';
+    const fStatusEl = document.getElementById('fStatus'); if (fStatusEl) fStatusEl.value = 'Ordered';
     // Reset calc displays
-    const td = document.getElementById('fTotalDisplay'); if (td) td.textContent = '₹0';
-    const pd = document.getElementById('fPendingDisplay'); if (pd) pd.textContent = '₹0';
+    const td = document.getElementById('fTotalDisplay');   if (td) td.textContent = '₹0';
+    const pd = document.getElementById('fPendingDisplay'); if (pd) { pd.textContent = '₹0'; pd.classList.remove('fg-calc-overdue'); }
   }
 
   // ── PAYMENT CALC ──
@@ -304,7 +318,7 @@ function initDashboard() {
     if (document.getElementById('fPaidTotal')) document.getElementById('fPaidTotal').value = paidTotal;
   }
 
-  ['addOrderBtn','quickAddBtn','qaAddOrder','sidebarAddOrder'].forEach(id => {
+  ['addOrderBtn','quickAddBtn','qaAddOrder','sidebarAddOrder','topbarAddBtn'].forEach(id => {
     document.getElementById(id)?.addEventListener('click', () => {
       document.getElementById('modalTitle').textContent = 'Add New Model'; openModal();
     });
@@ -342,15 +356,16 @@ function initDashboard() {
     const saveBtn = document.getElementById('modalSave');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
 
-    const editId   = document.getElementById('editOrderId')?.value || '';
-    const price    = parseFloat(document.getElementById('fActualPrice')?.value)  || 0;
-    const qty      = parseInt(document.getElementById('fQty')?.value)            || 1;
-    const ship     = parseFloat(document.getElementById('fShipping')?.value)     || 0;
-    const paidEach = parseFloat(document.getElementById('fPaid')?.value)         || 0;
+    const editId    = document.getElementById('editOrderId')?.value || '';
+    const price     = parseFloat(document.getElementById('fActualPrice')?.value)  || 0;
+    const qty       = parseInt(document.getElementById('fQty')?.value)            || 1;
+    const ship      = parseFloat(document.getElementById('fShipping')?.value)     || 0;
+    const paidEach  = parseFloat(document.getElementById('fPaid')?.value)         || 0;
     const paidTotal = paidEach * qty;
-    const total    = (price * qty) + ship;
-    const pending  = Math.max(0, total - paidTotal);
-    const existing = DB.orders.find(o => o.id === editId);
+    // Total = investment cost: (buy price × qty) + shipping
+    const total     = (price * qty) + ship;
+    const pending   = Math.max(0, total - paidTotal);
+    const existing  = DB.orders.find(o => o.id === editId);
 
     try {
       let imageUrl = existing?.image || '';
@@ -528,32 +543,50 @@ function renderSettingsInfo() {
 /* ══════════════════════════════════════ STATS ══════════════════════════════════════ */
 function renderStats() {
   const o = DB.orders, n = o.length;
-  const totalQty   = o.reduce((s,x) => s+(x.quantity||1), 0);
-  const marketVal  = o.reduce((s,x) => s+((x.preorder_price||0)*(x.quantity||1)), 0);
-  const investment = o.reduce((s,x) => s+(x.total||0), 0);
-  const pendingAmt = o.reduce((s,x) => s+(x.pending||0), 0);
-  const pendingPO  = o.filter(x => x.status==='Ordered'||x.status==='Processing'||x.status==='Preorder').length;
-  const delivered  = o.filter(x => x.status==='Delivered'||x.status==='Owned').length;
-  const transit    = o.filter(x => x.status==='Shipped'||x.status==='In Transit').length;
-  const overdue    = o.filter(x => x.eta && new Date(x.eta)<new Date() && x.status!=='Delivered' && x.status!=='Owned').length;
+  const totalQty = o.reduce((s,x) => s + (x.quantity||1), 0);
+
+  // Market Value = total MRP (preorder_price × qty) — what they're worth
+  const marketVal = o.reduce((s,x) => s + ((x.preorder_price||0) * (x.quantity||1)), 0);
+
+  // Investment = actual money spent = (buy_price × qty) + shipping for each order
+  const investment = o.reduce((s,x) => {
+    const buyTotal = (x.actual_price||0) * (x.quantity||1);
+    const ship     = x.shipping||0;
+    return s + buyTotal + ship;
+  }, 0);
+
+  // Pending = amount still owed across all orders
+  const pendingAmt = o.reduce((s,x) => s + (x.pending||0), 0);
+
+  const pendingPO = o.filter(x => x.status==='Ordered'||x.status==='In Transit').length;
+  const delivered = o.filter(x => x.status==='Delivered'||x.status==='Owned').length;
+  const transit   = o.filter(x => x.status==='In Transit').length;
+  const overdue   = o.filter(x => x.eta && new Date(x.eta)<new Date() && x.status!=='Delivered' && x.status!=='Owned' && x.status!=='Cancelled').length;
   const nc = {}; o.forEach(x => { const k=(x.product_name||'').toLowerCase().trim(); nc[k]=(nc[k]||0)+1; });
   const dups = Object.values(nc).filter(v=>v>1).length;
 
-  setText('statTotal',n); setText('statQty',totalQty);
-  setText('statMarketValue','₹'+marketVal.toLocaleString('en-IN'));
-  setText('statInvestment','₹'+investment.toLocaleString('en-IN'));
-  setText('statPending','₹'+pendingAmt.toLocaleString('en-IN'));
-  setText('statPendingPO',pendingPO); setText('statDelivered',delivered);
-  setText('statTransit',transit); setText('statOverdue',overdue); setText('statDuplicates',dups);
+  setText('statTotal', n);
+  setText('statQty', totalQty);
+  setText('statMarketValue', '₹' + marketVal.toLocaleString('en-IN'));
+  setText('statInvestment',  '₹' + investment.toLocaleString('en-IN'));
+  setText('statPending',     '₹' + pendingAmt.toLocaleString('en-IN'));
+  setText('statPendingPO', pendingPO);
+  setText('statDelivered',  delivered);
+  setText('statTransit',    transit);
+  setText('statOverdue',    overdue);
+  setText('statDuplicates', dups);
 
-  const pct=(x)=>n>0?Math.round((x/n)*100):0;
-  const sb=(id,v)=>{const el=document.getElementById(id);if(el)el.style.width=v+'%';};
-  sb('statDeliveredBar',pct(delivered)); sb('statTransitBar',pct(transit));
-  sb('statPendingPOBar',pct(pendingPO)); sb('statOverdueBar',pct(overdue));
-  sb('statDuplicatesBar',pct(dups));
-  sb('statPendingBar',investment>0?Math.round((pendingAmt/investment)*100):0);
-  const dot=document.getElementById('notifDot');
-  if(dot) dot.classList.toggle('show',pendingAmt>0||overdue>0);
+  const pct = (x) => n > 0 ? Math.min(100, Math.round((x/n)*100)) : 0;
+  const sb  = (id,v) => { const el=document.getElementById(id); if(el) el.style.width=v+'%'; };
+  sb('statDeliveredBar',   pct(delivered));
+  sb('statTransitBar',     pct(transit));
+  sb('statPendingPOBar',   pct(pendingPO));
+  sb('statOverdueBar',     pct(overdue));
+  sb('statDuplicatesBar',  pct(dups));
+  sb('statPendingBar',     investment > 0 ? Math.min(100, Math.round((pendingAmt/investment)*100)) : 0);
+
+  const dot = document.getElementById('notifDot');
+  if (dot) dot.classList.toggle('show', pendingAmt > 0 || overdue > 0);
 }
 
 /* ══════════════════════════════════════ UNIFIED COLLECTION FILTERS ══════════════════════════════════════ */
