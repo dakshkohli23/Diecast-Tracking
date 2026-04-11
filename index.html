@@ -33,6 +33,10 @@
       <a href="#" class="nav-item" data-section="catalog" data-tooltip="Catalog">
         <i class="fa-solid fa-shop"></i><span>Catalog</span>
       </a>
+      <!-- Add Order shortcut -->
+      <button class="nav-item nav-add-order" id="sidebarAddOrder" data-tooltip="Add Order">
+        <i class="fa-solid fa-circle-plus"></i><span>Add Order</span>
+      </button>
 
       <div class="nav-group-label">REPORTS</div>
       <a href="#" class="nav-item" data-section="analytics" data-tooltip="Analytics">
@@ -420,19 +424,65 @@
         <div class="section-header">
           <div>
             <h2 class="section-title">Settings</h2>
-            <p class="section-sub">Manage your preferences</p>
+            <p class="section-sub">Manage your preferences & app info</p>
           </div>
         </div>
+
+        <!-- ABOUT CARD -->
+        <div class="widget glass settings-about-card">
+          <div class="widget-header">
+            <h3><i class="fa-solid fa-circle-info"></i> About</h3>
+          </div>
+          <div class="settings-about-list">
+            <div class="settings-about-row">
+              <div>
+                <div class="sa-title">PreTrack NEXUS</div>
+                <div class="sa-sub">Diecast collection &amp; preorder tracker</div>
+              </div>
+              <span class="sa-badge sa-badge-version">v4.0</span>
+            </div>
+            <div class="settings-about-row">
+              <div>
+                <div class="sa-title">Data Source</div>
+                <div class="sa-sub">Live Firebase / Firestore</div>
+              </div>
+              <span class="sa-badge sa-badge-cloud"><i class="fa-solid fa-cloud"></i> Cloud</span>
+            </div>
+            <div class="settings-about-row">
+              <div>
+                <div class="sa-title">Collections</div>
+                <div class="sa-sub">Total models tracked</div>
+              </div>
+              <span class="sa-badge sa-badge-models" id="settingsModelCount">0 models</span>
+            </div>
+            <div class="settings-about-row">
+              <div>
+                <div class="sa-title">Logged in as</div>
+                <div class="sa-sub" id="settingsUserEmail">—</div>
+              </div>
+              <span class="sa-badge sa-badge-user"><i class="fa-solid fa-user-check"></i> Active</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DATA MANAGEMENT -->
         <div class="widget glass">
+          <div class="widget-header"><h3><i class="fa-solid fa-database"></i> Data Management</h3></div>
           <div class="settings-list">
             <div class="setting-item">
-              <div><strong>Export Data</strong><p>Download all orders as CSV</p></div>
+              <div>
+                <strong><i class="fa-solid fa-download" style="color:var(--teal)"></i> Export Data</strong>
+                <p>Download all your orders as a CSV file</p>
+              </div>
               <button class="btn btn-primary" id="exportCsvBtn">
-                <i class="fa-solid fa-download"></i> Export CSV
+                <i class="fa-solid fa-file-csv"></i> Export CSV
               </button>
             </div>
-            <div class="setting-item">
-              <div><strong>Clear All Data</strong><p>Remove all orders permanently</p></div>
+            <div class="setting-item setting-item-danger">
+              <div>
+                <strong><i class="fa-solid fa-triangle-exclamation" style="color:var(--red)"></i> Clear All Data</strong>
+                <p>Permanently remove all orders. Requires your account password.</p>
+              </div>
               <button class="btn btn-danger" id="clearDataBtn">
                 <i class="fa-solid fa-trash"></i> Clear Data
               </button>
@@ -538,10 +588,6 @@
                     <input type="radio" name="fStatusRadio" value="Ordered" checked hidden />
                     <i class="fa-solid fa-cart-shopping"></i> Ordered
                   </label>
-                  <label class="status-pill" data-status="Preorder">
-                    <input type="radio" name="fStatusRadio" value="Preorder" hidden />
-                    <i class="fa-solid fa-clock"></i> Preorder
-                  </label>
                   <label class="status-pill" data-status="In Transit">
                     <input type="radio" name="fStatusRadio" value="In Transit" hidden />
                     <i class="fa-solid fa-truck-moving"></i> In Transit
@@ -549,10 +595,6 @@
                   <label class="status-pill" data-status="Delivered">
                     <input type="radio" name="fStatusRadio" value="Delivered" hidden />
                     <i class="fa-solid fa-box-open"></i> Delivered
-                  </label>
-                  <label class="status-pill" data-status="Owned">
-                    <input type="radio" name="fStatusRadio" value="Owned" hidden />
-                    <i class="fa-solid fa-house"></i> Owned
                   </label>
                   <label class="status-pill" data-status="Cancelled">
                     <input type="radio" name="fStatusRadio" value="Cancelled" hidden />
@@ -588,14 +630,15 @@
               </div>
 
               <div class="form-group fg-quarter">
-                <label class="fg-label"><i class="fa-solid fa-hand-holding-dollar"></i> Amount Paid (₹)</label>
+                <label class="fg-label"><i class="fa-solid fa-hand-holding-dollar"></i> Paid / piece (₹)</label>
                 <input type="number" id="fPaid" class="fg-input" min="0" value="0" placeholder="0" />
+                <span class="fg-hint">× qty = total paid</span>
               </div>
 
               <!-- Auto-calculated -->
               <div class="form-group fg-half">
                 <label class="fg-label"><i class="fa-solid fa-calculator"></i> Total Amount (auto)</label>
-                <div class="fg-calc-field" id="fTotalDisplay">₹0</div>
+                <div class="fg-calc-field" id="fTotalDisplay" title="(buy price × qty) + shipping">₹0</div>
                 <input type="hidden" id="fTotal" />
               </div>
 
@@ -603,6 +646,7 @@
                 <label class="fg-label"><i class="fa-solid fa-hourglass-half"></i> Pending Amount (auto)</label>
                 <div class="fg-calc-field fg-calc-pending" id="fPendingDisplay">₹0</div>
                 <input type="hidden" id="fPending" />
+                <input type="hidden" id="fPaidTotal" />
               </div>
 
             </div>
@@ -694,6 +738,42 @@
   </div>
 
   <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ═══ CLEAR DATA PASSWORD MODAL ═══ -->
+  <div class="modal-overlay hidden" id="clearDataModal">
+    <div class="modal glass modal-sm" id="clearDataModalBox">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <div class="modal-header-icon" style="background:linear-gradient(135deg,#ef4444,#f97316)">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <h3>Confirm Deletion</h3>
+            <p class="modal-header-sub">Enter your password to continue</p>
+          </div>
+        </div>
+        <button class="modal-close" id="clearDataCancelBtn"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem">
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem">
+          <i class="fa-solid fa-triangle-exclamation" style="color:var(--red)"></i>
+          This will permanently delete <strong>all orders and images</strong>. This cannot be undone.
+        </p>
+        <div class="form-group" style="margin-bottom:0.75rem">
+          <label class="fg-label"><i class="fa-solid fa-lock"></i> Your Password</label>
+          <input type="password" id="clearDataPw" class="fg-input" placeholder="Enter your account password" />
+        </div>
+        <div id="clearDataPwErr" style="color:var(--red);font-size:0.78rem;min-height:1.2em;margin-bottom:0.75rem"></div>
+        <div style="display:flex;gap:0.6rem;justify-content:flex-end">
+          <button type="button" class="btn btn-ghost" id="clearDataCancelBtnFooter">Cancel</button>
+          <button type="button" class="btn btn-danger" id="clearDataConfirmBtn">
+            <i class="fa-solid fa-trash"></i> Delete Everything
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>
