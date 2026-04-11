@@ -446,29 +446,184 @@
 
   <!-- ═══ ADD/EDIT MODAL ═══ -->
   <div class="modal-overlay hidden" id="orderModal">
-    <div class="modal glass" id="orderModalBox">
+    <div class="modal modal-redesign glass" id="orderModalBox">
       <div class="modal-header">
-        <h3 id="modalTitle">Add New Order</h3>
+        <div class="modal-header-left">
+          <div class="modal-header-icon"><i class="fa-solid fa-car-side"></i></div>
+          <div>
+            <h3 id="modalTitle">Add New Order</h3>
+            <p class="modal-header-sub">Fill in the required fields below</p>
+          </div>
+        </div>
         <button class="modal-close" id="modalClose"><i class="fa-solid fa-xmark"></i></button>
       </div>
+
       <div class="modal-body">
         <form id="orderForm">
           <input type="hidden" id="editOrderId" />
-          <div class="form-tabs">
-            <button type="button" class="form-tab active" data-tab="basic">Basic Info</button>
-            <button type="button" class="form-tab" data-tab="payment">Payment</button>
-            <button type="button" class="form-tab" data-tab="media">Media</button>
+
+          <!-- ── SECTION: REQUIRED ── -->
+          <div class="form-section">
+            <div class="form-section-label">
+              <i class="fa-solid fa-star"></i> Required
+            </div>
+            <div class="form-grid-new">
+
+              <!-- Product Name - full width -->
+              <div class="form-group fg-full">
+                <label class="fg-label">
+                  <i class="fa-solid fa-tag"></i> Product Name
+                  <span class="fg-required">*</span>
+                </label>
+                <input type="text" id="fProductName" class="fg-input" placeholder="e.g. Nissan Skyline GT-R R34" required />
+              </div>
+
+              <!-- Brand dropdown -->
+              <div class="form-group fg-half">
+                <label class="fg-label">
+                  <i class="fa-solid fa-building"></i> Brand
+                  <span class="fg-required">*</span>
+                </label>
+                <div class="brand-select-wrap">
+                  <select id="fBrandSelect" class="fg-input fg-select" required>
+                    <option value="">Select Brand</option>
+                    <option value="Hot Wheels">Hot Wheels</option>
+                    <option value="Mini GT">Mini GT</option>
+                    <option value="Pop Race">Pop Race</option>
+                    <option value="Tarmac Works">Tarmac Works</option>
+                    <option value="Tomica">Tomica</option>
+                    <option value="Matchbox">Matchbox</option>
+                    <option value="Kaido House">Kaido House</option>
+                    <option value="Inno64">Inno64</option>
+                    <option value="__new__" class="brand-add-option">＋ Add New Brand</option>
+                  </select>
+                </div>
+                <!-- Hidden actual brand field -->
+                <input type="hidden" id="fBrand" />
+                <!-- New brand input (hidden by default) -->
+                <div class="new-brand-row hidden" id="newBrandRow">
+                  <input type="text" id="fNewBrand" class="fg-input" placeholder="Enter new brand name..." />
+                  <button type="button" class="btn-add-brand" id="confirmNewBrand">
+                    <i class="fa-solid fa-check"></i> Add
+                  </button>
+                  <button type="button" class="btn-cancel-brand" id="cancelNewBrand">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Quantity -->
+              <div class="form-group fg-quarter">
+                <label class="fg-label"><i class="fa-solid fa-boxes-stacked"></i> Quantity <span class="fg-required">*</span></label>
+                <input type="number" id="fQty" class="fg-input" min="1" value="1" required />
+              </div>
+
+              <!-- Order Date -->
+              <div class="form-group fg-quarter">
+                <label class="fg-label"><i class="fa-solid fa-calendar-plus"></i> Order Date</label>
+                <input type="date" id="fOrderDate" class="fg-input" />
+              </div>
+
+              <!-- ETA Date -->
+              <div class="form-group fg-quarter">
+                <label class="fg-label"><i class="fa-solid fa-calendar-check"></i> ETA Date</label>
+                <input type="date" id="fEta" class="fg-input" />
+              </div>
+
+              <!-- Status pills -->
+              <div class="form-group fg-full">
+                <label class="fg-label"><i class="fa-solid fa-circle-dot"></i> Status</label>
+                <div class="status-pill-group" id="statusPillGroup">
+                  <label class="status-pill" data-status="Ordered">
+                    <input type="radio" name="fStatusRadio" value="Ordered" checked hidden />
+                    <i class="fa-solid fa-cart-shopping"></i> Ordered
+                  </label>
+                  <label class="status-pill" data-status="Preorder">
+                    <input type="radio" name="fStatusRadio" value="Preorder" hidden />
+                    <i class="fa-solid fa-clock"></i> Preorder
+                  </label>
+                  <label class="status-pill" data-status="In Transit">
+                    <input type="radio" name="fStatusRadio" value="In Transit" hidden />
+                    <i class="fa-solid fa-truck-moving"></i> In Transit
+                  </label>
+                  <label class="status-pill" data-status="Delivered">
+                    <input type="radio" name="fStatusRadio" value="Delivered" hidden />
+                    <i class="fa-solid fa-box-open"></i> Delivered
+                  </label>
+                  <label class="status-pill" data-status="Owned">
+                    <input type="radio" name="fStatusRadio" value="Owned" hidden />
+                    <i class="fa-solid fa-house"></i> Owned
+                  </label>
+                  <label class="status-pill" data-status="Cancelled">
+                    <input type="radio" name="fStatusRadio" value="Cancelled" hidden />
+                    <i class="fa-solid fa-ban"></i> Cancelled
+                  </label>
+                </div>
+                <!-- Hidden actual status value -->
+                <input type="hidden" id="fStatus" value="Ordered" />
+              </div>
+            </div>
           </div>
 
-          <div class="tab-content active" id="tab-basic">
-            <div class="form-grid">
-              <div class="form-group"><label>Product Name *</label><input type="text" id="fProductName" required /></div>
-              <div class="form-group"><label>Order / Tracking #</label><input type="text" id="fOrderNumber" /></div>
-              <div class="form-group"><label>Brand *</label><input type="text" id="fBrand" required placeholder="e.g. Mini GT, Hot Wheels" /></div>
-              <div class="form-group"><label>Series</label><input type="text" id="fSeries" placeholder="e.g. Drift Series" /></div>
-              <div class="form-group">
-                <label>Scale</label>
-                <select id="fScale">
+          <!-- ── SECTION: PAYMENT ── -->
+          <div class="form-section">
+            <div class="form-section-label">
+              <i class="fa-solid fa-wallet"></i> Payment
+            </div>
+            <div class="form-grid-new">
+
+              <div class="form-group fg-quarter">
+                <label class="fg-label"><i class="fa-solid fa-tag"></i> Pre Order Amount (₹)</label>
+                <input type="number" id="fPreorderPrice" class="fg-input" min="0" value="0" placeholder="0" />
+              </div>
+
+              <div class="form-group fg-quarter">
+                <label class="fg-label"><i class="fa-solid fa-indian-rupee-sign"></i> Buy Price / piece (₹)</label>
+                <input type="number" id="fActualPrice" class="fg-input" min="0" value="0" placeholder="0" />
+              </div>
+
+              <div class="form-group fg-quarter">
+                <label class="fg-label"><i class="fa-solid fa-truck"></i> Shipping (₹)</label>
+                <input type="number" id="fShipping" class="fg-input" min="0" value="0" placeholder="0" />
+              </div>
+
+              <div class="form-group fg-quarter">
+                <label class="fg-label"><i class="fa-solid fa-hand-holding-dollar"></i> Amount Paid (₹)</label>
+                <input type="number" id="fPaid" class="fg-input" min="0" value="0" placeholder="0" />
+              </div>
+
+              <!-- Auto-calculated -->
+              <div class="form-group fg-half">
+                <label class="fg-label"><i class="fa-solid fa-calculator"></i> Total Amount (auto)</label>
+                <div class="fg-calc-field" id="fTotalDisplay">₹0</div>
+                <input type="hidden" id="fTotal" />
+              </div>
+
+              <div class="form-group fg-half">
+                <label class="fg-label"><i class="fa-solid fa-hourglass-half"></i> Pending Amount (auto)</label>
+                <div class="fg-calc-field fg-calc-pending" id="fPendingDisplay">₹0</div>
+                <input type="hidden" id="fPending" />
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ── SECTION: OPTIONAL ── -->
+          <details class="form-section form-section-optional" id="optionalSection">
+            <summary class="form-section-label form-section-toggle">
+              <i class="fa-solid fa-ellipsis"></i> Optional Details
+              <i class="fa-solid fa-chevron-down toggle-chevron"></i>
+            </summary>
+            <div class="form-grid-new" style="margin-top:1rem">
+
+              <div class="form-group fg-half">
+                <label class="fg-label"><i class="fa-solid fa-barcode"></i> Order / Tracking #</label>
+                <input type="text" id="fOrderNumber" class="fg-input" placeholder="e.g. TRK-123456" />
+              </div>
+
+              <div class="form-group fg-quarter">
+                <label class="fg-label"><i class="fa-solid fa-ruler"></i> Scale</label>
+                <select id="fScale" class="fg-input fg-select">
                   <option value="1:64">1:64</option>
                   <option value="1:43">1:43</option>
                   <option value="1:18">1:18</option>
@@ -477,70 +632,49 @@
                   <option value="Other">Other</option>
                 </select>
               </div>
-              <div class="form-group">
-                <label>Condition</label>
-                <select id="fCondition">
-                  <option value="Mint">Mint</option>
-                  <option value="Near Mint">Near Mint</option>
-                  <option value="Good">Good</option>
-                  <option value="Fair">Fair</option>
-                </select>
-              </div>
-              <div class="form-group"><label>Seller / Vendor</label><input type="text" id="fVendor" placeholder="e.g. Japan Importer" /></div>
-              <div class="form-group"><label>Location</label><input type="text" id="fLocation" placeholder="e.g. Shelf A / Box 1" /></div>
-              <div class="form-group">
-                <label>Variant</label>
-                <select id="fVariant">
+
+              <div class="form-group fg-quarter">
+                <label class="fg-label"><i class="fa-solid fa-cube"></i> Variant</label>
+                <select id="fVariant" class="fg-input fg-select">
                   <option value="Box">Box</option>
                   <option value="Blister">Blister</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
-              <div class="form-group"><label>Quantity *</label><input type="number" id="fQty" min="1" value="1" required /></div>
-              <div class="form-group"><label>Order Date</label><input type="date" id="fOrderDate" /></div>
-              <div class="form-group"><label>ETA</label><input type="date" id="fEta" /></div>
-              <div class="form-group">
-                <label>Status</label>
-                <select id="fStatus">
-                  <option value="Ordered">Ordered</option>
-                  <option value="Processing">Processing</option>
-                  <option value="Shipped">Shipped</option>
-                  <option value="In Transit">In Transit</option>
-                  <option value="Delivered">Delivered</option>
-                  <option value="Owned">Owned</option>
-                  <option value="Preorder">Preorder</option>
-                  <option value="Wishlist">Wishlist</option>
-                  <option value="Sold">Sold</option>
-                </select>
+
+              <div class="form-group fg-full">
+                <label class="fg-label"><i class="fa-solid fa-note-sticky"></i> Notes</label>
+                <textarea id="fNotes" class="fg-input fg-textarea" placeholder="Any extra notes about this order..." rows="2"></textarea>
               </div>
-            </div>
-          </div>
 
-          <div class="tab-content" id="tab-payment">
-            <div class="form-grid">
-              <div class="form-group"><label>Market Value (₹)</label><input type="number" id="fPreorderPrice" min="0" value="0" /></div>
-              <div class="form-group"><label>Buy Price (₹)</label><input type="number" id="fActualPrice" min="0" value="0" /></div>
-              <div class="form-group"><label>Shipping (₹)</label><input type="number" id="fShipping" min="0" value="0" /></div>
-              <div class="form-group"><label>Amount Paid (₹)</label><input type="number" id="fPaid" min="0" value="0" /></div>
-              <div class="form-group readonly-field"><label>Total (auto)</label><input type="text" id="fTotal" readonly /></div>
-              <div class="form-group readonly-field"><label>Pending (auto)</label><input type="text" id="fPending" readonly /></div>
-            </div>
-          </div>
+              <!-- Keep hidden fields for data compatibility -->
+              <input type="hidden" id="fSeries" />
+              <input type="hidden" id="fCondition" value="Mint" />
+              <input type="hidden" id="fVendor" />
+              <input type="hidden" id="fLocation" />
 
-          <div class="tab-content" id="tab-media">
+            </div>
+          </details>
+
+          <!-- ── IMAGE UPLOAD ── -->
+          <div class="form-section">
+            <div class="form-section-label"><i class="fa-solid fa-image"></i> Photo</div>
             <div class="image-upload-area" id="imageUploadArea">
               <div class="image-preview" id="imagePreview">
-                <i class="fa-solid fa-image"></i>
-                <p>Click to upload image</p>
+                <i class="fa-solid fa-camera"></i>
+                <p>Click to upload photo</p>
+                <span>JPG, PNG, WEBP · max 5MB</span>
               </div>
               <input type="file" id="fImage" accept="image/*" hidden />
             </div>
           </div>
 
           <div class="modal-footer">
-            <button type="button" class="btn btn-ghost" id="modalCancel">Cancel</button>
+            <button type="button" class="btn btn-ghost" id="modalCancel">
+              <i class="fa-solid fa-xmark"></i> Cancel
+            </button>
             <button type="submit" class="btn btn-primary" id="modalSave">
-              <i class="fa-solid fa-floppy-disk"></i> Save
+              <i class="fa-solid fa-floppy-disk"></i> Save Order
             </button>
           </div>
         </form>
