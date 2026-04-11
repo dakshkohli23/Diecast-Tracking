@@ -2927,1118 +2927,842 @@ body {
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- FIREBASE + APP LOGIC -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import {
-      getFirestore,
-      collection,
-      getDocs,
-      addDoc,
-      updateDoc,
-      deleteDoc,
-      doc,
-      getDoc,
-      writeBatch
-    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+<script type="module">
+  /* ===============================
+     PRETRACK — INLINE APP SCRIPT
+     Firebase Auth + Firestore + Supabase
+     Single-file version for combined.html
+     =============================== */
 
-    /* =========================================
-       REPLACE WITH YOUR REAL FIREBASE CONFIG
-    ========================================= */
-    const firebaseConfig = {
-      apiKey: "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
-  authDomain: "diecast-tracking-471f7.firebaseapp.com",
-  projectId: "diecast-tracking-471f7",
-  storageBucket: "diecast-tracking-471f7.firebasestorage.app",
-  messagingSenderId: "1042711268055",
-  appId: "1:1042711268055:web:9b09ded970a85532767e92"
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+  import {
+    getAuth,
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+  import {
+    getFirestore,
+    collection,
+    getDocs,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    doc,
+    query,
+    orderBy,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+  /* ===============================
+     🔴 IMPORTANT:
+     REPLACE THESE WITH YOUR REAL KEYS
+     (use the same keys from your existing app.js)
+     =============================== */
+  const firebaseConfig = {
+    apiKey: "YOUR_FIREBASE_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.firebasestorage.app",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const SUPABASE_URL = "YOUR_SUPABASE_URL";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  const SUPABASE_BUCKET = "order-images";
+
+  /* ===============================
+     INIT
+     =============================== */
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  /* ===============================
+     STATE
+     =============================== */
+  let DB = { orders: [], activity: [] };
+  let editingId = null;
+  let currentUser = null;
+  let selectedImageFile = null;
+
+  /* ===============================
+     HELPERS
+     =============================== */
+  const $ = (id) => document.getElementById(id);
+
+  function safeEl(id) {
+    return document.getElementById(id) || null;
+  }
+
+  function showToast(message, type = "info") {
+    let container = safeEl("toastContainer");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "toastContainer";
+      container.className = "toast-container";
+      document.body.appendChild(container);
+    }
+
+    const iconMap = {
+      success: "fa-circle-check",
+      error: "fa-circle-xmark",
+      warning: "fa-triangle-exclamation",
+      info: "fa-circle-info"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const PRODUCTS_COLLECTION = "products";
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+      <div class="toast-icon"><i class="fa-solid ${iconMap[type] || iconMap.info}"></i></div>
+      <div class="toast-msg">${escapeHtml(message)}</div>
+      <button class="toast-close" type="button"><i class="fa-solid fa-xmark"></i></button>
+      <div class="toast-bar"></div>
+    `;
 
-    /* =========================================
-       GLOBAL STATE
-    ========================================= */
-    let products = [];
-    let notifications = [];
-    let editingId = null;
-    let uploadedImageBase64 = "";
+    container.appendChild(toast);
 
-    const KANBAN_COLS = [
-      { key: "sourcing", label: "Sourcing", icon: "fa-magnifying-glass" },
-      { key: "ordered", label: "Ordered", icon: "fa-cart-shopping" },
-      { key: "transit", label: "In Transit", icon: "fa-truck-fast" },
-      { key: "received", label: "Received", icon: "fa-box-open" }
-    ];
+    const closeBtn = toast.querySelector(".toast-close");
+    closeBtn?.addEventListener("click", () => removeToast(toast));
 
-    /* =========================================
-       UTILITIES
-    ========================================= */
-    function formatCurrency(n) {
-      const num = Number(n || 0);
-      return "₹" + num.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    setTimeout(() => removeToast(toast), 3500);
+  }
+
+  function removeToast(toast) {
+    if (!toast) return;
+    toast.classList.add("out");
+    setTimeout(() => toast.remove(), 280);
+  }
+
+  function escapeHtml(str = "") {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function toNumber(v) {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function formatCurrency(n) {
+    return `₹${toNumber(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  }
+
+  function formatDate(value) {
+    if (!value) return "—";
+    try {
+      if (typeof value === "string") {
+        const d = new Date(value);
+        if (!isNaN(d)) return d.toLocaleDateString("en-IN");
+      }
+      if (value?.seconds) {
+        return new Date(value.seconds * 1000).toLocaleDateString("en-IN");
+      }
+      return "—";
+    } catch {
+      return "—";
     }
+  }
 
-    function formatDateHuman(dateStr) {
-      if (!dateStr) return "—";
-      const d = new Date(dateStr);
-      if (isNaN(d)) return "—";
-      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-    }
+  function getPaymentStatus(order) {
+    const total = toNumber(order.total);
+    const paid = toNumber(order.paid);
+    if (paid <= 0) return "Pending";
+    if (paid >= total && total > 0) return "Paid";
+    return "Partial";
+  }
 
-    function daysUntil(dateStr) {
-      if (!dateStr) return null;
-      return Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
-    }
+  function paymentBadgeClass(status) {
+    if (status === "Paid") return "badge-paid";
+    if (status === "Partial") return "badge-partial";
+    return "badge-pending-b";
+  }
 
-    function getStatusClass(status) {
-      const map = {
-        "Owned": "owned",
-        "Ordered": "ordered",
-        "In Transit": "transit",
-        "Preorder": "preorder",
-        "Sold": "sold"
-      };
-      return map[status] || "normal";
-    }
+  function statusBadgeClass(status) {
+    const s = (status || "").toLowerCase();
+    if (s.includes("deliver")) return "badge-delivered";
+    if (s.includes("ship")) return "badge-shipped";
+    if (s.includes("process")) return "badge-processing";
+    return "badge-ordered";
+  }
 
-    function escapeHtml(str) {
-      return String(str ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
+  function resetImagePreview() {
+    const preview = safeEl("imagePreview");
+    if (!preview) return;
+    preview.innerHTML = `
+      <i class="fa-solid fa-cloud-arrow-up"></i>
+      <span>Click or drag image here</span>
+    `;
+  }
 
-    function productMatchesQuery(p, q) {
-      if (!q) return true;
-      const text = [
-        p.name, p.brand, p.series, p.scale, p.status,
-        p.seller, p.notes, p.tracking
-      ].join(" ").toLowerCase();
-      return text.includes(q.toLowerCase());
-    }
+  function setImagePreview(src) {
+    const preview = safeEl("imagePreview");
+    if (!preview) return;
+    preview.innerHTML = `<img src="${src}" alt="Preview" />`;
+  }
 
-    function showToast(title, msg, type = "normal") {
-      const wrap = document.getElementById("toastContainer");
-      const colors = {
-        success: "rgba(16,185,129,.12)",
-        error: "rgba(239,68,68,.12)",
-        warning: "rgba(245,158,11,.12)",
-        normal: "rgba(99,102,241,.12)"
-      };
-      const icons = {
-        success: "fa-check",
-        error: "fa-xmark",
-        warning: "fa-triangle-exclamation",
-        normal: "fa-circle-info"
-      };
+  function openModal(id) {
+    const el = safeEl(id);
+    if (el) el.classList.remove("hidden");
+  }
 
-      const div = document.createElement("div");
-      div.className = "toast";
-      div.innerHTML = `
-        <div class="toast-icon" style="background:${colors[type] || colors.normal};color:var(--accent)">
-          <i class="fa-solid ${icons[type] || icons.normal}"></i>
-        </div>
-        <div class="toast-content">
-          <h4>${escapeHtml(title)}</h4>
-          <p>${escapeHtml(msg)}</p>
-        </div>
-      `;
-      wrap.appendChild(div);
-      setTimeout(() => div.remove(), 3000);
-    }
+  function closeModal(id) {
+    const el = safeEl(id);
+    if (el) el.classList.add("hidden");
+  }
 
-    function addNotification(title, message) {
-      notifications.unshift({
-        id: Date.now(),
-        title,
-        message,
-        time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-        read: false
+  /* ===============================
+     SUPABASE IMAGE UPLOAD
+     =============================== */
+  async function uploadImageToSupabase(file) {
+    if (!file) return null;
+
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `orders/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from(SUPABASE_BUCKET)
+      .upload(path, file, {
+        cacheControl: "3600",
+        upsert: false
       });
-      if (notifications.length > 15) notifications = notifications.slice(0, 15);
-      renderNotifications();
+
+    if (error) {
+      throw new Error(`Supabase upload failed: ${error.message}`);
     }
 
-    function renderNotifications() {
-      const list = document.getElementById("notifList");
-      const dot = document.getElementById("notifDot");
-      const unread = notifications.some(n => !n.read);
+    const { data } = supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+    return data?.publicUrl || null;
+  }
 
-      dot.classList.toggle("hidden", !unread);
+  /* ===============================
+     FIRESTORE FETCH (FIXED)
+     This is the important database fix:
+     - fetch orders and activity separately
+     - fallback if orderBy(createdAt) fails
+     =============================== */
+  async function fetchCollectionSafe(colName) {
+    try {
+      const snap = await getDocs(query(collection(db, colName), orderBy("createdAt", "desc")));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (orderedErr) {
+      console.warn(`${colName} ordered fetch failed, fallback used:`, orderedErr);
 
-      if (!notifications.length) {
-        list.innerHTML = `<div class="empty-state">No notifications</div>`;
+      const snap = await getDocs(collection(db, colName));
+      return snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+          const aTime = a.createdAt?.seconds ? a.createdAt.seconds : 0;
+          const bTime = b.createdAt?.seconds ? b.createdAt.seconds : 0;
+          return bTime - aTime;
+        });
+    }
+  }
+
+  async function fetchData() {
+    let orders = [];
+    let activity = [];
+
+    try {
+      orders = await fetchCollectionSafe("orders");
+    } catch (err) {
+      console.error("Orders fetch failed:", err);
+      showToast(`Orders load failed: ${err.message}`, "warning");
+      orders = [];
+    }
+
+    try {
+      activity = await fetchCollectionSafe("activity");
+    } catch (err) {
+      console.warn("Activity fetch failed:", err);
+      activity = [];
+    }
+
+    DB = { orders, activity };
+    renderAll();
+  }
+
+  /* ===============================
+     ACTIVITY LOG
+     =============================== */
+  async function addActivity(message, type = "info") {
+    try {
+      await addDoc(collection(db, "activity"), {
+        message,
+        type,
+        createdAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.warn("Activity log failed:", err);
+    }
+  }
+
+  /* ===============================
+     RENDERERS
+     =============================== */
+  function renderOrdersTable() {
+    const tbody = safeEl("ordersTableBody");
+    if (!tbody) return;
+
+    const search = (safeEl("orderSearch")?.value || "").toLowerCase().trim();
+    const status = safeEl("filterStatus")?.value || "";
+    const vendor = safeEl("filterVendor")?.value || "";
+    const from = safeEl("filterDateFrom")?.value || "";
+    const to = safeEl("filterDateTo")?.value || "";
+
+    let rows = [...DB.orders];
+
+    if (search) {
+      rows = rows.filter(o =>
+        [o.productName, o.orderNumber, o.brand, o.series, o.vendor, o.variant]
+          .some(v => String(v || "").toLowerCase().includes(search))
+      );
+    }
+
+    if (status) rows = rows.filter(o => (o.status || "") === status);
+    if (vendor) rows = rows.filter(o => (o.vendor || "") === vendor);
+
+    if (from) {
+      const fromDate = new Date(from);
+      rows = rows.filter(o => {
+        const d = new Date(o.orderDate || 0);
+        return !isNaN(d) && d >= fromDate;
+      });
+    }
+
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23, 59, 59, 999);
+      rows = rows.filter(o => {
+        const d = new Date(o.orderDate || 0);
+        return !isNaN(d) && d <= toDate;
+      });
+    }
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="9" class="empty-row">No orders found</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rows.map(order => {
+      const payStatus = getPaymentStatus(order);
+      const payPct = Math.min(100, Math.max(0, (toNumber(order.total) ? (toNumber(order.paid) / toNumber(order.total)) * 100 : 0)));
+
+      return `
+        <tr>
+          <td>
+            <div class="order-product-cell">
+              <div class="order-thumb">
+                ${order.imageUrl ? `<img src="${order.imageUrl}" alt="${escapeHtml(order.productName || "Product")}" />` : `<i class="fa-solid fa-box"></i>`}
+              </div>
+              <div>
+                <div class="order-product-name">${escapeHtml(order.productName || "Untitled")}</div>
+                <div class="order-variant">${escapeHtml(order.variant || "—")}</div>
+              </div>
+            </div>
+          </td>
+          <td>${escapeHtml(order.orderNumber || "—")}</td>
+          <td>${escapeHtml(order.brand || "—")}</td>
+          <td>
+            <span class="badge ${statusBadgeClass(order.status)}">${escapeHtml(order.status || "Ordered")}</span>
+            <div class="status-bar"><div class="status-fill fill-${((order.status || "ordered").toLowerCase().replace(/\s+/g, "-"))}"></div></div>
+          </td>
+          <td>${formatDate(order.orderDate)}</td>
+          <td>${formatDate(order.eta)}</td>
+          <td>
+            <span class="badge ${paymentBadgeClass(payStatus)}">${payStatus}</span>
+            <div class="pay-bar-wrap">
+              <div class="pay-bar"><div class="pay-fill" style="width:${payPct}%"></div></div>
+            </div>
+          </td>
+          <td>${formatCurrency(order.total)}</td>
+          <td>
+            <div class="table-actions">
+              <button class="btn btn-ghost btn-icon" onclick="window.viewOrder('${order.id}')"><i class="fa-solid fa-eye"></i></button>
+              <button class="btn btn-ghost btn-icon" onclick="window.editOrder('${order.id}')"><i class="fa-solid fa-pen"></i></button>
+              <button class="btn btn-danger btn-icon" onclick="window.deleteOrder('${order.id}')"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  function renderInventoryTable() {
+    const tbody = safeEl("inventoryTableBody");
+    if (!tbody) return;
+
+    const delivered = DB.orders.filter(o => (o.status || "").toLowerCase().includes("deliver"));
+
+    if (!delivered.length) {
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-row">No delivered inventory yet</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = delivered.map(order => `
+      <tr>
+        <td>
+          <div class="order-product-cell">
+            <div class="order-thumb">
+              ${order.imageUrl ? `<img src="${order.imageUrl}" alt="${escapeHtml(order.productName || "Product")}" />` : `<i class="fa-solid fa-cube"></i>`}
+            </div>
+            <div>
+              <div class="order-product-name">${escapeHtml(order.productName || "Untitled")}</div>
+              <div class="order-variant">${escapeHtml(order.variant || "—")}</div>
+            </div>
+          </div>
+        </td>
+        <td>${escapeHtml(order.brand || "—")}</td>
+        <td>${escapeHtml(order.series || "—")}</td>
+        <td>${escapeHtml(order.scale || "—")}</td>
+        <td>${escapeHtml(order.condition || "—")}</td>
+        <td>${escapeHtml(order.location || "—")}</td>
+        <td>${toNumber(order.qty) || 1}</td>
+        <td>${formatCurrency(order.total)}</td>
+      </tr>
+    `).join("");
+  }
+
+  function renderRecentOrders() {
+    const el = safeEl("recentOrdersList");
+    if (!el) return;
+
+    const recent = [...DB.orders].slice(0, 5);
+
+    if (!recent.length) {
+      el.innerHTML = `<div class="empty-state">No recent orders</div>`;
+      return;
+    }
+
+    el.innerHTML = recent.map(order => `
+      <div class="recent-order-item">
+        <div class="roi-thumb">
+          ${order.imageUrl ? `<img src="${order.imageUrl}" alt="${escapeHtml(order.productName || "Product")}" />` : `<i class="fa-solid fa-box"></i>`}
+        </div>
+        <div class="roi-info">
+          <div class="roi-name">${escapeHtml(order.productName || "Untitled")}</div>
+          <div class="roi-meta">${escapeHtml(order.brand || "—")} • ${formatDate(order.orderDate)}</div>
+        </div>
+        <div class="roi-status">
+          <span class="badge ${statusBadgeClass(order.status)}">${escapeHtml(order.status || "Ordered")}</span>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function renderActivity() {
+    const el = safeEl("activityList");
+    if (!el) return;
+
+    if (!DB.activity.length) {
+      el.innerHTML = `<div class="empty-state">No recent activity</div>`;
+      return;
+    }
+
+    el.innerHTML = DB.activity.slice(0, 8).map(item => `
+      <div class="activity-item">
+        <div class="activity-dot ${escapeHtml(item.type || "info")}"></div>
+        <div>${escapeHtml(item.message || "Activity updated")}</div>
+        <div class="activity-time">${formatDate(item.createdAt)}</div>
+      </div>
+    `).join("");
+  }
+
+  function renderStats() {
+    const totalOrders = DB.orders.length;
+    const totalQty = DB.orders.reduce((sum, o) => sum + (toNumber(o.qty) || 1), 0);
+    const totalValue = DB.orders.reduce((sum, o) => sum + toNumber(o.total), 0);
+    const totalPaid = DB.orders.reduce((sum, o) => sum + toNumber(o.paid), 0);
+    const totalPending = Math.max(0, totalValue - totalPaid);
+    const delivered = DB.orders.filter(o => (o.status || "").toLowerCase().includes("deliver")).length;
+    const shipped = DB.orders.filter(o => (o.status || "").toLowerCase().includes("ship")).length;
+
+    const map = {
+      statTotal: totalOrders,
+      statQty: totalQty,
+      statMarketValue: formatCurrency(totalValue),
+      statInvestment: formatCurrency(totalPaid),
+      statPending: formatCurrency(totalPending),
+      statPendingPO: DB.orders.filter(o => !String(o.status || "").toLowerCase().includes("deliver")).length,
+      statDelivered: delivered,
+      statTransit: shipped,
+      statOverdue: 0,
+      statDuplicates: 0
+    };
+
+    Object.entries(map).forEach(([id, val]) => {
+      const el = safeEl(id);
+      if (el) el.textContent = val;
+    });
+  }
+
+  function renderAll() {
+    renderOrdersTable();
+    renderInventoryTable();
+    renderRecentOrders();
+    renderActivity();
+    renderStats();
+  }
+
+  /* ===============================
+     FORM
+     =============================== */
+  function clearForm() {
+    editingId = null;
+    selectedImageFile = null;
+
+    const form = safeEl("orderForm");
+    form?.reset();
+
+    if (safeEl("editOrderId")) safeEl("editOrderId").value = "";
+    if (safeEl("modalTitle")) safeEl("modalTitle").textContent = "Add Order";
+
+    resetImagePreview();
+  }
+
+  function getFormData() {
+    return {
+      productName: safeEl("fProductName")?.value?.trim() || "",
+      orderNumber: safeEl("fOrderNumber")?.value?.trim() || "",
+      brand: safeEl("fBrand")?.value?.trim() || "",
+      series: safeEl("fSeries")?.value?.trim() || "",
+      scale: safeEl("fScale")?.value?.trim() || "",
+      condition: safeEl("fCondition")?.value?.trim() || "",
+      vendor: safeEl("fVendor")?.value?.trim() || "",
+      location: safeEl("fLocation")?.value?.trim() || "",
+      variant: safeEl("fVariant")?.value?.trim() || "",
+      qty: toNumber(safeEl("fQty")?.value || 1),
+      orderDate: safeEl("fOrderDate")?.value || "",
+      eta: safeEl("fEta")?.value || "",
+      status: safeEl("fStatus")?.value || "Ordered",
+      preorderPrice: toNumber(safeEl("fPreorderPrice")?.value || 0),
+      actualPrice: toNumber(safeEl("fActualPrice")?.value || 0),
+      shipping: toNumber(safeEl("fShipping")?.value || 0),
+      paid: toNumber(safeEl("fPaid")?.value || 0),
+      total: toNumber(safeEl("fTotal")?.value || 0),
+      pending: toNumber(safeEl("fPending")?.value || 0)
+    };
+  }
+
+  function fillForm(order) {
+    if (!order) return;
+
+    editingId = order.id;
+    if (safeEl("editOrderId")) safeEl("editOrderId").value = order.id;
+    if (safeEl("modalTitle")) safeEl("modalTitle").textContent = "Edit Order";
+
+    const setVal = (id, val) => { const el = safeEl(id); if (el) el.value = val ?? ""; };
+
+    setVal("fProductName", order.productName);
+    setVal("fOrderNumber", order.orderNumber);
+    setVal("fBrand", order.brand);
+    setVal("fSeries", order.series);
+    setVal("fScale", order.scale);
+    setVal("fCondition", order.condition);
+    setVal("fVendor", order.vendor);
+    setVal("fLocation", order.location);
+    setVal("fVariant", order.variant);
+    setVal("fQty", order.qty);
+    setVal("fOrderDate", order.orderDate);
+    setVal("fEta", order.eta);
+    setVal("fStatus", order.status);
+    setVal("fPreorderPrice", order.preorderPrice);
+    setVal("fActualPrice", order.actualPrice);
+    setVal("fShipping", order.shipping);
+    setVal("fPaid", order.paid);
+    setVal("fTotal", order.total);
+    setVal("fPending", order.pending);
+
+    if (order.imageUrl) setImagePreview(order.imageUrl);
+    else resetImagePreview();
+
+    openModal("orderModal");
+  }
+
+  function updateCalculatedFields() {
+    const preorder = toNumber(safeEl("fPreorderPrice")?.value);
+    const actual = toNumber(safeEl("fActualPrice")?.value);
+    const shipping = toNumber(safeEl("fShipping")?.value);
+    const paid = toNumber(safeEl("fPaid")?.value);
+
+    const total = actual || preorder ? (actual || preorder) + shipping : shipping;
+    const pending = Math.max(0, total - paid);
+
+    if (safeEl("fTotal")) safeEl("fTotal").value = total.toFixed(2);
+    if (safeEl("fPending")) safeEl("fPending").value = pending.toFixed(2);
+  }
+
+  async function handleOrderSubmit(e) {
+    e.preventDefault();
+
+    try {
+      const order = getFormData();
+
+      if (!order.productName) {
+        showToast("Product name is required", "warning");
         return;
       }
 
-      list.innerHTML = notifications.map(n => `
-        <div class="notif-item">
-          <div class="notif-icon"><i class="fa-solid fa-bell"></i></div>
-          <div class="notif-text">
-            <h4>${escapeHtml(n.title)}</h4>
-            <p>${escapeHtml(n.message)}</p>
-            <span>${escapeHtml(n.time)}</span>
-          </div>
-        </div>
-      `).join("");
+      let imageUrl = null;
+      const existing = editingId ? DB.orders.find(o => o.id === editingId) : null;
+
+      if (selectedImageFile) {
+        imageUrl = await uploadImageToSupabase(selectedImageFile);
+      } else if (existing?.imageUrl) {
+        imageUrl = existing.imageUrl;
+      }
+
+      const payload = {
+        ...order,
+        imageUrl: imageUrl || null,
+        updatedAt: serverTimestamp()
+      };
+
+      if (editingId) {
+        await updateDoc(doc(db, "orders", editingId), payload);
+        await addActivity(`Updated order: ${order.productName}`, "info");
+        showToast("Order updated successfully", "success");
+      } else {
+        payload.createdAt = serverTimestamp();
+        await addDoc(collection(db, "orders"), payload);
+        await addActivity(`Added order: ${order.productName}`, "success");
+        showToast("Order added successfully", "success");
+      }
+
+      closeModal("orderModal");
+      clearForm();
+      await fetchData();
+    } catch (err) {
+      console.error("Save failed:", err);
+      showToast(`Save failed: ${err.message}`, "error");
     }
+  }
 
-    window.toggleNotifMenu = function () {
-      document.getElementById("notifDropdown").classList.toggle("open");
-    };
+  /* ===============================
+     GLOBAL ACTIONS
+     =============================== */
+  window.editOrder = function(id) {
+    const order = DB.orders.find(o => o.id === id);
+    if (!order) return;
+    fillForm(order);
+  };
 
-    window.markAllRead = function () {
-      notifications = notifications.map(n => ({ ...n, read: true }));
-      renderNotifications();
-    };
+  window.viewOrder = function(id) {
+    const order = DB.orders.find(o => o.id === id);
+    if (!order) return;
 
-    document.addEventListener("click", (e) => {
-      const dd = document.getElementById("notifDropdown");
-      const wrap = e.target.closest(".dropdown-wrap");
-      if (!wrap) dd.classList.remove("open");
+    const body = safeEl("viewModalBody");
+    if (!body) return;
+
+    body.innerHTML = `
+      ${order.imageUrl ? `<img class="view-image" src="${order.imageUrl}" alt="${escapeHtml(order.productName || "Product")}" />` : ""}
+      <div class="view-grid">
+        <div class="view-field"><label>Product</label><span>${escapeHtml(order.productName || "—")}</span></div>
+        <div class="view-field"><label>Order No.</label><span>${escapeHtml(order.orderNumber || "—")}</span></div>
+        <div class="view-field"><label>Brand</label><span>${escapeHtml(order.brand || "—")}</span></div>
+        <div class="view-field"><label>Series</label><span>${escapeHtml(order.series || "—")}</span></div>
+        <div class="view-field"><label>Scale</label><span>${escapeHtml(order.scale || "—")}</span></div>
+        <div class="view-field"><label>Status</label><span>${escapeHtml(order.status || "—")}</span></div>
+        <div class="view-field"><label>Vendor</label><span>${escapeHtml(order.vendor || "—")}</span></div>
+        <div class="view-field"><label>Location</label><span>${escapeHtml(order.location || "—")}</span></div>
+        <div class="view-field"><label>Order Date</label><span>${formatDate(order.orderDate)}</span></div>
+        <div class="view-field"><label>ETA</label><span>${formatDate(order.eta)}</span></div>
+        <div class="view-field"><label>Total</label><span>${formatCurrency(order.total)}</span></div>
+        <div class="view-field"><label>Paid</label><span>${formatCurrency(order.paid)}</span></div>
+      </div>
+    `;
+
+    openModal("viewModal");
+  };
+
+  window.deleteOrder = async function(id) {
+    const order = DB.orders.find(o => o.id === id);
+    if (!order) return;
+
+    const ok = confirm(`Delete "${order.productName}"?`);
+    if (!ok) return;
+
+    try {
+      await deleteDoc(doc(db, "orders", id));
+      await addActivity(`Deleted order: ${order.productName}`, "warning");
+      showToast("Order deleted", "success");
+      await fetchData();
+    } catch (err) {
+      console.error("Delete failed:", err);
+      showToast(`Delete failed: ${err.message}`, "error");
+    }
+  };
+
+  /* ===============================
+     AUTH
+     =============================== */
+  async function handleLogin(e) {
+    e.preventDefault();
+
+    const username = safeEl("username")?.value?.trim() || "";
+    const password = safeEl("password")?.value || "";
+
+    const loginBtn = safeEl("loginBtn");
+    const loginError = safeEl("loginError");
+    const errorMsg = safeEl("errorMsg");
+
+    try {
+      if (loginBtn) loginBtn.disabled = true;
+      if (loginError) loginError.classList.add("hidden");
+
+      // if username is not an email, append your domain
+      const email = username.includes("@") ? username : `${username}@pretrack.app`;
+
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      currentUser = cred.user;
+      showToast("Login successful", "success");
+    } catch (err) {
+      console.error("Login failed:", err);
+      if (loginError) loginError.classList.remove("hidden");
+      if (errorMsg) errorMsg.textContent = err.message;
+      showToast("Login failed", "error");
+    } finally {
+      if (loginBtn) loginBtn.disabled = false;
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await signOut(auth);
+      showToast("Logged out", "info");
+    } catch (err) {
+      console.error("Logout failed:", err);
+      showToast("Logout failed", "error");
+    }
+  }
+
+  function showDashboard(user) {
+    currentUser = user;
+
+    document.body.classList.remove("login-body");
+    document.body.classList.add("dashboard-body");
+
+    const loginView = safeEl("loginView");
+    const dashboardView = safeEl("dashboardView");
+
+    if (loginView) loginView.classList.add("hidden");
+    if (dashboardView) dashboardView.classList.remove("hidden");
+
+    const profileName = safeEl("profileName");
+    if (profileName) {
+      profileName.textContent = user?.email ? user.email.split("@")[0] : "User";
+    }
+  }
+
+  function showLogin() {
+    document.body.classList.remove("dashboard-body");
+    document.body.classList.add("login-body");
+
+    const loginView = safeEl("loginView");
+    const dashboardView = safeEl("dashboardView");
+
+    if (dashboardView) dashboardView.classList.add("hidden");
+    if (loginView) loginView.classList.remove("hidden");
+  }
+
+  /* ===============================
+     UI BINDINGS
+     =============================== */
+  function bindEvents() {
+    safeEl("loginForm")?.addEventListener("submit", handleLogin);
+    safeEl("logoutBtn")?.addEventListener("click", handleLogout);
+
+    safeEl("addOrderBtn")?.addEventListener("click", () => {
+      clearForm();
+      openModal("orderModal");
     });
 
-    /* =========================================
-       FIREBASE CRUD
-    ========================================= */
-    async function fetchProducts() {
-      try {
-        const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
-        products = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    safeEl("quickAddBtn")?.addEventListener("click", () => {
+      clearForm();
+      openModal("orderModal");
+    });
 
-        products.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    safeEl("qaAddOrder")?.addEventListener("click", () => {
+      clearForm();
+      openModal("orderModal");
+    });
 
-        renderAll();
-      } catch (error) {
-        console.error(error);
-        showToast("Firebase Error", "Could not fetch products.", "error");
-      }
-    }
+    safeEl("modalClose")?.addEventListener("click", () => closeModal("orderModal"));
+    safeEl("modalCancel")?.addEventListener("click", () => closeModal("orderModal"));
+    safeEl("viewModalClose")?.addEventListener("click", () => closeModal("viewModal"));
 
-    async function addProductToFirebase(product) {
-      const payload = {
-        ...product,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
-      await addDoc(collection(db, PRODUCTS_COLLECTION), payload);
-    }
+    safeEl("orderForm")?.addEventListener("submit", handleOrderSubmit);
 
-    async function updateProductInFirebase(id, product) {
-      const ref = doc(db, PRODUCTS_COLLECTION, id);
-      await updateDoc(ref, {
-        ...product,
-        updatedAt: Date.now()
-      });
-    }
+    ["fPreorderPrice", "fActualPrice", "fShipping", "fPaid"].forEach(id => {
+      safeEl(id)?.addEventListener("input", updateCalculatedFields);
+    });
 
-    async function deleteProductFromFirebase(id) {
-      await deleteDoc(doc(db, PRODUCTS_COLLECTION, id));
-    }
-
-    async function clearAllProductsFromFirebase() {
-      const snap = await getDocs(collection(db, PRODUCTS_COLLECTION));
-      const batch = writeBatch(db);
-      snap.docs.forEach(d => batch.delete(d.ref));
-      await batch.commit();
-    }
-
-    /* =========================================
-       PAGE / SIDEBAR
-    ========================================= */
-    window.switchPage = function (page, el) {
-      document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
-      document.getElementById(`page-${page}`).classList.add("active");
-
-      document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-      if (el) el.classList.add("active");
-
-      closeSidebar();
-    };
-
-    window.openSidebar = function () {
-      document.getElementById("sidebar").classList.add("show");
-      document.getElementById("sidebarOverlay").classList.add("show");
-    };
-
-    window.closeSidebar = function () {
-      document.getElementById("sidebar").classList.remove("show");
-      document.getElementById("sidebarOverlay").classList.remove("show");
-    };
-
-    /* =========================================
-       MODAL / FORM
-    ========================================= */
-    window.openProductModal = function (id = null) {
-      editingId = id;
-      document.getElementById("productModal").classList.remove("hidden");
-
-      if (!id) {
-        document.getElementById("modalTitle").textContent = "Add New Diecast Model";
-        resetProductForm();
-        return;
-      }
-
-      const p = products.find(x => x.id === id);
-      if (!p) return;
-
-      document.getElementById("modalTitle").textContent = "Edit Diecast Model";
-      document.getElementById("editingProductId").value = p.id || "";
-      document.getElementById("f_name").value = p.name || "";
-      document.getElementById("f_brand").value = p.brand || "Hot Wheels";
-      document.getElementById("f_series").value = p.series || "";
-      document.getElementById("f_scale").value = p.scale || "1:64";
-      document.getElementById("f_status").value = p.status || "Owned";
-      document.getElementById("f_qty").value = p.qty || 1;
-      document.getElementById("f_buyPrice").value = p.buyPrice || "";
-      document.getElementById("f_marketValue").value = p.marketValue || "";
-      document.getElementById("f_seller").value = p.seller || "";
-      document.getElementById("f_purchaseDate").value = p.purchaseDate || "";
-      document.getElementById("f_eta").value = p.eta || "";
-      document.getElementById("f_tracking").value = p.tracking || "";
-      document.getElementById("f_condition").value = p.condition || "Mint";
-      document.getElementById("f_notes").value = p.notes || "";
-
-      uploadedImageBase64 = p.image || "";
-      renderImagePreview();
-    };
-
-    window.closeProductModal = function () {
-      document.getElementById("productModal").classList.add("hidden");
-      resetProductForm();
-    };
-
-    function resetProductForm() {
-      editingId = null;
-      uploadedImageBase64 = "";
-      document.getElementById("editingProductId").value = "";
-      document.getElementById("f_name").value = "";
-      document.getElementById("f_brand").value = "Hot Wheels";
-      document.getElementById("f_series").value = "";
-      document.getElementById("f_scale").value = "1:64";
-      document.getElementById("f_status").value = "Owned";
-      document.getElementById("f_qty").value = 1;
-      document.getElementById("f_buyPrice").value = "";
-      document.getElementById("f_marketValue").value = "";
-      document.getElementById("f_seller").value = "";
-      document.getElementById("f_purchaseDate").value = "";
-      document.getElementById("f_eta").value = "";
-      document.getElementById("f_tracking").value = "";
-      document.getElementById("f_condition").value = "Mint";
-      document.getElementById("f_notes").value = "";
-      document.getElementById("f_image").value = "";
-      renderImagePreview();
-    }
-
-    function renderImagePreview() {
-      const box = document.getElementById("imagePreview");
-      if (!uploadedImageBase64) {
-        box.innerHTML = `
-          <div id="imagePreviewPlaceholder" style="text-align:center;color:var(--muted)">
-            <i class="fa-regular fa-image" style="font-size:36px"></i>
-            <p style="margin-top:8px;font-size:12px">Click to upload</p>
-          </div>
-        `;
-        return;
-      }
-
-      box.innerHTML = `<img src="${uploadedImageBase64}" alt="Preview" />`;
-    }
-
-    window.handleImageUpload = function (event) {
-      const file = event.target.files?.[0];
+    safeEl("fImage")?.addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
       if (!file) return;
 
+      selectedImageFile = file;
       const reader = new FileReader();
-      reader.onload = () => {
-        uploadedImageBase64 = reader.result;
-        renderImagePreview();
-      };
+      reader.onload = () => setImagePreview(reader.result);
       reader.readAsDataURL(file);
-    };
+    });
 
-    window.clearImageUpload = function () {
-      uploadedImageBase64 = "";
-      document.getElementById("f_image").value = "";
-      renderImagePreview();
-    };
+    safeEl("imageUploadArea")?.addEventListener("click", () => {
+      safeEl("fImage")?.click();
+    });
 
-    window.saveProduct = async function () {
-      const product = {
-        name: document.getElementById("f_name").value.trim(),
-        brand: document.getElementById("f_brand").value,
-        series: document.getElementById("f_series").value.trim(),
-        scale: document.getElementById("f_scale").value,
-        status: document.getElementById("f_status").value,
-        qty: Number(document.getElementById("f_qty").value || 1),
-        buyPrice: Number(document.getElementById("f_buyPrice").value || 0),
-        marketValue: Number(document.getElementById("f_marketValue").value || 0),
-        seller: document.getElementById("f_seller").value.trim(),
-        purchaseDate: document.getElementById("f_purchaseDate").value,
-        eta: document.getElementById("f_eta").value,
-        tracking: document.getElementById("f_tracking").value.trim(),
-        condition: document.getElementById("f_condition").value,
-        notes: document.getElementById("f_notes").value.trim(),
-        image: uploadedImageBase64 || ""
-      };
+    ["orderSearch", "filterStatus", "filterVendor", "filterDateFrom", "filterDateTo"].forEach(id => {
+      safeEl(id)?.addEventListener("input", renderOrdersTable);
+      safeEl(id)?.addEventListener("change", renderOrdersTable);
+    });
 
-      if (!product.name) {
-        showToast("Validation", "Model Name is required.", "warning");
-        return;
-      }
-
-      try {
-        if (editingId) {
-          await updateProductInFirebase(editingId, product);
-          showToast("Updated", "Product updated successfully.", "success");
-          addNotification("Product Updated", `${product.name} was updated.`);
-        } else {
-          await addProductToFirebase(product);
-          showToast("Added", "Product added successfully.", "success");
-          addNotification("New Product Added", `${product.name} was added.`);
-        }
-
-        closeProductModal();
-        await fetchProducts();
-      } catch (error) {
-        console.error(error);
-        showToast("Save Failed", "Could not save product to Firebase.", "error");
-      }
-    };
-
-    window.deleteProduct = async function (id) {
-      const p = products.find(x => x.id === id);
-      if (!p) return;
-
-      const ok = confirm(`Delete "${p.name}"?`);
-      if (!ok) return;
-
-      try {
-        await deleteProductFromFirebase(id);
-        showToast("Deleted", "Product removed successfully.", "success");
-        addNotification("Product Deleted", `${p.name} was deleted.`);
-        await fetchProducts();
-      } catch (error) {
-        console.error(error);
-        showToast("Delete Failed", "Could not delete product.", "error");
-      }
-    };
-
-    /* =========================================
-       FILTERS / SEARCH
-    ========================================= */
-    function getFilteredProducts(base = products, searchId = null, brandId = null, statusId = null) {
-      let list = [...base];
-
-      const searchVal = searchId ? document.getElementById(searchId)?.value?.trim() || "" : "";
-      const brandVal = brandId ? document.getElementById(brandId)?.value || "" : "";
-      const statusVal = statusId ? document.getElementById(statusId)?.value || "" : "";
-
-      if (searchVal) list = list.filter(p => productMatchesQuery(p, searchVal));
-      if (brandVal) list = list.filter(p => p.brand === brandVal);
-      if (statusVal) list = list.filter(p => p.status === statusVal);
-
-      return list;
-    }
-
-    window.handleGlobalSearch = function () {
-      const q = document.getElementById("globalSearch").value.trim().toLowerCase();
-      const visibleSection = document.querySelector(".section.active")?.id || "page-dashboard";
-
-      if (visibleSection === "page-inventory") {
-        document.getElementById("filterSearch").value = q;
-        renderInventoryTable();
-      } else if (visibleSection === "page-catalog") {
-        document.getElementById("productSearch").value = q;
-        renderProductCards();
-      }
-    };
-
-    window.resetFilters = function () {
-      document.getElementById("filterSearch").value = "";
-      document.getElementById("filterBrand").value = "";
-      document.getElementById("filterStatus").value = "";
-      document.getElementById("filterScale").value = "";
-      document.getElementById("sortBy").value = "name-asc";
-      renderInventoryTable();
-    };
-
-    function populateFilters() {
-      const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
-      const scales = [...new Set(products.map(p => p.scale).filter(Boolean))].sort();
-      const statuses = ["Owned", "Ordered", "In Transit", "Preorder", "Sold"];
-
-      const setOptions = (id, first, arr) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const current = el.value;
-        el.innerHTML = `<option value="">${first}</option>` + arr.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
-        if (arr.includes(current)) el.value = current;
-      };
-
-      setOptions("filterBrand", "All Brands", brands);
-      setOptions("filterScale", "All Scales", scales);
-      setOptions("productBrandFilter", "All Brands", brands);
-
-      const filterStatus = document.getElementById("filterStatus");
-      filterStatus.innerHTML = `<option value="">All Statuses</option>` + statuses.map(v => `<option value="${v}">${v}</option>`).join("");
-
-      const productStatus = document.getElementById("productStatusFilter");
-      productStatus.innerHTML = `<option value="">All Statuses</option>` + statuses.map(v => `<option value="${v}">${v}</option>`).join("");
-    }
-
-    /* =========================================
-       RENDER HELPERS
-    ========================================= */
-    function renderAll() {
-      populateFilters();
-      renderDashboard();
-      renderInventoryTable();
-      renderProductCards();
-      renderKanban();
-      renderOrders();
-      renderAnalytics();
-      renderNotifications();
-      document.getElementById("settingsModelCount").textContent = `${products.length} models`;
-    }
-
-    function renderDashboard() {
-      const totalModels = products.reduce((sum, p) => sum + Number(p.qty || 0), 0);
-      const totalBuy = products.reduce((sum, p) => sum + (Number(p.buyPrice || 0) * Number(p.qty || 0)), 0);
-      const totalValue = products.reduce((sum, p) => sum + (Number(p.marketValue || 0) * Number(p.qty || 0)), 0);
-      const totalProfit = totalValue - totalBuy;
-      const inTransit = products.filter(p => ["Ordered", "In Transit", "Preorder"].includes(p.status)).length;
-
-      const byStatus = {
-        Owned: products.filter(p => p.status === "Owned").length,
-        Ordered: products.filter(p => p.status === "Ordered").length,
-        "In Transit": products.filter(p => p.status === "In Transit").length,
-        Preorder: products.filter(p => p.status === "Preorder").length,
-        Sold: products.filter(p => p.status === "Sold").length
-      };
-
-      const stats = [
-        { label: "Models", value: totalModels, icon: "fa-cubes", bg: "rgba(99,102,241,.12)" },
-        { label: "Collection Value", value: formatCurrency(totalValue), icon: "fa-sack-dollar", bg: "rgba(16,185,129,.12)" },
-        { label: "Total Buy Cost", value: formatCurrency(totalBuy), icon: "fa-wallet", bg: "rgba(245,158,11,.12)" },
-        { label: "Potential Profit", value: formatCurrency(totalProfit), icon: "fa-arrow-trend-up", bg: "rgba(6,182,212,.12)" },
-        { label: "Active Orders", value: inTransit, icon: "fa-truck-fast", bg: "rgba(244,63,94,.12)" }
-      ];
-
-      document.getElementById("dashboardStats").innerHTML = stats.map(s => `
-        <div class="stat-card">
-          <div class="stat-top">
-            <div>
-              <div class="stat-label">${escapeHtml(s.label)}</div>
-              <div class="stat-value">${escapeHtml(String(s.value))}</div>
-            </div>
-            <div class="stat-icon" style="background:${s.bg}">
-              <i class="fa-solid ${s.icon}"></i>
-            </div>
-          </div>
-          <div class="stat-sub">${products.length ? "Live Firebase data" : "No data yet"}</div>
-        </div>
-      `).join("");
-
-      const recent = [...products].sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 5);
-      document.getElementById("recentActivity").innerHTML = recent.length ? recent.map(p => `
-        <div class="mini-item">
-          <div class="mini-icon" style="background:rgba(99,102,241,.12);color:var(--accent)">
-            <i class="fa-solid fa-box"></i>
-          </div>
-          <div>
-            <h4>${escapeHtml(p.name)}</h4>
-            <p>${escapeHtml(p.brand || "—")} • ${formatDateHuman(p.purchaseDate || "")}</p>
-          </div>
-        </div>
-      `).join("") : `<div class="empty-state">No recent activity</div>`;
-
-      document.getElementById("latestAdded").innerHTML = recent.length ? recent.slice(0, 4).map(p => `
-        <div class="mini-item">
-          <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)">
-            <i class="fa-solid fa-plus"></i>
-          </div>
-          <div>
-            <h4>${escapeHtml(p.name)}</h4>
-            <p>${escapeHtml(p.status || "—")} • ${formatCurrency(p.marketValue || 0)}</p>
-          </div>
-        </div>
-      `).join("") : `<div class="empty-state">No models yet</div>`;
-
-      const transitList = products.filter(p => ["Ordered", "In Transit", "Preorder"].includes(p.status));
-      document.getElementById("shippingInsights").innerHTML = transitList.length ? transitList.slice(0, 5).map(p => `
-        <div class="mini-item">
-          <div class="mini-icon" style="background:rgba(6,182,212,.12);color:var(--accent-3)">
-            <i class="fa-solid fa-truck-fast"></i>
-          </div>
-          <div>
-            <h4>${escapeHtml(p.name)}</h4>
-            <p>${escapeHtml(p.status)} • ETA: ${formatDateHuman(p.eta)}</p>
-          </div>
-        </div>
-      `).join("") : `<div class="empty-state">No shipping insights</div>`;
-
-      renderSimpleList("brandDistribution", groupCounts(products, "brand"));
-      renderSimpleList("scaleBreakdown", groupCounts(products, "scale"));
-      renderDuplicates();
-      renderLowStock();
-      renderProfitInsights();
-      renderSimpleList("dashboardStatusMix", byStatus);
-
-      renderValueBars();
-    }
-
-    function groupCounts(list, key) {
-      return list.reduce((acc, item) => {
-        const k = item[key] || "Unknown";
-        acc[k] = (acc[k] || 0) + 1;
-        return acc;
-      }, {});
-    }
-
-    function renderSimpleList(targetId, obj) {
-      const el = document.getElementById(targetId);
-      const entries = Object.entries(obj || {}).sort((a,b) => b[1] - a[1]);
-
-      if (!entries.length) {
-        el.innerHTML = `<div class="empty-state">No data available</div>`;
-        return;
-      }
-
-      el.innerHTML = entries.slice(0, 6).map(([k, v]) => `
-        <div class="mini-item">
-          <div class="mini-icon" style="background:rgba(99,102,241,.12);color:var(--accent)">
-            <i class="fa-solid fa-layer-group"></i>
-          </div>
-          <div style="flex:1">
-            <h4>${escapeHtml(k)}</h4>
-            <p>${v} item${v > 1 ? "s" : ""}</p>
-          </div>
-        </div>
-      `).join("");
-    }
-
-    function renderDuplicates() {
-      const el = document.getElementById("duplicateList");
-      const map = {};
-      products.forEach(p => {
-        const key = `${(p.name || "").toLowerCase()}|${(p.brand || "").toLowerCase()}`;
-        map[key] = (map[key] || 0) + Number(p.qty || 0);
+    safeEl("clearFilters")?.addEventListener("click", () => {
+      ["orderSearch", "filterStatus", "filterVendor", "filterDateFrom", "filterDateTo"].forEach(id => {
+        const el = safeEl(id);
+        if (el) el.value = "";
       });
+      renderOrdersTable();
+    });
 
-      const dupes = Object.entries(map).filter(([,v]) => v > 1);
-      if (!dupes.length) {
-        el.innerHTML = `<div class="empty-state">No duplicates found</div>`;
-        return;
-      }
+    safeEl("togglePw")?.addEventListener("click", () => {
+      const pw = safeEl("password");
+      if (!pw) return;
+      pw.type = pw.type === "password" ? "text" : "password";
+    });
 
-      el.innerHTML = dupes.slice(0, 5).map(([k, v]) => {
-        const [name, brand] = k.split("|");
-        return `
-          <div class="mini-item">
-            <div class="mini-icon" style="background:rgba(245,158,11,.12);color:var(--warning)">
-              <i class="fa-solid fa-copy"></i>
-            </div>
-            <div>
-              <h4>${escapeHtml(name)}</h4>
-              <p>${escapeHtml(brand)} • Qty ${v}</p>
-            </div>
-          </div>
-        `;
-      }).join("");
-    }
-
-    function renderLowStock() {
-      const el = document.getElementById("lowStockList");
-      const low = products.filter(p => Number(p.qty || 0) <= 1 && p.status === "Owned");
-
-      if (!low.length) {
-        el.innerHTML = `<div class="empty-state">No alerts</div>`;
-        return;
-      }
-
-      el.innerHTML = low.slice(0, 5).map(p => `
-        <div class="mini-item">
-          <div class="mini-icon" style="background:rgba(239,68,68,.12);color:var(--danger)">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-          </div>
-          <div>
-            <h4>${escapeHtml(p.name)}</h4>
-            <p>Only ${Number(p.qty || 0)} left</p>
-          </div>
-        </div>
-      `).join("");
-    }
-
-    function renderProfitInsights() {
-      const el = document.getElementById("profitInsights");
-      const ranked = [...products]
-        .map(p => ({ ...p, profit: (Number(p.marketValue || 0) - Number(p.buyPrice || 0)) * Number(p.qty || 0) }))
-        .sort((a,b) => b.profit - a.profit)
-        .slice(0, 5);
-
-      if (!ranked.length) {
-        el.innerHTML = `<div class="empty-state">No data available</div>`;
-        return;
-      }
-
-      el.innerHTML = ranked.map(p => `
-        <div class="mini-item">
-          <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)">
-            <i class="fa-solid fa-arrow-trend-up"></i>
-          </div>
-          <div>
-            <h4>${escapeHtml(p.name)}</h4>
-            <p>${formatCurrency(p.profit)} potential</p>
-          </div>
-        </div>
-      `).join("");
-    }
-
-    function renderValueBars() {
-      const el = document.getElementById("valueBars");
-      const byBrand = products.reduce((acc, p) => {
-        const key = p.brand || "Other";
-        acc[key] = (acc[key] || 0) + (Number(p.marketValue || 0) * Number(p.qty || 0));
-        return acc;
-      }, {});
-
-      const items = Object.entries(byBrand).sort((a,b) => b[1] - a[1]).slice(0, 6);
-      if (!items.length) {
-        el.innerHTML = `<div class="empty-state" style="width:100%">No data available</div>`;
-        return;
-      }
-
-      const max = Math.max(...items.map(i => i[1]), 1);
-      el.innerHTML = items.map(([label, value]) => {
-        const h = Math.max(20, Math.round((value / max) * 140));
-        return `
-          <div class="bar-wrap">
-            <div class="bar" style="height:${h}px"><span>${Math.round(value / 1000)}k</span></div>
-            <div class="bar-label">${escapeHtml(label)}</div>
-          </div>
-        `;
-      }).join("");
-    }
-
-    /* =========================================
-       INVENTORY
-    ========================================= */
-    window.renderInventoryTable = function () {
-      let list = getFilteredProducts(products, "filterSearch", "filterBrand", "filterStatus");
-
-      const scale = document.getElementById("filterScale").value;
-      if (scale) list = list.filter(p => p.scale === scale);
-
-      const sortBy = document.getElementById("sortBy").value;
-      list.sort((a, b) => {
-        switch (sortBy) {
-          case "name-asc": return (a.name || "").localeCompare(b.name || "");
-          case "name-desc": return (b.name || "").localeCompare(a.name || "");
-          case "value-desc": return Number(b.marketValue || 0) - Number(a.marketValue || 0);
-          case "value-asc": return Number(a.marketValue || 0) - Number(b.marketValue || 0);
-          case "price-desc": return Number(b.buyPrice || 0) - Number(a.buyPrice || 0);
-          case "price-asc": return Number(a.buyPrice || 0) - Number(b.buyPrice || 0);
-          case "date-desc": return Number(b.createdAt || 0) - Number(a.createdAt || 0);
-          case "date-asc": return Number(a.createdAt || 0) - Number(b.createdAt || 0);
-          default: return 0;
-        }
+    // Close modal on overlay click
+    ["orderModal", "viewModal"].forEach(id => {
+      const modal = safeEl(id);
+      modal?.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal(id);
       });
+    });
+  }
 
-      const tbody = document.getElementById("inventoryTableBody");
-
-      if (!list.length) {
-        tbody.innerHTML = `<tr><td colspan="10" class="empty-state">No models found</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = list.map(p => `
-        <tr>
-          <td>
-            <div class="prod-cell">
-              <div class="prod-thumb">
-                ${p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" />` : `<i class="fa-solid fa-car-side"></i>`}
-              </div>
-              <div class="prod-meta">
-                <h4>${escapeHtml(p.name)}</h4>
-                <p>${escapeHtml(p.condition || "—")}</p>
-              </div>
-            </div>
-          </td>
-          <td>${escapeHtml(p.brand || "—")}</td>
-          <td>${escapeHtml(p.series || "—")}</td>
-          <td>${escapeHtml(p.scale || "—")}</td>
-          <td><span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status || "—")}</span></td>
-          <td>${Number(p.qty || 0)}</td>
-          <td>${formatCurrency(p.buyPrice || 0)}</td>
-          <td>${formatCurrency(p.marketValue || 0)}</td>
-          <td>${escapeHtml(p.seller || "—")}</td>
-          <td>
-            <div class="action-row">
-              <button class="icon-action" onclick="viewProduct('${p.id}')" title="View">
-                <i class="fa-solid fa-eye"></i>
-              </button>
-              <button class="icon-action" onclick="openProductModal('${p.id}')" title="Edit">
-                <i class="fa-solid fa-pen"></i>
-              </button>
-              <button class="icon-action" onclick="deleteProduct('${p.id}')" title="Delete">
-                <i class="fa-solid fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-      `).join("");
-    };
-
-    /* =========================================
-       CATALOG
-    ========================================= */
-    window.renderProductCards = function () {
-      const list = getFilteredProducts(products, "productSearch", "productBrandFilter", "productStatusFilter");
-      const grid = document.getElementById("productGrid");
-
-      if (!list.length) {
-        grid.innerHTML = `<div class="card" style="grid-column:1/-1"><div class="empty-state">No products found</div></div>`;
-        return;
-      }
-
-      grid.innerHTML = list.map(p => `
-        <div class="product-card">
-          <div class="product-cover">
-            ${p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" />` : `<i class="fa-solid fa-car-side" style="font-size:40px;color:var(--muted)"></i>`}
-          </div>
-
-          <div class="product-info">
-            <div class="product-title">
-              <h4>${escapeHtml(p.name)}</h4>
-              <div class="product-price">${formatCurrency(p.marketValue || 0)}</div>
-            </div>
-
-            <div class="product-specs">
-              <span class="chip">${escapeHtml(p.brand || "—")}</span>
-              <span class="chip">${escapeHtml(p.scale || "—")}</span>
-              <span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status || "—")}</span>
-            </div>
-
-            <div class="toolbar">
-              <button class="btn btn-ghost btn-sm" onclick="viewProduct('${p.id}')">
-                <i class="fa-solid fa-eye"></i> View
-              </button>
-              <button class="btn btn-ghost btn-sm" onclick="openProductModal('${p.id}')">
-                <i class="fa-solid fa-pen"></i> Edit
-              </button>
-            </div>
-          </div>
-        </div>
-      `).join("");
-    };
-
-    window.viewProduct = function (id) {
-      const p = products.find(x => x.id === id);
-      if (!p) return;
-
-      const card = document.getElementById("productDetailCard");
-      const panel = document.getElementById("productDetailPanel");
-
-      panel.innerHTML = `
-        <div class="detail-image">
-          ${p.image ? `<img src="${p.image}" alt="${escapeHtml(p.name)}" />` : `<i class="fa-solid fa-car-side" style="font-size:48px"></i>`}
-        </div>
-
-        <div class="detail-meta">
-          <h3>${escapeHtml(p.name)}</h3>
-
-          <div class="detail-grid">
-            <div class="kv"><span>Brand</span><strong>${escapeHtml(p.brand || "—")}</strong></div>
-            <div class="kv"><span>Series</span><strong>${escapeHtml(p.series || "—")}</strong></div>
-            <div class="kv"><span>Scale</span><strong>${escapeHtml(p.scale || "—")}</strong></div>
-            <div class="kv"><span>Status</span><strong>${escapeHtml(p.status || "—")}</strong></div>
-            <div class="kv"><span>Quantity</span><strong>${Number(p.qty || 0)}</strong></div>
-            <div class="kv"><span>Condition</span><strong>${escapeHtml(p.condition || "—")}</strong></div>
-            <div class="kv"><span>Buy Price</span><strong>${formatCurrency(p.buyPrice || 0)}</strong></div>
-            <div class="kv"><span>Market Value</span><strong>${formatCurrency(p.marketValue || 0)}</strong></div>
-            <div class="kv"><span>Seller</span><strong>${escapeHtml(p.seller || "—")}</strong></div>
-            <div class="kv"><span>Purchase Date</span><strong>${formatDateHuman(p.purchaseDate)}</strong></div>
-            <div class="kv"><span>ETA</span><strong>${formatDateHuman(p.eta)}</strong></div>
-            <div class="kv"><span>Tracking</span><strong>${escapeHtml(p.tracking || "—")}</strong></div>
-          </div>
-
-          <div class="kv">
-            <span>Notes</span>
-            <strong>${escapeHtml(p.notes || "—")}</strong>
-          </div>
-        </div>
-      `;
-
-      card.classList.remove("hidden");
-      switchPage("catalog", document.querySelector('[data-page=catalog]'));
-    };
-
-    window.closeProductDetails = function () {
-      document.getElementById("productDetailCard").classList.add("hidden");
-    };
-
-    /* =========================================
-       KANBAN
-    ========================================= */
-    function mapStatusToKanban(status) {
-      if (status === "Ordered") return "ordered";
-      if (status === "In Transit") return "transit";
-      if (status === "Preorder") return "sourcing";
-      return "received";
+  /* ===============================
+     AUTH STATE
+     =============================== */
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      showDashboard(user);
+      await fetchData();
+    } else {
+      showLogin();
     }
+  });
 
-    function renderKanban() {
-      const board = document.getElementById("kanbanBoard");
-
-      board.innerHTML = KANBAN_COLS.map(col => {
-        const items = products.filter(p => mapStatusToKanban(p.status) === col.key);
-
-        return `
-          <div class="kanban-col">
-            <div class="kanban-head">
-              <h4><i class="fa-solid ${col.icon}"></i> ${col.label}</h4>
-              <span class="kanban-count">${items.length}</span>
-            </div>
-            <div class="kanban-list">
-              ${items.length ? items.map(p => `
-                <div class="kanban-card">
-                  <h5>${escapeHtml(p.name)}</h5>
-                  <p>${escapeHtml(p.brand || "—")} • ${escapeHtml(p.scale || "—")}</p>
-                  <div class="k-meta">
-                    <span>${escapeHtml(p.status || "—")}</span>
-                    <span>${formatCurrency(p.marketValue || 0)}</span>
-                  </div>
-                </div>
-              `).join("") : `<div class="empty-state">No items</div>`}
-            </div>
-          </div>
-        `;
-      }).join("");
-    }
-
-    /* =========================================
-       ORDERS
-    ========================================= */
-    function renderOrders() {
-      const queue = products.filter(p => ["Ordered", "In Transit", "Preorder"].includes(p.status));
-
-      const summary = {
-        Ordered: queue.filter(p => p.status === "Ordered").length,
-        "In Transit": queue.filter(p => p.status === "In Transit").length,
-        Preorder: queue.filter(p => p.status === "Preorder").length
-      };
-
-      document.getElementById("orderSummaryCards").innerHTML = Object.entries(summary).map(([k,v]) => `
-        <div class="stat-card">
-          <div class="stat-top">
-            <div>
-              <div class="stat-label">${escapeHtml(k)}</div>
-              <div class="stat-value">${v}</div>
-            </div>
-            <div class="stat-icon" style="background:rgba(99,102,241,.12)">
-              <i class="fa-solid fa-truck-fast"></i>
-            </div>
-          </div>
-        </div>
-      `).join("");
-
-      const tbody = document.getElementById("ordersTableBody");
-      if (!queue.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No orders available</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = queue.map(p => `
-        <tr>
-          <td>${escapeHtml(p.name)}</td>
-          <td><span class="badge ${getStatusClass(p.status)}">${escapeHtml(p.status)}</span></td>
-          <td>${formatDateHuman(p.eta)}</td>
-          <td>${escapeHtml(p.seller || "—")}</td>
-          <td>${escapeHtml(p.tracking || "—")}</td>
-          <td>${formatCurrency(p.marketValue || 0)}</td>
-        </tr>
-      `).join("");
-    }
-
-    /* =========================================
-       ANALYTICS
-    ========================================= */
-    function renderAnalytics() {
-      const totalBuy = products.reduce((sum, p) => sum + (Number(p.buyPrice || 0) * Number(p.qty || 0)), 0);
-      const totalValue = products.reduce((sum, p) => sum + (Number(p.marketValue || 0) * Number(p.qty || 0)), 0);
-      const roi = totalBuy ? (((totalValue - totalBuy) / totalBuy) * 100).toFixed(1) : "0.0";
-      const avgValue = products.length ? Math.round(totalValue / products.length) : 0;
-
-      const stats = [
-        { label: "Portfolio Value", value: formatCurrency(totalValue), icon: "fa-chart-line" },
-        { label: "Total Cost", value: formatCurrency(totalBuy), icon: "fa-wallet" },
-        { label: "ROI", value: `${roi}%`, icon: "fa-percent" },
-        { label: "Avg Model Value", value: formatCurrency(avgValue), icon: "fa-cube" }
-      ];
-
-      document.getElementById("analyticsStats").innerHTML = stats.map(s => `
-        <div class="stat-card">
-          <div class="stat-top">
-            <div>
-              <div class="stat-label">${escapeHtml(s.label)}</div>
-              <div class="stat-value">${escapeHtml(String(s.value))}</div>
-            </div>
-            <div class="stat-icon" style="background:rgba(99,102,241,.12)">
-              <i class="fa-solid ${s.icon}"></i>
-            </div>
-          </div>
-        </div>
-      `).join("");
-
-      const brandValue = products.reduce((acc, p) => {
-        const k = p.brand || "Other";
-        acc[k] = (acc[k] || 0) + (Number(p.marketValue || 0) * Number(p.qty || 0));
-        return acc;
-      }, {});
-      renderBars("brandValueBars", brandValue);
-
-      const statusObj = {
-        Owned: products.filter(p => p.status === "Owned").length,
-        Ordered: products.filter(p => p.status === "Ordered").length,
-        "In Transit": products.filter(p => p.status === "In Transit").length,
-        Preorder: products.filter(p => p.status === "Preorder").length,
-        Sold: products.filter(p => p.status === "Sold").length
-      };
-
-      renderSimpleList("statusMix", statusObj);
-      renderSimpleList("analyticsStatus", statusObj);
-
-      const leaderboard = [...products]
-        .map(p => ({ ...p, profit: (Number(p.marketValue || 0) - Number(p.buyPrice || 0)) * Number(p.qty || 0) }))
-        .sort((a,b) => b.profit - a.profit)
-        .slice(0, 8);
-
-      const el = document.getElementById("profitLeaderboard");
-      if (!leaderboard.length) {
-        el.innerHTML = `<div class="empty-state">No data available</div>`;
-        return;
-      }
-
-      el.innerHTML = leaderboard.map(p => `
-        <div class="mini-item">
-          <div class="mini-icon" style="background:rgba(16,185,129,.12);color:var(--success)">
-            <i class="fa-solid fa-trophy"></i>
-          </div>
-          <div>
-            <h4>${escapeHtml(p.name)}</h4>
-            <p>${formatCurrency(p.profit)} profit potential</p>
-          </div>
-        </div>
-      `).join("");
-    }
-
-    function renderBars(targetId, obj) {
-      const el = document.getElementById(targetId);
-      const items = Object.entries(obj).sort((a,b) => b[1] - a[1]).slice(0, 6);
-
-      if (!items.length) {
-        el.innerHTML = `<div class="empty-state" style="width:100%">No data available</div>`;
-        return;
-      }
-
-      const max = Math.max(...items.map(i => i[1]), 1);
-
-      el.innerHTML = items.map(([label, value]) => {
-        const h = Math.max(20, Math.round((value / max) * 140));
-        return `
-          <div class="bar-wrap">
-            <div class="bar" style="height:${h}px"><span>${Math.round(value / 1000)}k</span></div>
-            <div class="bar-label">${escapeHtml(label)}</div>
-          </div>
-        `;
-      }).join("");
-    }
-
-    /* =========================================
-       EXPORT / IMPORT
-    ========================================= */
-    window.exportData = function () {
-      const blob = new Blob([JSON.stringify(products, null, 2)], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "pretrack-products.json";
-      a.click();
-      URL.revokeObjectURL(a.href);
-      showToast("Exported", "JSON exported successfully.", "success");
-    };
-
-    window.importData = async function (event) {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-
-        if (!Array.isArray(data)) {
-          showToast("Import Failed", "Invalid JSON format.", "error");
-          return;
-        }
-
-        for (const item of data) {
-          const payload = {
-            name: item.name || "",
-            brand: item.brand || "Other",
-            series: item.series || "",
-            scale: item.scale || "1:64",
-            status: ["Owned","Ordered","In Transit","Preorder","Sold"].includes(item.status) ? item.status : "Owned",
-            qty: Number(item.qty || 1),
-            buyPrice: Number(item.buyPrice || 0),
-            marketValue: Number(item.marketValue || 0),
-            seller: item.seller || "",
-            purchaseDate: item.purchaseDate || "",
-            eta: item.eta || "",
-            tracking: item.tracking || "",
-            condition: item.condition || "Mint",
-            notes: item.notes || "",
-            image: item.image || "",
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-          };
-          await addDoc(collection(db, PRODUCTS_COLLECTION), payload);
-        }
-
-        showToast("Imported", "Products imported to Firebase.", "success");
-        addNotification("Import Complete", "Products imported successfully.");
-        await fetchProducts();
-      } catch (error) {
-        console.error(error);
-        showToast("Import Failed", "Could not import JSON.", "error");
-      }
-
-      event.target.value = "";
-    };
-
-    window.resetAllData = async function () {
-      const ok = confirm("Delete ALL products from Firebase?");
-      if (!ok) return;
-
-      try {
-        await clearAllProductsFromFirebase();
-        showToast("Reset Complete", "All Firebase products deleted.", "success");
-        addNotification("All Data Cleared", "All products were removed.");
-        await fetchProducts();
-      } catch (error) {
-        console.error(error);
-        showToast("Reset Failed", "Could not clear Firebase data.", "error");
-      }
-    };
-
-    /* =========================================
-       INIT
-    ========================================= */
-    renderNotifications();
-    fetchProducts();
-  </script>
+  /* ===============================
+     BOOT
+     =============================== */
+  bindEvents();
+  resetImagePreview();
+</script>
 </body>
 </html>
