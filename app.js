@@ -176,51 +176,99 @@ function initDashboard() {
     applyCollectionFilters();
   });
 
-  // ── MODAL ──
-  const orderModal = document.getElementById('orderModal');
-  const viewModal  = document.getElementById('viewModal');
+  // ── BRAND DROPDOWN LOGIC ──
+  const brandSelect    = document.getElementById('fBrandSelect');
+  const newBrandRow    = document.getElementById('newBrandRow');
+  const fNewBrand      = document.getElementById('fNewBrand');
+  const confirmNewBrand = document.getElementById('confirmNewBrand');
+  const cancelNewBrand  = document.getElementById('cancelNewBrand');
+  const fBrandHidden   = document.getElementById('fBrand');
 
+  // Custom brands stored in localStorage
+  let customBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
+
+  function rebuildBrandDropdown(selectVal) {
+    if (!brandSelect) return;
+    const base = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
+    const all  = [...base, ...customBrands];
+    // Remove all options except first (placeholder) and last (+Add New)
+    while (brandSelect.options.length > 1) brandSelect.remove(1);
+    all.forEach(b => {
+      const o = document.createElement('option'); o.value = b; o.textContent = b;
+      brandSelect.insertBefore(o, brandSelect.lastElementChild);
+    });
+    if (selectVal) brandSelect.value = selectVal;
+  }
+  rebuildBrandDropdown();
+
+  brandSelect?.addEventListener('change', () => {
+    if (brandSelect.value === '__new__') {
+      newBrandRow?.classList.remove('hidden');
+      fNewBrand?.focus();
+      fBrandHidden && (fBrandHidden.value = '');
+    } else {
+      newBrandRow?.classList.add('hidden');
+      fBrandHidden && (fBrandHidden.value = brandSelect.value);
+    }
+  });
+
+  confirmNewBrand?.addEventListener('click', () => {
+    const name = fNewBrand?.value.trim();
+    if (!name) { showToast('Enter a brand name', 'warning'); return; }
+    if (!customBrands.includes(name)) {
+      customBrands.push(name);
+      localStorage.setItem('pretrack_brands', JSON.stringify(customBrands));
+    }
+    rebuildBrandDropdown(name);
+    fBrandHidden && (fBrandHidden.value = name);
+    newBrandRow?.classList.add('hidden');
+    showToast(`Brand "${name}" added!`, 'success');
+  });
+
+  cancelNewBrand?.addEventListener('click', () => {
+    newBrandRow?.classList.add('hidden');
+    brandSelect && (brandSelect.value = '');
+    fBrandHidden && (fBrandHidden.value = '');
+  });
+
+  // ── STATUS PILL LOGIC ──
+  document.querySelectorAll('.status-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const radio = pill.querySelector('input[type="radio"]');
+      if (radio) {
+        radio.checked = true;
+        const fStatus = document.getElementById('fStatus');
+        if (fStatus) fStatus.value = radio.value;
+      }
+    });
+  });
+  // Activate first pill by default
+  document.querySelector('.status-pill')?.classList.add('active');
+
+  // ── MODAL OPEN/CLOSE ──
   function openModal() { orderModal?.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
   function closeModal() {
     orderModal?.classList.add('hidden'); document.body.style.overflow = '';
     document.getElementById('orderForm')?.reset();
     if (document.getElementById('editOrderId')) document.getElementById('editOrderId').value = '';
     const ip = document.getElementById('imagePreview');
-    if (ip) ip.innerHTML = '<i class="fa-solid fa-image"></i><p>Click to upload image</p>';
+    if (ip) ip.innerHTML = '<i class="fa-solid fa-camera"></i><p>Click to upload photo</p><span>JPG, PNG, WEBP · max 5MB</span>';
     const fi = document.getElementById('fImage'); if (fi) fi.value = '';
     _currentImageFile = null; _currentImageB64 = '';
-    document.querySelectorAll('.form-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelector('.form-tab[data-tab="basic"]')?.classList.add('active');
-    document.getElementById('tab-basic')?.classList.add('active');
-    calcTotals();
+    // Reset brand
+    rebuildBrandDropdown();
+    newBrandRow?.classList.add('hidden');
+    if (fBrandHidden) fBrandHidden.value = '';
+    // Reset status pills
+    document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
+    document.querySelector('.status-pill')?.classList.add('active');
+    const fStatus = document.getElementById('fStatus'); if (fStatus) fStatus.value = 'Ordered';
+    // Reset calc displays
+    const td = document.getElementById('fTotalDisplay'); if (td) td.textContent = '₹0';
+    const pd = document.getElementById('fPendingDisplay'); if (pd) pd.textContent = '₹0';
   }
-
-  ['addOrderBtn','quickAddBtn','qaAddOrder'].forEach(id => {
-    document.getElementById(id)?.addEventListener('click', () => {
-      document.getElementById('modalTitle').textContent = 'Add New Model'; openModal();
-    });
-  });
-  document.getElementById('modalClose')?.addEventListener('click',  closeModal);
-  document.getElementById('modalCancel')?.addEventListener('click', closeModal);
-  orderModal?.addEventListener('click', e => { if (e.target === orderModal) closeModal(); });
-
-  document.getElementById('viewModalClose')?.addEventListener('click', () => {
-    viewModal?.classList.add('hidden'); document.body.style.overflow = '';
-  });
-  viewModal?.addEventListener('click', e => {
-    if (e.target === viewModal) { viewModal.classList.add('hidden'); document.body.style.overflow = ''; }
-  });
-
-  // ── FORM TABS ──
-  document.querySelectorAll('.form-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.form-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById(`tab-${tab.dataset.tab}`)?.classList.add('active');
-    });
-  });
 
   // ── PAYMENT CALC ──
   ['fPreorderPrice','fActualPrice','fShipping','fPaid','fQty'].forEach(id => {
@@ -232,10 +280,34 @@ function initDashboard() {
     const qty   = parseInt(document.getElementById('fQty')?.value)           || 1;
     const ship  = parseFloat(document.getElementById('fShipping')?.value)    || 0;
     const paid  = parseFloat(document.getElementById('fPaid')?.value)        || 0;
-    const total = (price * qty) + ship, pending = Math.max(0, total - paid);
-    if (document.getElementById('fTotal'))   document.getElementById('fTotal').value   = `₹${total.toLocaleString('en-IN')}`;
-    if (document.getElementById('fPending')) document.getElementById('fPending').value = `₹${pending.toLocaleString('en-IN')}`;
+    const total = (price * qty) + ship;
+    const pending = Math.max(0, total - paid);
+    const fmt = v => `₹${v.toLocaleString('en-IN')}`;
+    const td = document.getElementById('fTotalDisplay'); if (td) td.textContent = fmt(total);
+    const pd = document.getElementById('fPendingDisplay'); if (pd) {
+      pd.textContent = fmt(pending);
+      pd.classList.toggle('fg-calc-overdue', pending > 0);
+    }
+    if (document.getElementById('fTotal'))   document.getElementById('fTotal').value   = total;
+    if (document.getElementById('fPending')) document.getElementById('fPending').value = pending;
   }
+
+  ['addOrderBtn','quickAddBtn','qaAddOrder'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', () => {
+      document.getElementById('modalTitle').textContent = 'Add New Model'; openModal();
+    });
+  });
+  document.getElementById('modalClose')?.addEventListener('click',  closeModal);
+  document.getElementById('modalCancel')?.addEventListener('click', closeModal);
+  orderModal?.addEventListener('click', e => { if (e.target === orderModal) closeModal(); });
+
+  const viewModal = document.getElementById('viewModal');
+  document.getElementById('viewModalClose')?.addEventListener('click', () => {
+    viewModal?.classList.add('hidden'); document.body.style.overflow = '';
+  });
+  viewModal?.addEventListener('click', e => {
+    if (e.target === viewModal) { viewModal.classList.add('hidden'); document.body.style.overflow = ''; }
+  });
 
   // ── IMAGE UPLOAD ──
   document.getElementById('imageUploadArea')?.addEventListener('click', () => document.getElementById('fImage')?.click());
@@ -277,12 +349,13 @@ function initDashboard() {
         product_name: document.getElementById('fProductName')?.value.trim() || '',
         order_number: document.getElementById('fOrderNumber')?.value.trim() || '',
         brand:        document.getElementById('fBrand')?.value.trim()       || '',
-        series:       document.getElementById('fSeries')?.value.trim()      || '',
+        series:       document.getElementById('fSeries')?.value?.trim()     || '',
         scale:        document.getElementById('fScale')?.value              || '1:64',
         condition:    document.getElementById('fCondition')?.value          || 'Mint',
-        vendor:       document.getElementById('fVendor')?.value.trim()      || '',
-        location:     document.getElementById('fLocation')?.value.trim()    || '',
+        vendor:       document.getElementById('fVendor')?.value?.trim()     || '',
+        location:     document.getElementById('fLocation')?.value?.trim()   || '',
         variant:      document.getElementById('fVariant')?.value            || '',
+        notes:        document.getElementById('fNotes')?.value?.trim()      || '',
         quantity: qty, order_date: document.getElementById('fOrderDate')?.value || '',
         eta:      document.getElementById('fEta')?.value    || '',
         status:   document.getElementById('fStatus')?.value || 'Ordered',
@@ -526,24 +599,60 @@ window.editOrder = function(id) {
   document.getElementById('modalTitle').textContent = 'Edit Model';
   [
     ['editOrderId','id'],['fProductName','product_name'],['fOrderNumber','order_number'],
-    ['fBrand','brand'],['fSeries','series'],['fScale','scale'],['fCondition','condition'],
+    ['fSeries','series'],['fScale','scale'],['fCondition','condition'],
     ['fVendor','vendor'],['fLocation','location'],['fVariant','variant'],
-    ['fQty','quantity'],['fOrderDate','order_date'],['fEta','eta'],['fStatus','status'],
+    ['fNotes','notes'],
+    ['fQty','quantity'],['fOrderDate','order_date'],['fEta','eta'],
     ['fPreorderPrice','preorder_price'],['fActualPrice','actual_price'],
     ['fShipping','shipping'],['fPaid','paid']
-  ].forEach(([fieldId, key]) => { setVal(fieldId, key==='id' ? o.id : o[key]); });
+  ].forEach(([fieldId, key]) => { const el=document.getElementById(fieldId); if(el) el.value = key==='id' ? o.id : (o[key]??''); });
+
+  // Set brand dropdown
+  const brandSel = document.getElementById('fBrandSelect');
+  const fBrandH  = document.getElementById('fBrand');
+  const customBrandsStored = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
+  if (brandSel) {
+    // Rebuild dropdown so custom brands are present
+    const base = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
+    const all  = [...base, ...customBrandsStored];
+    while (brandSel.options.length > 1) brandSel.remove(1);
+    all.forEach(b => {
+      const opt = document.createElement('option'); opt.value = b; opt.textContent = b;
+      brandSel.insertBefore(opt, brandSel.lastElementChild);
+    });
+    const brand = o.brand || o.vendor || '';
+    brandSel.value = brand;
+    if (brandSel.value !== brand && brand) {
+      // It's a custom brand not in list yet — add it
+      const opt = document.createElement('option'); opt.value = brand; opt.textContent = brand;
+      brandSel.insertBefore(opt, brandSel.lastElementChild);
+      brandSel.value = brand;
+    }
+    if (fBrandH) fBrandH.value = brand;
+  }
+
+  // Set status pills
+  const status = o.status || 'Ordered';
+  document.querySelectorAll('.status-pill').forEach(p => {
+    p.classList.remove('active');
+    const r = p.querySelector('input[type="radio"]');
+    if (r && r.value === status) { p.classList.add('active'); r.checked = true; }
+  });
+  const fSt = document.getElementById('fStatus'); if (fSt) fSt.value = status;
+
   _currentImageFile = null; _currentImageB64 = '';
   const ip = document.getElementById('imagePreview');
-  if(ip) ip.innerHTML = o.image ? `<img src="${o.image}" alt="preview" />` : '<i class="fa-solid fa-image"></i><p>Click to upload image</p>';
+  if(ip) ip.innerHTML = o.image ? `<img src="${o.image}" alt="preview" />` : '<i class="fa-solid fa-camera"></i><p>Click to upload photo</p><span>JPG, PNG, WEBP · max 5MB</span>';
   document.getElementById('orderModal')?.classList.remove('hidden'); document.body.style.overflow='hidden';
-  document.querySelectorAll('.form-tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-  document.querySelector('.form-tab[data-tab="basic"]')?.classList.add('active');
-  document.getElementById('tab-basic')?.classList.add('active');
-  const price=(parseFloat(o.actual_price)||0), qty=(parseInt(o.quantity)||1), ship=(parseFloat(o.shipping)||0), paid=(parseFloat(o.paid)||0);
-  const total=(price*qty)+ship, pending=Math.max(0,total-paid);
-  if(document.getElementById('fTotal'))   document.getElementById('fTotal').value   = `₹${total.toLocaleString('en-IN')}`;
-  if(document.getElementById('fPending')) document.getElementById('fPending').value = `₹${pending.toLocaleString('en-IN')}`;
+
+  // Recalc totals display
+  const price=(parseFloat(o.actual_price)||0), qty2=(parseInt(o.quantity)||1), ship2=(parseFloat(o.shipping)||0), paid2=(parseFloat(o.paid)||0);
+  const total2=(price*qty2)+ship2, pending2=Math.max(0,total2-paid2);
+  const fmt = v=>`₹${v.toLocaleString('en-IN')}`;
+  const td=document.getElementById('fTotalDisplay'); if(td) td.textContent=fmt(total2);
+  const pd=document.getElementById('fPendingDisplay'); if(pd){ pd.textContent=fmt(pending2); pd.classList.toggle('fg-calc-overdue',pending2>0); }
+  if(document.getElementById('fTotal'))   document.getElementById('fTotal').value   = total2;
+  if(document.getElementById('fPending')) document.getElementById('fPending').value = pending2;
 };
 
 window.deleteOrder = async function(id) {
