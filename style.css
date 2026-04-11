@@ -2660,3 +2660,51 @@ input, select, textarea { color-scheme: light; }
 .setting-item-danger {
   background: rgba(239,68,68,0.02);
 }
+
+
+/* ══════════════════════════════════════
+   TOPBAR — ADD ORDER BUTTON
+══════════════════════════════════════ */
+.topbar-add-btn {
+  border-radius: var(--radius-md);
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-shadow: 0 4px 14px rgba(124,92,252,0.35);
+  flex-shrink: 0;
+}
+
+/* Hide label on very small screens, keep icon */
+@media (max-width: 480px) {
+  .topbar-add-label { display: none; }
+  .topbar-add-btn { padding: 0.5rem 0.7rem; }
+}
+
+/* ══════════════════════════════════════
+   MOBILE SIDEBAR — FIXES
+══════════════════════════════════════ */
+@media (max-width: 900px) {
+  /* Ensure overlay always sits above content but below sidebar */
+  .sidebar-overlay {
+    z-index: 299 !important;
+  }
+  .sidebar {
+    z-index: 300 !important;
+  }
+  /* Modal must be above sidebar overlay */
+  .modal-overlay {
+    z-index: 400 !important;
+  }
+  /* When sidebar is open, make it truly full height */
+  .sidebar.mobile-open {
+    transform: translateX(0) !important;
+    box-shadow: 4px 0 32px rgba(0,0,0,0.18);
+  }
+  /* Prevent text selection issues on mobile during sidebar open */
+  .sidebar-overlay.show {
+    cursor: pointer;
+  }
+}
