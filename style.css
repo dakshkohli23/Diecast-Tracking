@@ -1457,9 +1457,6 @@ code {
 /* ══════════════════════════════════════
    MODAL REDESIGN — NEW FORM SYSTEM
 ══════════════════════════════════════ */
-.modal-redesign {
-  max-width: 680px;
-}
 
 /* Header upgrade */
 .modal-header-left {
@@ -2542,4 +2539,124 @@ input, select, textarea { color-scheme: light; }
 }
 @media (max-width: 640px) {
   .roi-stats-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ══════════════════════════════════════
+   SIDEBAR — ADD ORDER BUTTON
+══════════════════════════════════════ */
+.nav-add-order {
+  background: linear-gradient(135deg, rgba(124,92,252,0.12), rgba(236,72,153,0.1)) !important;
+  border: 1.5px dashed rgba(124,92,252,0.35) !important;
+  color: var(--primary) !important;
+  font-weight: 700 !important;
+  margin-top: 0.25rem;
+  transition: all var(--transition) !important;
+}
+.nav-add-order:hover {
+  background: var(--grad-primary) !important;
+  border-color: transparent !important;
+  color: white !important;
+  box-shadow: 0 4px 16px rgba(124,92,252,0.35) !important;
+}
+.nav-add-order i { color: inherit !important; }
+
+/* ══════════════════════════════════════
+   MODAL — SCROLLBAR + SIZE FIX
+══════════════════════════════════════ */
+.modal-redesign {
+  max-width: 680px;
+  max-height: 88vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124,92,252,0.25) transparent;
+}
+.modal-redesign::-webkit-scrollbar {
+  width: 5px;
+}
+.modal-redesign::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+.modal-redesign::-webkit-scrollbar-thumb {
+  background: rgba(124,92,252,0.25);
+  border-radius: 10px;
+}
+.modal-redesign::-webkit-scrollbar-thumb:hover {
+  background: rgba(124,92,252,0.5);
+}
+.modal-sm {
+  max-width: 440px;
+}
+
+/* ══════════════════════════════════════
+   FORM — HINT TEXT
+══════════════════════════════════════ */
+.fg-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+  font-style: italic;
+}
+
+/* ══════════════════════════════════════
+   SETTINGS — ABOUT CARD
+══════════════════════════════════════ */
+.settings-about-card {
+  margin-bottom: 1.25rem;
+}
+.settings-about-list {
+  display: flex;
+  flex-direction: column;
+}
+.settings-about-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--glass-border);
+  gap: 1rem;
+  transition: background var(--transition);
+}
+.settings-about-row:last-child { border-bottom: none; }
+.settings-about-row:hover { background: rgba(124,92,252,0.03); }
+.sa-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.sa-sub {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+.sa-badge {
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.sa-badge-version {
+  background: rgba(124,92,252,0.1);
+  color: var(--primary);
+  border: 1px solid rgba(124,92,252,0.2);
+}
+.sa-badge-cloud {
+  background: rgba(20,184,166,0.1);
+  color: var(--teal);
+  border: 1px solid rgba(20,184,166,0.2);
+}
+.sa-badge-models {
+  background: rgba(34,197,94,0.12);
+  color: var(--green);
+  border: 1px solid rgba(34,197,94,0.25);
+}
+.sa-badge-user {
+  background: rgba(99,102,241,0.1);
+  color: var(--indigo);
+  border: 1px solid rgba(99,102,241,0.2);
+}
+.setting-item-danger {
+  background: rgba(239,68,68,0.02);
 }
