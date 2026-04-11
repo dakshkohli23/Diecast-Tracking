@@ -441,7 +441,7 @@ function initGreeting() {
     const h     = new Date().getHours();
     const emoji = h < 12 ? '<i class="fa-solid fa-cloud-sun"></i>' : h < 17 ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
     const word  = h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening';
-    if (gt) gt.innerHTML = `Good ${word}, Daksh! ${emoji}`;
+    if (gt) gt.innerHTML = `${word}, Mr. Dlaize! ${emoji}`;
     if (gd) gd.textContent = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   }
 
