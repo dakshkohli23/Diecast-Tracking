@@ -1943,141 +1943,85 @@ input, select, textarea { color-scheme: light; }
   .catalog-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* orders-table: always nowrap cells for readability */
+.orders-table th,
+.orders-table td { white-space: nowrap; }
+
+
 /* ══════════════════════════════════════
-   INVENTORY = SAME STYLE AS ORDERS
+   EXTRA STATUS BADGES
+══════════════════════════════════════ */
+.badge-wishlist   { background: rgba(168,85,247,.15); color: #a855f7; }
+.badge-preorder   { background: rgba(251,146,60,.15);  color: #f97316; }
+.badge-owned      { background: rgba(34,197,94,.15);   color: #22c55e; }
+.badge-in-transit { background: rgba(56,189,248,.15);  color: #38bdf8; }
+.badge-sold       { background: rgba(239,68,68,.15);   color: #ef4444; }
+
+/* ══════════════════════════════════════
+   RESPONSIVE — FULL PASS
 ══════════════════════════════════════ */
 
-/* Remove old custom inventory wrapper feel */
-#section-inventory .widget.glass {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
-}
-
-/* Make inventory table same spacing as orders */
-#section-inventory .table-wrap.glass {
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+/* Table: always scrollable on any screen */
+.table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.orders-table {
+  min-width: 900px; /* prevents squishing on mobile */
 }
 
-/* Inventory table uses same order table styling */
-#section-inventory .orders-table th,
-#section-inventory .orders-table td {
-  white-space: nowrap;
-}
-
-/* Better width handling for many columns */
-#section-inventory .table-wrap {
-  width: 100%;
-}
-
-/* Product cell same visual style as orders */
-.inventory-product-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-}
-
-.inventory-thumb {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background: var(--grad-indigo);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  color: white;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.inventory-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.inventory-product-name {
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-
-.inventory-meta {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-
-/* Inventory filters responsive like orders */
-#section-inventory .filters-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-lg);
-  margin-bottom: 1rem;
+/* Filters bar: wraps on small screens */
+.filters-bar {
   flex-wrap: wrap;
 }
-
-#section-inventory .filter-search {
-  flex: 1;
-  min-width: 220px;
+.filter-search {
+  min-width: 160px;
 }
 
-/* Ensure select/input sizing is consistent */
-#section-inventory .filter-select,
-#section-inventory .filter-search input {
-  min-height: 38px;
-}
-
-/* Better action buttons inside inventory */
-#section-inventory .table-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  flex-wrap: nowrap;
-}
-
-/* Empty row consistency */
-#section-inventory .empty-row i {
-  margin-right: 0.35rem;
-  opacity: 0.8;
-}
-
-/* Responsive for inventory section */
-@media (max-width: 1024px) {
-  #section-inventory .filters-bar {
-    padding: 0.75rem;
-  }
-
-  #section-inventory .filter-search {
-    min-width: 100%;
-  }
-}
-
-@media (max-width: 768px) {
-  #section-inventory .filters-bar {
+/* Section header: stack on mobile */
+@media (max-width: 600px) {
+  .section-header {
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
+    gap: 0.75rem;
   }
-
-  #section-inventory .filter-search,
-  #section-inventory .filter-select,
-  #section-inventory #invClearFilters {
-    width: 100%;
-  }
+  .section-header .btn { width: 100%; justify-content: center; }
 }
 
+/* Modal: full-screen on mobile */
+@media (max-width: 640px) {
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal {
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+  .modal-header { border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
+  .modal-view { max-width: 100%; }
+}
 
-/* ══════════════════════════════════════
-   RESPONSIVE
-══════════════════════════════════════ */
+/* Greeting bar: compact on mobile */
+@media (max-width: 640px) {
+  .greeting-bar { padding: 0.75rem 1rem; }
+  .greeting-text { font-size: 1rem; }
+  .greeting-meta { font-size: 0.7rem; flex-wrap: wrap; gap: 0.25rem; }
+}
+
+/* Stats grid */
 @media (max-width: 1200px) {
   .stats-grid { grid-template-columns: repeat(4, 1fr); }
 }
+@media (max-width: 900px) {
+  .stats-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 640px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 400px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
 
+/* Sidebar mobile */
 @media (max-width: 900px) {
   .sidebar {
     transform: translateX(-100%);
@@ -2085,9 +2029,7 @@ input, select, textarea { color-scheme: light; }
     transition: transform var(--transition);
     z-index: 300;
   }
-  .sidebar.mobile-open {
-    transform: translateX(0);
-  }
+  .sidebar.mobile-open { transform: translateX(0); }
   .sidebar-overlay {
     display: none;
     position: fixed;
@@ -2097,66 +2039,69 @@ input, select, textarea { color-scheme: light; }
     backdrop-filter: blur(2px);
   }
   .sidebar-overlay.show { display: block; }
-
   .sidebar .brand-text,
   .sidebar .brand-sub,
   .sidebar .nav-item span { opacity: 1; pointer-events: auto; }
-
   .main-wrap,
   .main-wrap.expanded { margin-left: 0 !important; }
-
-  .widgets-grid { grid-template-columns: 1fr; }
+  .widgets-grid { grid-template-columns: 1fr 1fr; }
   .analytics-grid { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: repeat(3, 1fr);}
+  .activity-row { grid-template-columns: 1fr; }
+  .kanban-board { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 640px) {
-  .stats-grid { grid-template-columns: 1fr 1fr;}
+  .topbar { padding: 0 0.75rem; }
+  .topbar-profile .profile-info { display: none; } /* hide email on mobile */
+  .search-box { display: none; }
+  .page-content { padding: 0.85rem; }
   .widgets-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
-  .topbar { padding: 0 1rem; }
-  .page-content { padding: 1rem; }
-  .search-box { display: none; }
   .view-grid { grid-template-columns: 1fr; }
+  .kanban-board { grid-template-columns: 1fr 1fr; }
+  .catalog-grid { grid-template-columns: repeat(2, 1fr); }
+  .filters-bar { gap: 0.5rem; }
+  .filters-bar .filter-select { flex: 1; min-width: 120px; }
+  .stat-value { font-size: 1.3rem; }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 420px) {
+  .kanban-board { grid-template-columns: 1fr; }
+  .catalog-grid { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: 1fr; }
+  .page-content { padding: 0.65rem; }
 }
 
-/* ── INVENTORY FILTERS ── */
-.inv-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  padding: 1rem 1.2rem 0.6rem;
+/* Topbar: compact on mobile */
+@media (max-width: 640px) {
+  .topbar-right { gap: 0.3rem; }
+  .icon-btn { width: 34px; height: 34px; }
+  .topbar-profile { padding: 0.25rem 0.5rem; }
+  .avatar { width: 26px; height: 26px; font-size: 0.65rem; }
 }
-.inv-filters input,
-.inv-filters select {
-	height: 40px;
-    padding: 0 12px;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 10px;
-    background: #ffffff;
-    color: #0f172a;
-    font-size: 13px;
-    outline: none;
-    transition: .2s ease;
-	font-family:inherit;
+
+/* Kanban: horizontal scroll on very small */
+@media (max-width: 420px) {
+  .kanban-board {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+  }
+  .kanban-col {
+    min-width: 240px;
+    flex-shrink: 0;
+  }
 }
-.inv-filters input { flex: 1; min-width: 160px; }
-.inv-filters select { min-width: 150px; }
-.inv-filters input:focus,
-.inv-filters select:focus { border-color: var(--primary); }
 
-/* Extra status badge colours */
-.badge-wishlist    { background: rgba(168,85,247,.15); color: #a855f7; }
-.badge-preorder    { background: rgba(251,146,60,.15);  color: #f97316; }
-.badge-owned       { background: rgba(34,197,94,.15);   color: #22c55e; }
-.badge-in-transit  { background: rgba(56,189,248,.15);  color: #38bdf8; }
-.badge-sold        { background: rgba(239,68,68,.15);   color: #ef4444; }
+/* Table actions: smaller on mobile */
+@media (max-width: 640px) {
+  .table-actions { gap: 0.2rem; }
+  .btn-icon { width: 28px; height: 28px; }
+}
 
-@media (max-width: 768px) {
-  .inv-filters input  { min-width: 100%; }
-  .inv-filters select { min-width: calc(50% - 0.3rem); flex: 1; }
+/* Payments table responsive */
+@media (max-width: 640px) {
+  #paymentsContent .table-wrap { overflow-x: auto; }
 }
