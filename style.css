@@ -2713,10 +2713,10 @@ input, select, textarea { color-scheme: light; }
 /* ══════════════════════════════════════
    RESPONSIVE SHOW/HIDE
 ══════════════════════════════════════ */
-.desktop-only { display: block; }
-.mobile-only  { display: none;  }
+.desktop-only { display: block !important; }
+.mobile-only  { display: none  !important; }
 @media (max-width: 768px) {
-  .desktop-only { display: none !important; }
+  .desktop-only { display: none  !important; }
   .mobile-only  { display: block !important; }
 }
 
