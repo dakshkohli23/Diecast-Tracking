@@ -108,6 +108,7 @@ function initDashboard() {
   const mainWrap       = document.getElementById('mainWrap');
   const sidebarToggle  = document.getElementById('sidebarToggle');
   const sidebarOverlay = document.getElementById('sidebarOverlay');
+  const orderModal     = document.getElementById('orderModal'); // ← pulled into closure
   const isMobile       = () => window.innerWidth <= 900;
 
   sidebarToggle?.addEventListener('click', () => {
@@ -115,7 +116,6 @@ function initDashboard() {
       const isOpen = sidebar.classList.contains('mobile-open');
       sidebar.classList.toggle('mobile-open', !isOpen);
       sidebarOverlay?.classList.toggle('show', !isOpen);
-      // Prevent body scroll when sidebar open on mobile
       document.body.style.overflow = isOpen ? '' : 'hidden';
     } else {
       sidebar.classList.toggle('collapsed');
@@ -147,7 +147,6 @@ function initDashboard() {
       navigateTo(item.dataset.section);
       if (isMobile()) {
         closeMobileSidebar();
-        // Scroll page to top on section change
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     });
@@ -190,14 +189,13 @@ function initDashboard() {
   // SHARED BRAND STORE — Firestore backed
   // ══════════════════════════════════════
   const BASE_BRANDS = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
-  let customBrands = []; // loaded from Firestore 'brands' collection
+  let customBrands = [];
 
   async function loadBrandsFromFirestore() {
     try {
       const snap = await getDocs(collection(db, 'brands'));
       customBrands = snap.docs.map(d => d.data().name).filter(Boolean);
     } catch(e) {
-      // fallback to localStorage if Firestore unavailable
       customBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
     }
     rebuildAllBrandDropdowns();
@@ -211,7 +209,6 @@ function initDashboard() {
       await addDoc(collection(db, 'brands'), { name, createdAt: serverTimestamp() });
       customBrands.push(name);
     } catch(e) {
-      // fallback to localStorage
       customBrands.push(name);
       localStorage.setItem('pretrack_brands', JSON.stringify(customBrands));
     }
@@ -220,25 +217,19 @@ function initDashboard() {
 
   function getAllBrands() { return [...BASE_BRANDS, ...customBrands]; }
 
-  // Rebuild a <select> fully: clear everything, add placeholder + brands + __new__
   function rebuildDropdown(selectEl, selectedVal) {
     if (!selectEl) return;
-    // Remove ALL options
     while (selectEl.options.length > 0) selectEl.remove(0);
-    // Add placeholder
     const placeholder = document.createElement('option');
     placeholder.value = ''; placeholder.textContent = 'Select Brand';
     selectEl.appendChild(placeholder);
-    // Add all brands
     getAllBrands().forEach(b => {
       const o = document.createElement('option'); o.value = b; o.textContent = b;
       selectEl.appendChild(o);
     });
-    // Add "+ Add New Brand" at end
     const newOpt = document.createElement('option');
     newOpt.value = '__new__'; newOpt.textContent = '＋ Add New Brand';
     selectEl.appendChild(newOpt);
-    // Set selected value
     if (selectedVal) selectEl.value = selectedVal;
   }
 
@@ -248,7 +239,6 @@ function initDashboard() {
   }
   function rebuildBrandDropdown(val) { rebuildDropdown(document.getElementById('fBrandSelect'), val); }
 
-  // Load brands from Firestore on startup
   loadBrandsFromFirestore();
 
   // ── MODAL brand dropdown ──
@@ -261,7 +251,7 @@ function initDashboard() {
     if (brandSelect.value === '__new__') {
       newBrandRow?.classList.remove('hidden'); fNewBrand?.focus();
       if (fBrandHidden) fBrandHidden.value = '';
-      brandSelect.value = ''; // reset select to placeholder
+      brandSelect.value = '';
     } else {
       newBrandRow?.classList.add('hidden');
       if (fBrandHidden) fBrandHidden.value = brandSelect.value;
@@ -296,7 +286,7 @@ function initDashboard() {
     if (fBrandHidden) fBrandHidden.value = '';
   });
 
-  // ── STATUS PILL LOGIC (modal only — scoped to modal form) ──
+  // ── STATUS PILL LOGIC (modal scoped) ──
   document.querySelectorAll('#orderModal .status-pill').forEach(pill => {
     pill.addEventListener('click', () => {
       document.querySelectorAll('#orderModal .status-pill').forEach(p => p.classList.remove('active'));
@@ -321,15 +311,12 @@ function initDashboard() {
     if (ip) ip.innerHTML = '<i class="fa-solid fa-camera"></i><p>Click to upload photo</p><span>JPG, PNG, WEBP · max 5MB</span>';
     const fi = document.getElementById('fImage'); if (fi) fi.value = '';
     _currentImageFile = null; _currentImageB64 = '';
-    // Reset brand
     rebuildBrandDropdown();
     document.getElementById('newBrandRow')?.classList.add('hidden');
     if (document.getElementById('fBrand')) document.getElementById('fBrand').value = '';
-    // Reset status pills (modal scoped)
     document.querySelectorAll('#orderModal .status-pill').forEach(p => p.classList.remove('active'));
     document.querySelector('#orderModal .status-pill')?.classList.add('active');
     const fStatusEl = document.getElementById('fStatus'); if (fStatusEl) fStatusEl.value = 'Ordered';
-    // Reset calc displays
     const td = document.getElementById('fTotalDisplay');   if (td) td.textContent = '₹0';
     const pd = document.getElementById('fPendingDisplay'); if (pd) { pd.textContent = '₹0'; pd.classList.remove('fg-calc-overdue'); }
   }
@@ -340,16 +327,13 @@ function initDashboard() {
   });
 
   function calcTotals() {
-    const price      = parseFloat(document.getElementById('fActualPrice')?.value)    || 0;
-    const qty        = parseInt(document.getElementById('fQty')?.value)              || 1;
-    const ship       = parseFloat(document.getElementById('fShipping')?.value)       || 0;
-    const paidEach   = parseFloat(document.getElementById('fPaid')?.value)           || 0;
-    // Total = (buy price per piece × qty) + shipping
-    const total      = (price * qty) + ship;
-    // Paid total = paid per piece × qty
-    const paidTotal  = paidEach * qty;
-    // Pending = total - what has been paid
-    const pending    = Math.max(0, total - paidTotal);
+    const price    = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
+    const qty      = parseInt(document.getElementById('fQty')?.value)           || 1;
+    const ship     = parseFloat(document.getElementById('fShipping')?.value)    || 0;
+    const paidEach = parseFloat(document.getElementById('fPaid')?.value)        || 0;
+    const total    = (price * qty) + ship;
+    const paidTotal = paidEach * qty;
+    const pending  = Math.max(0, total - paidTotal);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
     const td = document.getElementById('fTotalDisplay');
     if (td) {
@@ -362,9 +346,8 @@ function initDashboard() {
       pd.classList.toggle('fg-calc-overdue', pending > 0);
       if (paidTotal > 0) pd.title = `Paid ₹${paidEach.toLocaleString('en-IN')} × ${qty} = ₹${paidTotal.toLocaleString('en-IN')}`;
     }
-    if (document.getElementById('fTotal'))   document.getElementById('fTotal').value   = total;
-    if (document.getElementById('fPending')) document.getElementById('fPending').value = pending;
-    // Store actual paid total for Firestore
+    if (document.getElementById('fTotal'))    document.getElementById('fTotal').value   = total;
+    if (document.getElementById('fPending'))  document.getElementById('fPending').value = pending;
     if (document.getElementById('fPaidTotal')) document.getElementById('fPaidTotal').value = paidTotal;
   }
 
@@ -407,17 +390,18 @@ function initDashboard() {
     if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
 
     const editId    = document.getElementById('editOrderId')?.value || '';
-    const price     = parseFloat(document.getElementById('fActualPrice')?.value)  || 0;
-    const qty       = parseInt(document.getElementById('fQty')?.value)            || 1;
-    const ship      = parseFloat(document.getElementById('fShipping')?.value)     || 0;
-    const paidEach  = parseFloat(document.getElementById('fPaid')?.value)         || 0;
+    const price     = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
+    const qty       = parseInt(document.getElementById('fQty')?.value)           || 1;
+    const ship      = parseFloat(document.getElementById('fShipping')?.value)    || 0;
+    const paidEach  = parseFloat(document.getElementById('fPaid')?.value)        || 0;
     const paidTotal = paidEach * qty;
-    // Total = investment cost: (buy price × qty) + shipping
     const total     = (price * qty) + ship;
     const pending   = Math.max(0, total - paidTotal);
     const existing  = DB.orders.find(o => o.id === editId);
 
     try {
+      // ── IMAGE LOGIC (fixed) ──
+      // Keep existing image by default; only replace if a new file was chosen
       let imageUrl = existing?.image || '';
       if (_currentImageFile) {
         if (existing?.image) await deleteImageFromSupabase(existing.image);
@@ -481,14 +465,13 @@ function initDashboard() {
   const pBrandHidden = document.getElementById('pBrand');
   let _pageImageFile = null;
 
-  // Page brand dropdown uses shared store
   rebuildDropdown(pBrandSelect);
 
   pBrandSelect?.addEventListener('change', () => {
     if (pBrandSelect.value === '__new__') {
       pNewBrandRow?.classList.remove('hidden'); pNewBrandIn?.focus();
       if (pBrandHidden) pBrandHidden.value = '';
-      pBrandSelect.value = ''; // reset to placeholder
+      pBrandSelect.value = '';
     } else {
       pNewBrandRow?.classList.add('hidden');
       if (pBrandHidden) pBrandHidden.value = pBrandSelect.value;
@@ -523,7 +506,6 @@ function initDashboard() {
     if (pBrandHidden) pBrandHidden.value = '';
   });
 
-  // Page status pills (scoped)
   document.querySelectorAll('#pStatusPillGroup .status-pill').forEach(pill => {
     pill.addEventListener('click', () => {
       document.querySelectorAll('#pStatusPillGroup .status-pill').forEach(p => p.classList.remove('active'));
@@ -533,7 +515,6 @@ function initDashboard() {
     });
   });
 
-  // Page image upload
   document.getElementById('pImageUploadArea')?.addEventListener('click', () => document.getElementById('pImage')?.click());
   document.getElementById('pImage')?.addEventListener('change', (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -547,7 +528,6 @@ function initDashboard() {
     reader.readAsDataURL(file);
   });
 
-  // Page payment calc
   ['pActualPrice','pQty','pShipping','pPaid'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', calcPageTotals);
   });
@@ -582,7 +562,6 @@ function initDashboard() {
 
   document.getElementById('addOrderPageClear')?.addEventListener('click', resetPageForm);
 
-  // Page form submit
   pageForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const saveBtn = document.getElementById('addOrderPageSave');
@@ -638,12 +617,10 @@ function initDashboard() {
   }
 
   document.getElementById('clearDataBtn')?.addEventListener('click', async () => {
-    // Show password confirmation modal instead of simple confirm
     const pwModal = document.getElementById('clearDataModal');
     if (pwModal) { pwModal.classList.remove('hidden'); document.getElementById('clearDataPw')?.focus(); }
   });
 
-  // Close X button on clear data modal
   document.getElementById('clearDataCancelBtn')?.addEventListener('click', () => {
     document.getElementById('clearDataModal')?.classList.add('hidden');
     if (document.getElementById('clearDataPw')) document.getElementById('clearDataPw').value = '';
@@ -659,7 +636,6 @@ function initDashboard() {
     try {
       const { signInWithEmailAndPassword: reauth } = await import("https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js");
       await reauth(auth, user.email, pw);
-      // Password correct — proceed with deletion
       document.getElementById('clearDataModal')?.classList.add('hidden');
       if (document.getElementById('clearDataPw')) document.getElementById('clearDataPw').value = '';
       await Promise.all(DB.orders.map(o => o.image ? deleteImageFromSupabase(o.image) : Promise.resolve()));
@@ -676,7 +652,136 @@ function initDashboard() {
     if (document.getElementById('clearDataPw')) document.getElementById('clearDataPw').value = '';
     if (document.getElementById('clearDataPwErr')) document.getElementById('clearDataPwErr').textContent = '';
   });
-}
+
+  /* ══════════════════════════════════════
+     GLOBAL ORDER ACTIONS
+     Defined inside initDashboard so they can access:
+     getAllBrands, customBrands, rebuildDropdown, openModal, closeModal, navigateTo
+  ══════════════════════════════════════ */
+
+  window.editOrder = function(id) {
+    const o = DB.orders.find(x => x.id === id); if (!o) return;
+
+    document.getElementById('modalTitle').textContent = 'Edit Model';
+
+    // Populate all text/number/date fields
+    [
+      ['editOrderId','id'],['fProductName','product_name'],['fOrderNumber','order_number'],
+      ['fSeries','series'],['fScale','scale'],['fCondition','condition'],
+      ['fVendor','vendor'],['fLocation','location'],['fVariant','variant'],
+      ['fNotes','notes'],
+      ['fQty','quantity'],['fOrderDate','order_date'],['fEta','eta'],
+      ['fPreorderPrice','preorder_price'],['fActualPrice','actual_price'],
+      ['fShipping','shipping']
+    ].forEach(([fieldId, key]) => {
+      const el = document.getElementById(fieldId);
+      if (el) el.value = key === 'id' ? o.id : (o[key] ?? '');
+    });
+
+    // paid per piece
+    const paidEachEl = document.getElementById('fPaid');
+    if (paidEachEl) paidEachEl.value = o.paid_each ?? (o.paid || 0);
+
+    // Brand dropdown — ensure brand exists in list before rebuilding
+    const brandSel = document.getElementById('fBrandSelect');
+    const fBrandH  = document.getElementById('fBrand');
+    const brand    = o.brand || o.vendor || '';
+    if (brand && !getAllBrands().includes(brand)) customBrands.push(brand);
+    rebuildDropdown(brandSel, brand);
+    if (fBrandH) fBrandH.value = brand;
+
+    // Status pills (modal scoped)
+    const status = o.status || 'Ordered';
+    document.querySelectorAll('#orderModal .status-pill').forEach(p => {
+      p.classList.remove('active');
+      const r = p.querySelector('input[type="radio"]');
+      if (r && r.value === status) { p.classList.add('active'); r.checked = true; }
+    });
+    const fSt = document.getElementById('fStatus'); if (fSt) fSt.value = status;
+
+    // ── IMAGE: show existing image or placeholder; reset new-file state ──
+    _currentImageFile = null;
+    _currentImageB64  = '';
+    const fi = document.getElementById('fImage'); if (fi) fi.value = '';
+    const ip = document.getElementById('imagePreview');
+    if (ip) {
+      ip.innerHTML = o.image
+        ? `<img src="${o.image}" alt="preview" />`
+        : '<i class="fa-solid fa-camera"></i><p>Click to upload photo</p><span>JPG, PNG, WEBP · max 5MB</span>';
+    }
+
+    // Recalculate totals display
+    const price2    = parseFloat(o.actual_price)              || 0;
+    const qty2      = parseInt(o.quantity)                    || 1;
+    const ship2     = parseFloat(o.shipping)                  || 0;
+    const paidEach2 = parseFloat(o.paid_each ?? o.paid)       || 0;
+    const paidTotal2 = paidEach2 * qty2;
+    const total2    = (price2 * qty2) + ship2;
+    const pending2  = Math.max(0, total2 - paidTotal2);
+    const fmt = v => `₹${v.toLocaleString('en-IN')}`;
+    const td = document.getElementById('fTotalDisplay');
+    if (td) td.textContent = fmt(total2);
+    const pd = document.getElementById('fPendingDisplay');
+    if (pd) { pd.textContent = fmt(pending2); pd.classList.toggle('fg-calc-overdue', pending2 > 0); }
+    if (document.getElementById('fTotal'))    document.getElementById('fTotal').value   = total2;
+    if (document.getElementById('fPending'))  document.getElementById('fPending').value = pending2;
+
+    openModal();
+  };
+
+  window.deleteOrder = async function(id) {
+    if (!confirm('Delete this order?')) return;
+    try {
+      const o = DB.orders.find(x => x.id === id);
+      if (o?.image) await deleteImageFromSupabase(o.image);
+      await deleteDoc(doc(db, 'orders', id));
+      await addActivity('warning', `Deleted — ${o?.product_name || id}`);
+      showToast('Order deleted', 'success'); await fetchData();
+    } catch(e) { showToast('Failed to delete: ' + e.message, 'warning'); }
+  };
+
+  window.duplicateOrder = async function(id) {
+    const o = DB.orders.find(x => x.id === id); if (!o) return;
+    try {
+      const { id: _id, createdAt, updatedAt, ...copy } = o;
+      await addDoc(collection(db, 'orders'), { ...copy, product_name: copy.product_name + ' (Copy)', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      await addActivity('info', `Duplicated — ${o.product_name}`);
+      showToast('Order duplicated!', 'success'); await fetchData();
+    } catch(e) { showToast('Failed to duplicate', 'warning'); }
+  };
+
+  window.viewOrder = function(id) {
+    const o = DB.orders.find(x => x.id === id); if (!o) return;
+    const body  = document.getElementById('viewModalBody');
+    const modal = document.getElementById('viewModal');
+    if (!body || !modal) return;
+    const sc = (o.status || '').toLowerCase().replace(/\s+/g,'-');
+    body.innerHTML = `
+      ${o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" class="view-image" />` : ''}
+      <div class="view-grid">
+        <div><strong>Product:</strong> ${escHtml(o.product_name||'—')}</div>
+        <div><strong>Brand:</strong> ${escHtml(o.brand||o.vendor||'—')}</div>
+        <div><strong>Series:</strong> ${escHtml(o.series||'—')}</div>
+        <div><strong>Scale:</strong> ${escHtml(o.scale||'1:64')}</div>
+        <div><strong>Condition:</strong> ${escHtml(o.condition||'—')}</div>
+        <div><strong>Status:</strong> <span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></div>
+        <div><strong>Order #:</strong> ${escHtml(o.order_number||'—')}</div>
+        <div><strong>Seller:</strong> ${escHtml(o.vendor||'—')}</div>
+        <div><strong>Location:</strong> ${escHtml(o.location||'—')}</div>
+        <div><strong>Qty:</strong> ${o.quantity||1}</div>
+        <div><strong>Order Date:</strong> ${formatDate(o.order_date)}</div>
+        <div><strong>ETA:</strong> ${formatDate(o.eta)}</div>
+        <div><strong>Buy Price:</strong> ₹${(o.actual_price||0).toLocaleString('en-IN')}</div>
+        <div><strong>Market Value:</strong> ₹${(o.preorder_price||0).toLocaleString('en-IN')}</div>
+        <div><strong>Shipping:</strong> ₹${(o.shipping||0).toLocaleString('en-IN')}</div>
+        <div><strong>Paid:</strong> ₹${(o.paid||0).toLocaleString('en-IN')}</div>
+        <div><strong>Pending:</strong> ₹${(o.pending||0).toLocaleString('en-IN')}</div>
+        <div><strong>Total:</strong> ₹${(o.total||0).toLocaleString('en-IN')}</div>
+      </div>`;
+    modal.classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  };
+
+} // ← end of initDashboard()
 
 /* ══════════════════════════════════════ FIRESTORE ══════════════════════════════════════ */
 async function fetchData() {
@@ -721,7 +826,7 @@ function initGreeting() {
 /* ══════════════════════════════════════ RENDER ALL ══════════════════════════════════════ */
 function renderAll() {
   renderStats();
-  applyCollectionFilters(); // renders the unified collection table
+  applyCollectionFilters();
   populateBrandFilter();
   renderRecentOrders();
   renderEtaWidget();
@@ -750,15 +855,11 @@ function renderStats() {
   const o = DB.orders, n = o.length;
   const totalQty = o.reduce((s,x) => s + (x.quantity||1), 0);
 
-  // Investment = actual money spent = (buy_price × qty) + shipping for each order
   const investment = o.reduce((s,x) => {
     return s + ((x.actual_price||0) * (x.quantity||1)) + (x.shipping||0);
   }, 0);
 
-  // Avg buy price per unit
   const avgBuy = totalQty > 0 ? Math.round(investment / totalQty) : 0;
-
-  // Pending = amount still owed
   const pendingAmt = o.reduce((s,x) => s + (x.pending||0), 0);
 
   const pendingPO = o.filter(x => x.status==='Ordered'||x.status==='In Transit').length;
@@ -766,13 +867,12 @@ function renderStats() {
   const transit   = o.filter(x => x.status==='In Transit').length;
   const overdue   = o.filter(x => x.eta && new Date(x.eta)<new Date() && x.status!=='Delivered' && x.status!=='Cancelled').length;
 
-  // Top brand by quantity
   const bm = {}; o.forEach(x => { const k=(x.brand||x.vendor||'—').trim(); bm[k]=(bm[k]||0)+(x.quantity||1); });
   const topBrand = Object.entries(bm).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—';
 
   setText('statTotal', n);
   setText('statQty', totalQty);
-  setText('statAvgBuy',   avgBuy > 0 ? '₹' + avgBuy.toLocaleString('en-IN') : '₹0');
+  setText('statAvgBuy',     avgBuy > 0 ? '₹' + avgBuy.toLocaleString('en-IN') : '₹0');
   setText('statInvestment', '₹' + investment.toLocaleString('en-IN'));
   setText('statPending',    '₹' + pendingAmt.toLocaleString('en-IN'));
   setText('statPendingPO', pendingPO);
@@ -788,8 +888,6 @@ function renderStats() {
   sb('statPendingPOBar',  pct(pendingPO));
   sb('statOverdueBar',    pct(overdue));
   sb('statPendingBar',    investment > 0 ? Math.min(100, Math.round((pendingAmt/investment)*100)) : 0);
-
-  // (notification dot removed)
 }
 
 /* ══════════════════════════════════════ UNIFIED COLLECTION FILTERS ══════════════════════════════════════ */
@@ -813,7 +911,6 @@ function applyCollectionFilters() {
   if (sort === 'name-za')  items.sort((a,b) => (b.product_name||'').localeCompare(a.product_name||''));
   if (sort === 'price-hi') items.sort((a,b) => (b.actual_price||0) - (a.actual_price||0));
   if (sort === 'price-lo') items.sort((a,b) => (a.actual_price||0) - (b.actual_price||0));
-  // newest = default Firestore ordering (createdAt desc)
 
   renderTable(items);
 }
@@ -829,22 +926,21 @@ function populateBrandFilter() {
 
 /* ══════════════════════════════════════ TABLE + MOBILE CARDS ══════════════════════════════════════ */
 function renderTable(orders) {
-  const tbody = document.getElementById('ordersTableBody');
+  const tbody      = document.getElementById('ordersTableBody');
   const mobileList = document.getElementById('mobileOrderList');
 
   if (!orders?.length) {
-    if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>`;
+    if (tbody)      tbody.innerHTML      = `<tr><td colspan="10" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>`;
     if (mobileList) mobileList.innerHTML = `<div class="empty-state"><i class="fa-solid fa-inbox"></i> No items found</div>`;
     return;
   }
 
-  // ── DESKTOP TABLE ──
   if (tbody) {
     tbody.innerHTML = orders.map(o => {
-      const sc     = (o.status||'').toLowerCase().replace(/\s+/g,'-');
-      const thumb  = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
-      const pb     = (o.pending||0)<=0?'badge-paid':((o.paid||0)>0?'badge-partial':'badge-pending-b');
-      const pl     = (o.pending||0)<=0?'Paid':((o.paid||0)>0?'Partial':'Pending');
+      const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+      const thumb = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
+      const pb    = (o.pending||0)<=0?'badge-paid':((o.paid||0)>0?'badge-partial':'badge-pending-b');
+      const pl    = (o.pending||0)<=0?'Paid':((o.paid||0)>0?'Partial':'Pending');
       return `<tr>
         <td>
           <div class="order-product-cell">
@@ -859,11 +955,7 @@ function renderTable(orders) {
         <td><span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></td>
         <td style="text-align:center">${o.quantity||1}</td>
         <td style="white-space:nowrap"><strong>₹${(o.total||0).toLocaleString('en-IN')}</strong></td>
-        <td>
-          <div class="pay-bar-wrap">
-            <span class="badge ${pb}" style="font-size:0.68rem">${pl}</span>
-          </div>
-        </td>
+        <td><div class="pay-bar-wrap"><span class="badge ${pb}" style="font-size:0.68rem">${pl}</span></div></td>
         <td style="font-size:0.76rem;color:var(--text-muted);white-space:nowrap">${o.eta?formatDate(o.eta):'—'}</td>
         <td>
           <div class="table-actions">
@@ -876,7 +968,6 @@ function renderTable(orders) {
     }).join('');
   }
 
-  // ── MOBILE CARDS ──
   if (mobileList) {
     mobileList.innerHTML = orders.map(o => {
       const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
@@ -909,117 +1000,12 @@ function renderTable(orders) {
   }
 }
 
-/* ══════════════════════════════════════ GLOBAL ACTIONS ══════════════════════════════════════ */
-window.editOrder = function(id) {
-  const o = DB.orders.find(x=>x.id===id); if(!o) return;
-  document.getElementById('modalTitle').textContent = 'Edit Model';
-  [
-    ['editOrderId','id'],['fProductName','product_name'],['fOrderNumber','order_number'],
-    ['fSeries','series'],['fScale','scale'],['fCondition','condition'],
-    ['fVendor','vendor'],['fLocation','location'],['fVariant','variant'],
-    ['fNotes','notes'],
-    ['fQty','quantity'],['fOrderDate','order_date'],['fEta','eta'],
-    ['fPreorderPrice','preorder_price'],['fActualPrice','actual_price'],
-    ['fShipping','shipping']
-  ].forEach(([fieldId, key]) => { const el=document.getElementById(fieldId); if(el) el.value = key==='id' ? o.id : (o[key]??''); });
-  // fPaid should show paid per piece (paid_each), not total paid
-  const paidEachEl = document.getElementById('fPaid');
-  if (paidEachEl) paidEachEl.value = o.paid_each ?? (o.paid || 0);
-
-  // Set brand dropdown using shared rebuildDropdown
-  const brandSel = document.getElementById('fBrandSelect');
-  const fBrandH  = document.getElementById('fBrand');
-  const brand    = o.brand || o.vendor || '';
-  // If the brand isn't in the list yet, add it to customBrands so it shows
-  if (brand && !getAllBrands().includes(brand)) {
-    customBrands.push(brand);
-  }
-  rebuildDropdown(brandSel, brand);
-  if (fBrandH) fBrandH.value = brand;
-
-  // Set status pills (modal scoped)
-  const status = o.status || 'Ordered';
-  document.querySelectorAll('#orderModal .status-pill').forEach(p => {
-    p.classList.remove('active');
-    const r = p.querySelector('input[type="radio"]');
-    if (r && r.value === status) { p.classList.add('active'); r.checked = true; }
-  });
-  const fSt = document.getElementById('fStatus'); if (fSt) fSt.value = status;
-
-  _currentImageFile = null; _currentImageB64 = '';
-  const ip = document.getElementById('imagePreview');
-  if(ip) ip.innerHTML = o.image ? `<img src="${o.image}" alt="preview" />` : '<i class="fa-solid fa-camera"></i><p>Click to upload photo</p><span>JPG, PNG, WEBP · max 5MB</span>';
-  document.getElementById('orderModal')?.classList.remove('hidden'); document.body.style.overflow='hidden';
-
-  // Recalc totals display
-  const price2=(parseFloat(o.actual_price)||0), qty2=(parseInt(o.quantity)||1), ship2=(parseFloat(o.shipping)||0);
-  const paidEach2 = parseFloat(o.paid_each ?? o.paid) || 0;
-  const paidTotal2 = paidEach2 * qty2;
-  const total2=(price2*qty2)+ship2, pending2=Math.max(0,total2-paidTotal2);
-  const fmt = v=>`₹${v.toLocaleString('en-IN')}`;
-  const td=document.getElementById('fTotalDisplay'); if(td) td.textContent=fmt(total2);
-  const pd=document.getElementById('fPendingDisplay'); if(pd){ pd.textContent=fmt(pending2); pd.classList.toggle('fg-calc-overdue',pending2>0); }
-  if(document.getElementById('fTotal'))   document.getElementById('fTotal').value   = total2;
-  if(document.getElementById('fPending')) document.getElementById('fPending').value = pending2;
-};
-
-window.deleteOrder = async function(id) {
-  if(!confirm('Delete this order?')) return;
-  try {
-    const o = DB.orders.find(x=>x.id===id);
-    if (o?.image) await deleteImageFromSupabase(o.image);
-    await deleteDoc(doc(db,'orders',id));
-    await addActivity('warning',`Deleted — ${o?.product_name||id}`);
-    showToast('Order deleted','success'); await fetchData();
-  } catch(e) { showToast('Failed to delete: ' + e.message,'warning'); }
-};
-
-window.duplicateOrder = async function(id) {
-  const o = DB.orders.find(x=>x.id===id); if(!o) return;
-  try {
-    const { id: _id, createdAt, updatedAt, ...copy } = o;
-    await addDoc(collection(db,'orders'), { ...copy, product_name: copy.product_name + ' (Copy)', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-    await addActivity('info', `Duplicated — ${o.product_name}`);
-    showToast('Order duplicated!', 'success'); await fetchData();
-  } catch(e) { showToast('Failed to duplicate', 'warning'); }
-};
-
-window.viewOrder = function(id) {
-  const o=DB.orders.find(x=>x.id===id); if(!o) return;
-  const body=document.getElementById('viewModalBody'), modal=document.getElementById('viewModal');
-  if(!body||!modal) return;
-  const sc=(o.status||'').toLowerCase().replace(/\s+/g,'-');
-  body.innerHTML = `
-    ${o.image?`<img src="${o.image}" alt="${escHtml(o.product_name)}" class="view-image" />`:''}
-    <div class="view-grid">
-      <div><strong>Product:</strong> ${escHtml(o.product_name||'—')}</div>
-      <div><strong>Brand:</strong> ${escHtml(o.brand||o.vendor||'—')}</div>
-      <div><strong>Series:</strong> ${escHtml(o.series||'—')}</div>
-      <div><strong>Scale:</strong> ${escHtml(o.scale||'1:64')}</div>
-      <div><strong>Condition:</strong> ${escHtml(o.condition||'—')}</div>
-      <div><strong>Status:</strong> <span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></div>
-      <div><strong>Order #:</strong> ${escHtml(o.order_number||'—')}</div>
-      <div><strong>Seller:</strong> ${escHtml(o.vendor||'—')}</div>
-      <div><strong>Location:</strong> ${escHtml(o.location||'—')}</div>
-      <div><strong>Qty:</strong> ${o.quantity||1}</div>
-      <div><strong>Order Date:</strong> ${formatDate(o.order_date)}</div>
-      <div><strong>ETA:</strong> ${formatDate(o.eta)}</div>
-      <div><strong>Buy Price:</strong> ₹${(o.actual_price||0).toLocaleString('en-IN')}</div>
-      <div><strong>Market Value:</strong> ₹${(o.preorder_price||0).toLocaleString('en-IN')}</div>
-      <div><strong>Shipping:</strong> ₹${(o.shipping||0).toLocaleString('en-IN')}</div>
-      <div><strong>Paid:</strong> ₹${(o.paid||0).toLocaleString('en-IN')}</div>
-      <div><strong>Pending:</strong> ₹${(o.pending||0).toLocaleString('en-IN')}</div>
-      <div><strong>Total:</strong> ₹${(o.total||0).toLocaleString('en-IN')}</div>
-    </div>`;
-  modal.classList.remove('hidden'); document.body.style.overflow='hidden';
-};
-
 /* ══════════════════════════════════════ WIDGETS ══════════════════════════════════════ */
 function renderRecentOrders() {
-  const c=document.getElementById('recentOrdersList'); if(!c) return;
-  const items=DB.orders.slice(0,5);
-  if(!items.length){c.innerHTML=`<div class="empty-state">No orders yet</div>`;return;}
-  c.innerHTML=items.map(o=>`
+  const c = document.getElementById('recentOrdersList'); if (!c) return;
+  const items = DB.orders.slice(0,5);
+  if (!items.length) { c.innerHTML=`<div class="empty-state">No orders yet</div>`; return; }
+  c.innerHTML = items.map(o => `
     <div class="recent-order-item">
       <div class="roi-thumb">${o.image?`<img src="${o.image}" alt="${escHtml(o.product_name)}" />`:`<i class="fa-solid fa-cube"></i>`}</div>
       <div class="roi-info">
@@ -1031,14 +1017,14 @@ function renderRecentOrders() {
 }
 
 function renderEtaWidget() {
-  const c=document.getElementById('etaList'); if(!c) return;
-  const upcoming=DB.orders.filter(o=>o.eta&&o.status!=='Delivered'&&o.status!=='Owned').sort((a,b)=>new Date(a.eta)-new Date(b.eta)).slice(0,6);
-  if(!upcoming.length){c.innerHTML=`<div class="empty-state">No upcoming deliveries</div>`;return;}
-  const today=new Date();
-  c.innerHTML=upcoming.map(o=>{
-    const d=Math.ceil((new Date(o.eta)-today)/(1000*60*60*24));
-    let dc='eta-chip-ok',dl=`${d}d`;
-    if(d<0){dc='eta-chip-overdue';dl=`${Math.abs(d)}d overdue`;}else if(d<=7){dc='eta-chip-soon';}
+  const c = document.getElementById('etaList'); if (!c) return;
+  const upcoming = DB.orders.filter(o=>o.eta&&o.status!=='Delivered'&&o.status!=='Owned').sort((a,b)=>new Date(a.eta)-new Date(b.eta)).slice(0,6);
+  if (!upcoming.length) { c.innerHTML=`<div class="empty-state">No upcoming deliveries</div>`; return; }
+  const today = new Date();
+  c.innerHTML = upcoming.map(o => {
+    const d  = Math.ceil((new Date(o.eta)-today)/(1000*60*60*24));
+    let dc   = 'eta-chip-ok', dl = `${d}d`;
+    if (d < 0) { dc='eta-chip-overdue'; dl=`${Math.abs(d)}d overdue`; } else if (d <= 7) { dc='eta-chip-soon'; }
     return `<div class="delivery-item">
       <div class="delivery-icon"><i class="fa-solid fa-truck"></i></div>
       <div class="delivery-info">
@@ -1049,14 +1035,15 @@ function renderEtaWidget() {
           <span class="delivery-chip vendor-chip"><i class="fa-solid fa-store"></i> ${escHtml(o.brand||o.vendor||'—')}</span>
         </div>
       </div>
-    </div>`;}).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderActivityFeed() {
-  const c=document.getElementById('activityList'); if(!c) return;
-  const items=DB.activity.slice(0,8);
-  if(!items.length){c.innerHTML=`<div class="empty-state">No recent activity</div>`;return;}
-  c.innerHTML=items.map(a=>`
+  const c = document.getElementById('activityList'); if (!c) return;
+  const items = DB.activity.slice(0,8);
+  if (!items.length) { c.innerHTML=`<div class="empty-state">No recent activity</div>`; return; }
+  c.innerHTML = items.map(a => `
     <div class="activity-item">
       <span class="activity-dot ${escHtml(a.type||'info')}"></span>
       <span>${escHtml(a.msg||'')}</span>
@@ -1065,13 +1052,13 @@ function renderActivityFeed() {
 }
 
 function renderBrandLeaderboard() {
-  const c=document.getElementById('leaderboardList'); if(!c) return;
-  if(!DB.orders.length){c.innerHTML=`<div class="empty-state">No data yet</div>`;return;}
-  const bm={};
-  DB.orders.forEach(o=>{const k=(o.brand||o.vendor||'Unknown').trim();bm[k]=(bm[k]||0)+(o.quantity||1);});
-  const sorted=Object.entries(bm).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const ri=(i)=>i===0?`<div class="lb-rank-icon gold"><i class="fa-solid fa-crown"></i></div>`:i===1?`<div class="lb-rank-icon silver"><i class="fa-solid fa-medal"></i></div>`:i===2?`<div class="lb-rank-icon bronze"><i class="fa-solid fa-award"></i></div>`:`<div class="lb-rank-icon"><i class="fa-solid fa-hashtag"></i></div>`;
-  c.innerHTML=sorted.map(([brand,qty],i)=>`
+  const c = document.getElementById('leaderboardList'); if (!c) return;
+  if (!DB.orders.length) { c.innerHTML=`<div class="empty-state">No data yet</div>`; return; }
+  const bm = {};
+  DB.orders.forEach(o => { const k=(o.brand||o.vendor||'Unknown').trim(); bm[k]=(bm[k]||0)+(o.quantity||1); });
+  const sorted = Object.entries(bm).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const ri = (i) => i===0?`<div class="lb-rank-icon gold"><i class="fa-solid fa-crown"></i></div>`:i===1?`<div class="lb-rank-icon silver"><i class="fa-solid fa-medal"></i></div>`:i===2?`<div class="lb-rank-icon bronze"><i class="fa-solid fa-award"></i></div>`:`<div class="lb-rank-icon"><i class="fa-solid fa-hashtag"></i></div>`;
+  c.innerHTML = sorted.map(([brand,qty],i) => `
     <div class="lb-item">${ri(i)}
       <div class="lb-info"><div class="lb-name">#${i+1} ${escHtml(brand)}</div><div class="lb-sub">${qty} unit${qty!==1?'s':''} tracked</div></div>
       <span class="lb-count">${qty}</span>
@@ -1079,14 +1066,14 @@ function renderBrandLeaderboard() {
 }
 
 function renderAlerts() {
-  const c=document.getElementById('alertsPanel'); if(!c) return;
-  const alerts=[];
-  const delayed=DB.orders.filter(o=>o.eta&&new Date(o.eta)<new Date()&&o.status!=='Delivered'&&o.status!=='Owned');
-  const unpaid=DB.orders.filter(o=>(o.pending||0)>0);
-  if(delayed.length>0) alerts.push({type:'warning',msg:`${delayed.length} delayed order(s)`});
-  if(unpaid.length>0)  alerts.push({type:'danger', msg:`${unpaid.length} order(s) with pending payment`});
-  if(!alerts.length)   alerts.push({type:'info',   msg:'All systems normal'});
-  c.innerHTML=alerts.map(a=>`<div class="alert-item ${a.type}"><i class="fa-solid fa-circle-info"></i><span>${escHtml(a.msg)}</span></div>`).join('');
+  const c = document.getElementById('alertsPanel'); if (!c) return;
+  const alerts = [];
+  const delayed = DB.orders.filter(o=>o.eta&&new Date(o.eta)<new Date()&&o.status!=='Delivered'&&o.status!=='Owned');
+  const unpaid  = DB.orders.filter(o=>(o.pending||0)>0);
+  if (delayed.length > 0) alerts.push({type:'warning', msg:`${delayed.length} delayed order(s)`});
+  if (unpaid.length  > 0) alerts.push({type:'danger',  msg:`${unpaid.length} order(s) with pending payment`});
+  if (!alerts.length)     alerts.push({type:'info',    msg:'All systems normal'});
+  c.innerHTML = alerts.map(a => `<div class="alert-item ${a.type}"><i class="fa-solid fa-circle-info"></i><span>${escHtml(a.msg)}</span></div>`).join('');
 }
 
 function renderPayments() {
@@ -1101,7 +1088,6 @@ function renderPayments() {
   const totalPaid    = DB.orders.reduce((s,o) => s+(o.paid||0), 0);
   const totalPending = DB.orders.reduce((s,o) => s+(o.pending||0), 0);
 
-  // Desktop table rows
   const rows = DB.orders.map(o => {
     const sc = (o.status||'').toLowerCase().replace(/\s+/g,'-');
     const pb = (o.pending||0)<=0 ? 'badge-paid' : ((o.paid||0)>0 ? 'badge-partial' : 'badge-pending-b');
@@ -1120,7 +1106,6 @@ function renderPayments() {
     </tr>`;
   }).join('');
 
-  // Mobile payment cards
   const mobCards = DB.orders.map(o => {
     const sc = (o.status||'').toLowerCase().replace(/\s+/g,'-');
     const pb = (o.pending||0)<=0 ? 'badge-paid' : ((o.paid||0)>0 ? 'badge-partial' : 'badge-pending-b');
@@ -1156,19 +1141,14 @@ function renderPayments() {
         <div class="pay-sum-val" style="color:${totalPending>0?'var(--orange)':'var(--green)'}">${fmt(totalPending)}</div>
       </div>
     </div>
-
     <div class="widget glass full-width">
       <div class="widget-header"><h3><i class="fa-solid fa-credit-card"></i> Payment Overview</h3></div>
-
-      <!-- Desktop table -->
       <div class="table-wrap desktop-only" style="overflow-x:auto">
         <table class="orders-table">
           <thead><tr><th>Product</th><th>Total</th><th>Paid</th><th>Pending</th><th>Payment</th><th>Status</th><th>ETA</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
-
-      <!-- Mobile cards -->
       <div class="pay-mob-list mobile-only">${mobCards}</div>
     </div>`;
 }
@@ -1176,11 +1156,10 @@ function renderPayments() {
 function renderAnalytics() {
   const o = DB.orders;
 
-  // ── SUMMARY CARDS ──
-  const totalCost   = o.reduce((s,x) => s + ((x.actual_price||0)*(x.quantity||1)) + (x.shipping||0), 0);
-  const totalPend   = o.reduce((s,x) => s + (x.pending||0), 0);
-  const totalUnits  = o.reduce((s,x) => s + (x.quantity||1), 0);
-  const avgBuy      = totalUnits > 0 ? Math.round(totalCost / totalUnits) : 0;
+  const totalCost  = o.reduce((s,x) => s + ((x.actual_price||0)*(x.quantity||1)) + (x.shipping||0), 0);
+  const totalPend  = o.reduce((s,x) => s + (x.pending||0), 0);
+  const totalUnits = o.reduce((s,x) => s + (x.quantity||1), 0);
+  const avgBuy     = totalUnits > 0 ? Math.round(totalCost / totalUnits) : 0;
   const fmt = v => `₹${v.toLocaleString('en-IN')}`;
 
   setText('roiTotalCost',    fmt(totalCost));
@@ -1188,7 +1167,6 @@ function renderAnalytics() {
   setText('roiTotalUnits',   totalUnits.toString());
   setText('roiAvgValue',     fmt(avgBuy));
 
-  // ── BRAND SPEND COMPARISON ──
   const bvc = document.getElementById('brandValueChart');
   if (bvc) {
     const bv = {};
@@ -1211,16 +1189,15 @@ function renderAnalytics() {
       : `<div class="empty-state">No data yet</div>`;
   }
 
-  // ── STATUS DISTRIBUTION — only 4 statuses ──
   const sdEl = document.getElementById('statusDistList');
   if (sdEl) {
     const sm = {};
     o.forEach(x => { const k=x.status||'Unknown'; sm[k]=(sm[k]||0)+1; });
     const statusConfig = [
-      { s:'Ordered',    icon:'fa-cart-shopping',  grad:'linear-gradient(135deg,#6366f1,#7c5cfc)' },
-      { s:'In Transit', icon:'fa-truck-moving',   grad:'linear-gradient(135deg,#14b8a6,#06b6d4)' },
-      { s:'Delivered',  icon:'fa-box-open',        grad:'linear-gradient(135deg,#22c55e,#14b8a6)' },
-      { s:'Cancelled',  icon:'fa-ban',             grad:'linear-gradient(135deg,#ef4444,#f97316)' }
+      { s:'Ordered',    icon:'fa-cart-shopping', grad:'linear-gradient(135deg,#6366f1,#7c5cfc)' },
+      { s:'In Transit', icon:'fa-truck-moving',  grad:'linear-gradient(135deg,#14b8a6,#06b6d4)' },
+      { s:'Delivered',  icon:'fa-box-open',       grad:'linear-gradient(135deg,#22c55e,#14b8a6)' },
+      { s:'Cancelled',  icon:'fa-ban',            grad:'linear-gradient(135deg,#ef4444,#f97316)' }
     ];
     const total = o.length || 1;
     sdEl.innerHTML = statusConfig.map(({s,icon,grad}) => {
@@ -1237,7 +1214,6 @@ function renderAnalytics() {
     }).join('');
   }
 
-  // ── BRAND BREAKDOWN by count ──
   const vc = document.getElementById('vendorChart');
   if (vc) {
     const vm = {};
@@ -1250,7 +1226,6 @@ function renderAnalytics() {
       </div>`).join('') || `<div class="empty-state">No data</div>`;
   }
 
-  // ── MONTHLY SPEND ──
   const mc = document.getElementById('monthlyChart');
   if (mc) {
     const mm = {};
@@ -1273,26 +1248,22 @@ function renderCatalog() {
   if (!DB.orders.length) { grid.innerHTML = `<div class="empty-state">No models tracked yet</div>`; return; }
   const fmt = v => `₹${Number(v||0).toLocaleString('en-IN')}`;
   grid.innerHTML = DB.orders.map(o => {
-    const sc      = (o.status||'').toLowerCase().replace(/\s+/g,'-');
-    const hasImg  = !!o.image;
-    const pending = o.pending||0;
-    const payIcon = pending <= 0
+    const sc       = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+    const hasImg   = !!o.image;
+    const pending  = o.pending||0;
+    const payIcon  = pending <= 0
       ? `<span class="cc-pay-badge cc-paid"><i class="fa-solid fa-circle-check"></i> Paid</span>`
       : `<span class="cc-pay-badge cc-pending"><i class="fa-solid fa-hourglass-half"></i> ₹${pending.toLocaleString('en-IN')} due</span>`;
-    const etaStr  = o.eta ? formatDate(o.eta) : null;
+    const etaStr   = o.eta ? formatDate(o.eta) : null;
     const isOverdue = o.eta && new Date(o.eta) < new Date() && o.status !== 'Delivered' && o.status !== 'Cancelled';
 
     return `<div class="catalog-card cc-rich" onclick="viewOrder('${o.id}')">
-
-      <!-- Image / placeholder -->
       <div class="cc-img ${hasImg?'cc-has-img':''}">
         ${hasImg
           ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />`
           : `<div class="cc-img-placeholder"><i class="fa-solid fa-car-side"></i></div>`}
         <span class="badge badge-${sc} cc-status-badge">${escHtml(o.status||'Ordered')}</span>
       </div>
-
-      <!-- Body -->
       <div class="cc-body">
         <div class="cc-brand-row">
           <span class="cc-brand">${escHtml(o.brand||o.vendor||'—')}</span>
@@ -1300,8 +1271,6 @@ function renderCatalog() {
         </div>
         <div class="cc-name">${escHtml(o.product_name)}</div>
         ${o.variant ? `<div class="cc-variant"><i class="fa-solid fa-cube"></i> ${escHtml(o.variant)}</div>` : ''}
-
-        <!-- Price row -->
         <div class="cc-price-row">
           <div class="cc-price-block">
             <span class="cc-price-label">Buy Price</span>
@@ -1316,8 +1285,6 @@ function renderCatalog() {
             <span class="cc-price-val cc-total">${fmt(o.total)}</span>
           </div>
         </div>
-
-        <!-- Payment status -->
         <div class="cc-footer-row">
           ${payIcon}
           ${etaStr
@@ -1326,8 +1293,6 @@ function renderCatalog() {
                </span>`
             : ''}
         </div>
-
-        <!-- Actions -->
         <div class="cc-actions" onclick="event.stopPropagation()">
           <button class="btn btn-ghost btn-icon cc-btn" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
           <button class="btn btn-danger btn-icon cc-btn" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
@@ -1338,16 +1303,16 @@ function renderCatalog() {
 }
 
 /* ══════════════════════════════════════ HELPERS ══════════════════════════════════════ */
-function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
-function setVal(id,val){const el=document.getElementById(id);if(el)el.value=val??'';}
-function escHtml(str=''){return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');}
-function formatDate(s){if(!s)return'—';const d=new Date(s);return isNaN(d)?s:d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}
-function showToast(message,type='info'){
-  let t=document.getElementById('globalToast');
-  if(!t){t=document.createElement('div');t.id='globalToast';Object.assign(t.style,{position:'fixed',right:'20px',bottom:'20px',zIndex:'9999',padding:'12px 16px',borderRadius:'12px',color:'#fff',fontSize:'14px',fontWeight:'600',boxShadow:'0 10px 30px rgba(0,0,0,0.25)',transition:'all .25s ease',transform:'translateY(20px)',opacity:'0'});document.body.appendChild(t);}
-  t.style.background={success:'linear-gradient(135deg,#22c55e,#14b8a6)',warning:'linear-gradient(135deg,#f97316,#ef4444)',info:'linear-gradient(135deg,#7c5cfc,#6366f1)'}[type]||'linear-gradient(135deg,#7c5cfc,#6366f1)';
-  t.textContent=message;
-  requestAnimationFrame(()=>{t.style.transform='translateY(0)';t.style.opacity='1';});
+function setText(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; }
+function setVal(id,val) { const el=document.getElementById(id); if(el) el.value=val??''; }
+function escHtml(str='') { return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
+function formatDate(s)   { if(!s) return '—'; const d=new Date(s); return isNaN(d)?s:d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+function showToast(message, type='info') {
+  let t = document.getElementById('globalToast');
+  if (!t) { t=document.createElement('div'); t.id='globalToast'; Object.assign(t.style,{position:'fixed',right:'20px',bottom:'20px',zIndex:'9999',padding:'12px 16px',borderRadius:'12px',color:'#fff',fontSize:'14px',fontWeight:'600',boxShadow:'0 10px 30px rgba(0,0,0,0.25)',transition:'all .25s ease',transform:'translateY(20px)',opacity:'0'}); document.body.appendChild(t); }
+  t.style.background = {success:'linear-gradient(135deg,#22c55e,#14b8a6)',warning:'linear-gradient(135deg,#f97316,#ef4444)',info:'linear-gradient(135deg,#7c5cfc,#6366f1)'}[type]||'linear-gradient(135deg,#7c5cfc,#6366f1)';
+  t.textContent = message;
+  requestAnimationFrame(() => { t.style.transform='translateY(0)'; t.style.opacity='1'; });
   clearTimeout(window.__toastTimer);
-  window.__toastTimer=setTimeout(()=>{t.style.transform='translateY(20px)';t.style.opacity='0';},2500);
+  window.__toastTimer = setTimeout(() => { t.style.transform='translateY(20px)'; t.style.opacity='0'; }, 2500);
 }
