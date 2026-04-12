@@ -2679,6 +2679,7 @@ input, select, textarea { color-scheme: light; }
 
 /* Hide label on very small screens, keep icon */
 @media (max-width: 480px) {
+  .topbar-add-label { display: none; }
   .topbar-add-btn { padding: 0.5rem 0.7rem; }
 }
 
@@ -3112,4 +3113,29 @@ input, select, textarea { color-scheme: light; }
   border-radius: var(--radius-sm);
   padding: 0.6rem 0.7rem;
   margin: 0.5rem 0 0.4rem;
+}
+
+
+/* ══════════════════════════════════════
+   COLLECTION TABLE — FIT IN SCREEN
+══════════════════════════════════════ */
+/* Override forced nowrap so table fits without horizontal scroll */
+.orders-table th,
+.orders-table td { white-space: normal !important; }
+.orders-table th { white-space: nowrap !important; }
+.orders-table .order-product-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+.orders-table .order-product-cell { min-width: 0; }
+
+/* ══════════════════════════════════════
+   ADD ORDER NAV — ALWAYS VISIBLE ON MOBILE
+══════════════════════════════════════ */
+/* Make sure Add Order is never hidden on mobile */
+.nav-item[data-section="add-order"] {
+  display: flex !important;
 }
