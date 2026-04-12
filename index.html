@@ -79,10 +79,6 @@
         <button class="btn btn-primary topbar-add-btn" id="topbarAddBtn">
           <i class="fa-solid fa-plus"></i> <span class="topbar-add-label">Add Order</span>
         </button>
-        <button class="icon-btn notif-btn" data-tooltip="Notifications">
-          <i class="fa-solid fa-bell"></i>
-          <span class="notif-dot" id="notifDot"></span>
-        </button>
         <div class="topbar-profile">
           <div class="avatar"><i class="fa-solid fa-user"></i></div>
           <div class="profile-info">
@@ -283,7 +279,7 @@
         </div>
 
         <!-- DESKTOP TABLE -->
-        <div class="table-wrap glass desktop-only">
+        <div class="table-wrap glass desktop-only" style="overflow-x:auto">
           <table class="orders-table" id="ordersTable">
             <thead>
               <tr>
@@ -291,16 +287,14 @@
                 <th>Brand</th>
                 <th>Status</th>
                 <th>Qty</th>
-                <th>Buy Price</th>
                 <th>Total</th>
-                <th>Paid</th>
                 <th>Pending</th>
                 <th>ETA</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="ordersTableBody">
-              <tr><td colspan="10" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>
+              <tr><td colspan="8" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>
             </tbody>
           </table>
         </div>
@@ -447,6 +441,21 @@
               </div>
             </details>
 
+            <!-- PHOTO -->
+            <div class="form-section">
+              <div class="form-section-label"><i class="fa-solid fa-camera"></i> Photo</div>
+              <div style="padding:0.85rem 1rem 1rem">
+                <div class="image-upload-area" id="pImageUploadArea">
+                  <div class="image-preview" id="pImagePreview">
+                    <i class="fa-solid fa-camera"></i>
+                    <p>Click to upload photo</p>
+                    <span>JPG, PNG, WEBP · max 5MB</span>
+                  </div>
+                  <input type="file" id="pImage" accept="image/*" hidden />
+                </div>
+              </div>
+            </div>
+
             <div class="add-order-page-footer">
               <button type="button" class="btn btn-ghost" id="addOrderPageClear">
                 <i class="fa-solid fa-rotate-left"></i> Clear
@@ -565,10 +574,10 @@
           <div class="settings-about-list">
             <div class="settings-about-row">
               <div>
-                <div class="sa-title">PreTrack NEXUS</div>
+                <div class="sa-title">PreTrack Pegasus</div>
                 <div class="sa-sub">Diecast collection &amp; preorder tracker</div>
               </div>
-              <span class="sa-badge sa-badge-version">v4.0</span>
+              <span class="sa-badge sa-badge-version">v4.1</span>
             </div>
             <div class="settings-about-row">
               <div>
