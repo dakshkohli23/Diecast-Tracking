@@ -26,17 +26,15 @@
       <a href="#" class="nav-item active" data-section="dashboard" data-tooltip="Dashboard">
         <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
       </a>
-      <!-- Inventory now points to orders (merged) -->
       <a href="#" class="nav-item" data-section="orders" data-tooltip="Collection">
         <i class="fa-solid fa-car-side"></i><span>Collection</span>
       </a>
       <a href="#" class="nav-item" data-section="catalog" data-tooltip="Catalog">
         <i class="fa-solid fa-shop"></i><span>Catalog</span>
       </a>
-      <!-- Add Order shortcut -->
-      <button class="nav-item nav-add-order" id="sidebarAddOrder" data-tooltip="Add Order">
+      <a href="#" class="nav-item" data-section="add-order" data-tooltip="Add Order">
         <i class="fa-solid fa-circle-plus"></i><span>Add Order</span>
-      </button>
+      </a>
 
       <div class="nav-group-label">REPORTS</div>
       <a href="#" class="nav-item" data-section="analytics" data-tooltip="Analytics">
@@ -141,10 +139,10 @@
             <div class="stat-bar"><div class="stat-bar-fill s-green" id="statQtyBar" style="width:80%"></div></div>
           </div>
           <div class="stat-card glass">
-            <div class="stat-card-top"><div class="stat-icon teal"><i class="fa-solid fa-chart-line"></i></div><span class="stat-badge s-teal">Market</span></div>
-            <div class="stat-label">Market Value</div>
-            <div class="stat-value" id="statMarketValue">₹0</div>
-            <div class="stat-footer"><i class="fa-solid fa-arrow-trend-up s-teal"></i><span class="s-teal">Portfolio worth</span></div>
+            <div class="stat-card-top"><div class="stat-icon teal"><i class="fa-solid fa-indian-rupee-sign"></i></div><span class="stat-badge s-teal">Avg Cost</span></div>
+            <div class="stat-label">Avg Buy Price</div>
+            <div class="stat-value" id="statAvgBuy">₹0</div>
+            <div class="stat-footer"><i class="fa-solid fa-calculator s-teal"></i><span class="s-teal">Per unit avg</span></div>
             <div class="stat-bar"><div class="stat-bar-fill s-teal" style="width:65%"></div></div>
           </div>
           <div class="stat-card glass">
@@ -190,11 +188,11 @@
             <div class="stat-bar"><div class="stat-bar-fill s-red" id="statOverdueBar" style="width:0%"></div></div>
           </div>
           <div class="stat-card glass">
-            <div class="stat-card-top"><div class="stat-icon indigo"><i class="fa-solid fa-clone"></i></div><span class="stat-badge s-indigo">Variants</span></div>
-            <div class="stat-label">Duplicates</div>
-            <div class="stat-value" id="statDuplicates">0</div>
-            <div class="stat-footer"><i class="fa-solid fa-copy s-indigo"></i><span class="s-indigo">Duplicate variants</span></div>
-            <div class="stat-bar"><div class="stat-bar-fill s-indigo" id="statDuplicatesBar" style="width:0%"></div></div>
+            <div class="stat-card-top"><div class="stat-icon indigo"><i class="fa-solid fa-crown"></i></div><span class="stat-badge s-indigo">Top Brand</span></div>
+            <div class="stat-label">Most Ordered</div>
+            <div class="stat-value stat-value-sm" id="statTopBrand">—</div>
+            <div class="stat-footer"><i class="fa-solid fa-ranking-star s-indigo"></i><span class="s-indigo">By quantity</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill s-indigo" style="width:80%"></div></div>
           </div>
         </div>
 
@@ -244,7 +242,7 @@
         <div class="section-header">
           <div>
             <h2 class="section-title">Collection</h2>
-            <p class="section-sub">All orders, preorders & inventory</p>
+            <p class="section-sub">All orders, preorders &amp; inventory</p>
           </div>
           <button class="btn btn-primary" id="addOrderBtn">
             <i class="fa-solid fa-plus"></i> <span>Add Model</span>
@@ -255,7 +253,7 @@
         <div class="filters-bar glass">
           <div class="filter-search">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" id="invSearch" placeholder="Search name, brand, series..." />
+            <input type="text" id="invSearch" placeholder="Search name, brand..." />
           </div>
           <select id="invFilterBrand" class="filter-select">
             <option value="">All Brands</option>
@@ -263,23 +261,14 @@
           <select id="invFilterStatus" class="filter-select">
             <option value="">All Statuses</option>
             <option>Ordered</option>
-            <option>Processing</option>
-            <option>Shipped</option>
             <option>In Transit</option>
             <option>Delivered</option>
-            <option>Owned</option>
-            <option>Preorder</option>
-            <option>Wishlist</option>
-            <option>Sold</option>
+            <option>Cancelled</option>
           </select>
           <select id="invFilterScale" class="filter-select">
             <option value="">All Scales</option>
-            <option>1:64</option>
-            <option>1:43</option>
-            <option>1:18</option>
-            <option>1:24</option>
-            <option>1:12</option>
-            <option>Other</option>
+            <option>1:64</option><option>1:43</option><option>1:18</option>
+            <option>1:24</option><option>1:12</option><option>Other</option>
           </select>
           <select id="invSort" class="filter-select">
             <option value="newest">Newest</option>
@@ -289,35 +278,184 @@
             <option value="price-lo">Price Low</option>
           </select>
           <button class="btn btn-ghost" id="invClearFilters">
-            <i class="fa-solid fa-xmark"></i> <span>Clear</span>
+            <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
 
-        <!-- FULL INVENTORY TABLE -->
-        <div class="table-wrap glass">
+        <!-- DESKTOP TABLE -->
+        <div class="table-wrap glass desktop-only">
           <table class="orders-table" id="ordersTable">
             <thead>
               <tr>
                 <th>Product</th>
                 <th>Brand</th>
-                <th>Series</th>
-                <th>Scale</th>
                 <th>Status</th>
                 <th>Qty</th>
                 <th>Buy Price</th>
-                <th>Market Value</th>
                 <th>Total</th>
                 <th>Paid</th>
                 <th>Pending</th>
                 <th>ETA</th>
-                <th>Location</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="ordersTableBody">
-              <tr><td colspan="14" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>
+              <tr><td colspan="10" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- MOBILE CARDS -->
+        <div class="mobile-order-list mobile-only" id="mobileOrderList">
+          <div class="empty-state">No items found</div>
+        </div>
+      </section>
+
+      <!-- ═══ SECTION: ADD ORDER ═══ -->
+      <section class="section" id="section-add-order">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Add Order</h2>
+            <p class="section-sub">Track a new diecast model</p>
+          </div>
+        </div>
+
+        <div class="add-order-page-wrap">
+          <form id="addOrderPageForm" class="add-order-page-form glass">
+
+            <!-- REQUIRED -->
+            <div class="form-section">
+              <div class="form-section-label"><i class="fa-solid fa-star"></i> Required</div>
+              <div class="form-grid-new">
+                <div class="form-group fg-full">
+                  <label class="fg-label"><i class="fa-solid fa-tag"></i> Product Name <span class="fg-required">*</span></label>
+                  <input type="text" id="pProductName" class="fg-input" placeholder="e.g. Nissan Skyline GT-R R34" required />
+                </div>
+                <div class="form-group fg-half">
+                  <label class="fg-label"><i class="fa-solid fa-building"></i> Brand <span class="fg-required">*</span></label>
+                  <div class="brand-select-wrap">
+                    <select id="pBrandSelect" class="fg-input fg-select" required>
+                      <option value="">Select Brand</option>
+                      <option value="Hot Wheels">Hot Wheels</option>
+                      <option value="Mini GT">Mini GT</option>
+                      <option value="Pop Race">Pop Race</option>
+                      <option value="Tarmac Works">Tarmac Works</option>
+                      <option value="Tomica">Tomica</option>
+                      <option value="Matchbox">Matchbox</option>
+                      <option value="Kaido House">Kaido House</option>
+                      <option value="Inno64">Inno64</option>
+                      <option value="__new__">＋ Add New Brand</option>
+                    </select>
+                  </div>
+                  <input type="hidden" id="pBrand" />
+                  <div class="new-brand-row hidden" id="pNewBrandRow">
+                    <input type="text" id="pNewBrand" class="fg-input" placeholder="Enter new brand name..." />
+                    <button type="button" class="btn-add-brand" id="pConfirmNewBrand"><i class="fa-solid fa-check"></i> Add</button>
+                    <button type="button" class="btn-cancel-brand" id="pCancelNewBrand"><i class="fa-solid fa-xmark"></i></button>
+                  </div>
+                </div>
+                <div class="form-group fg-quarter">
+                  <label class="fg-label"><i class="fa-solid fa-boxes-stacked"></i> Qty <span class="fg-required">*</span></label>
+                  <input type="number" id="pQty" class="fg-input" min="1" value="1" required />
+                </div>
+                <div class="form-group fg-quarter">
+                  <label class="fg-label"><i class="fa-solid fa-calendar-plus"></i> Order Date</label>
+                  <input type="date" id="pOrderDate" class="fg-input" />
+                </div>
+                <div class="form-group fg-quarter">
+                  <label class="fg-label"><i class="fa-solid fa-calendar-check"></i> ETA Date</label>
+                  <input type="date" id="pEta" class="fg-input" />
+                </div>
+                <div class="form-group fg-full">
+                  <label class="fg-label"><i class="fa-solid fa-circle-dot"></i> Status</label>
+                  <div class="status-pill-group" id="pStatusPillGroup">
+                    <label class="status-pill active" data-status="Ordered"><input type="radio" name="pStatusRadio" value="Ordered" checked hidden /><i class="fa-solid fa-cart-shopping"></i> Ordered</label>
+                    <label class="status-pill" data-status="In Transit"><input type="radio" name="pStatusRadio" value="In Transit" hidden /><i class="fa-solid fa-truck-moving"></i> In Transit</label>
+                    <label class="status-pill" data-status="Delivered"><input type="radio" name="pStatusRadio" value="Delivered" hidden /><i class="fa-solid fa-box-open"></i> Delivered</label>
+                    <label class="status-pill" data-status="Cancelled"><input type="radio" name="pStatusRadio" value="Cancelled" hidden /><i class="fa-solid fa-ban"></i> Cancelled</label>
+                  </div>
+                  <input type="hidden" id="pStatus" value="Ordered" />
+                </div>
+              </div>
+            </div>
+
+            <!-- PAYMENT -->
+            <div class="form-section">
+              <div class="form-section-label"><i class="fa-solid fa-wallet"></i> Payment</div>
+              <div class="form-grid-new">
+                <div class="form-group fg-quarter">
+                  <label class="fg-label"><i class="fa-solid fa-tag"></i> Pre Order Amt (₹)</label>
+                  <input type="number" id="pPreorderPrice" class="fg-input" min="0" value="0" placeholder="0" />
+                </div>
+                <div class="form-group fg-quarter">
+                  <label class="fg-label"><i class="fa-solid fa-indian-rupee-sign"></i> Buy Price/piece (₹)</label>
+                  <input type="number" id="pActualPrice" class="fg-input" min="0" value="0" placeholder="0" />
+                </div>
+                <div class="form-group fg-quarter">
+                  <label class="fg-label"><i class="fa-solid fa-truck"></i> Shipping (₹)</label>
+                  <input type="number" id="pShipping" class="fg-input" min="0" value="0" placeholder="0" />
+                </div>
+                <div class="form-group fg-quarter">
+                  <label class="fg-label"><i class="fa-solid fa-hand-holding-dollar"></i> Paid/piece (₹)</label>
+                  <input type="number" id="pPaid" class="fg-input" min="0" value="0" placeholder="0" />
+                  <span class="fg-hint">× qty = total paid</span>
+                </div>
+                <div class="form-group fg-half">
+                  <label class="fg-label"><i class="fa-solid fa-calculator"></i> Total (auto)</label>
+                  <div class="fg-calc-field" id="pTotalDisplay">₹0</div>
+                  <input type="hidden" id="pTotal" />
+                </div>
+                <div class="form-group fg-half">
+                  <label class="fg-label"><i class="fa-solid fa-hourglass-half"></i> Pending (auto)</label>
+                  <div class="fg-calc-field" id="pPendingDisplay">₹0</div>
+                  <input type="hidden" id="pPending" />
+                </div>
+              </div>
+            </div>
+
+            <!-- OPTIONAL -->
+            <details class="form-section form-section-optional">
+              <summary class="form-section-label form-section-toggle">
+                <i class="fa-solid fa-ellipsis"></i> Optional Details
+                <i class="fa-solid fa-chevron-down toggle-chevron"></i>
+              </summary>
+              <div class="form-grid-new" style="margin-top:1rem">
+                <div class="form-group fg-half">
+                  <label class="fg-label"><i class="fa-solid fa-barcode"></i> Order / Tracking #</label>
+                  <input type="text" id="pOrderNumber" class="fg-input" placeholder="e.g. TRK-123456" />
+                </div>
+                <div class="form-group fg-quarter">
+                  <label class="fg-label"><i class="fa-solid fa-ruler"></i> Scale</label>
+                  <select id="pScale" class="fg-input fg-select">
+                    <option value="1:64">1:64</option><option value="1:43">1:43</option>
+                    <option value="1:18">1:18</option><option value="1:24">1:24</option>
+                    <option value="1:12">1:12</option><option value="Other">Other</option>
+                  </select>
+                </div>
+                <div class="form-group fg-quarter">
+                  <label class="fg-label"><i class="fa-solid fa-cube"></i> Variant</label>
+                  <select id="pVariant" class="fg-input fg-select">
+                    <option value="Box">Box</option>
+                    <option value="Blister">Blister</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div class="form-group fg-full">
+                  <label class="fg-label"><i class="fa-solid fa-note-sticky"></i> Notes</label>
+                  <textarea id="pNotes" class="fg-input fg-textarea" placeholder="Any notes..." rows="2"></textarea>
+                </div>
+              </div>
+            </details>
+
+            <div class="add-order-page-footer">
+              <button type="button" class="btn btn-ghost" id="addOrderPageClear">
+                <i class="fa-solid fa-rotate-left"></i> Clear
+              </button>
+              <button type="submit" class="btn btn-primary btn-lg" id="addOrderPageSave">
+                <i class="fa-solid fa-floppy-disk"></i> Save Order
+              </button>
+            </div>
+          </form>
         </div>
       </section>
 
@@ -339,67 +477,55 @@
         <div class="section-header">
           <div>
             <h2 class="section-title">Analytics</h2>
-            <p class="section-sub">Value, ROI, brand and performance insights</p>
+            <p class="section-sub">Spend, brand and order insights</p>
           </div>
         </div>
 
-        <!-- ROI SUMMARY CARDS (from Image 1) -->
+        <!-- SUMMARY CARDS -->
         <div class="roi-stats-grid" id="roiStatsGrid">
           <div class="roi-stat-card glass">
-            <div class="roi-stat-label"><i class="fa-solid fa-chart-line"></i> Portfolio Value</div>
-            <div class="roi-stat-value" id="roiPortfolioValue">₹0</div>
-            <div class="roi-stat-sub">Current market value</div>
-          </div>
-          <div class="roi-stat-card glass">
-            <div class="roi-stat-label"><i class="fa-solid fa-receipt"></i> Total Cost</div>
+            <div class="roi-stat-label"><i class="fa-solid fa-receipt"></i> Total Spent</div>
             <div class="roi-stat-value" id="roiTotalCost">₹0</div>
-            <div class="roi-stat-sub">Total amount spent</div>
+            <div class="roi-stat-sub">Buy price × qty + shipping</div>
           </div>
           <div class="roi-stat-card glass">
-            <div class="roi-stat-label"><i class="fa-solid fa-percent"></i> ROI</div>
-            <div class="roi-stat-value" id="roiPercent">0%</div>
-            <div class="roi-stat-sub">Return on investment</div>
+            <div class="roi-stat-label"><i class="fa-solid fa-hourglass-half"></i> Total Pending</div>
+            <div class="roi-stat-value" id="roiTotalPending">₹0</div>
+            <div class="roi-stat-sub">Still to be paid</div>
           </div>
           <div class="roi-stat-card glass">
-            <div class="roi-stat-label"><i class="fa-solid fa-box-open"></i> Avg Model Value</div>
+            <div class="roi-stat-label"><i class="fa-solid fa-boxes-stacked"></i> Total Units</div>
+            <div class="roi-stat-value" id="roiTotalUnits">0</div>
+            <div class="roi-stat-sub">Across all orders</div>
+          </div>
+          <div class="roi-stat-card glass">
+            <div class="roi-stat-label"><i class="fa-solid fa-calculator"></i> Avg Buy Price</div>
             <div class="roi-stat-value" id="roiAvgValue">₹0</div>
-            <div class="roi-stat-sub">Per item average</div>
+            <div class="roi-stat-sub">Per unit average</div>
           </div>
         </div>
 
         <!-- MAIN ANALYTICS GRID -->
         <div class="analytics-grid">
-          <!-- Brand Value Comparison (bar chart, from Image 1) -->
+          <!-- Brand Spend Comparison -->
           <div class="widget glass analytics-brand-value">
-            <div class="widget-header"><h3><i class="fa-solid fa-ranking-star"></i> Brand Value Comparison</h3></div>
+            <div class="widget-header"><h3><i class="fa-solid fa-ranking-star"></i> Brand Spend Comparison</h3></div>
             <div id="brandValueChart" class="brand-value-chart-area"></div>
           </div>
 
-          <!-- Status Distribution (list style, from Image 1) -->
+          <!-- Status Distribution — only 4 statuses -->
           <div class="widget glass">
             <div class="widget-header"><h3><i class="fa-solid fa-layer-group"></i> Status Distribution</h3></div>
             <div id="statusDistList" class="status-dist-list"></div>
           </div>
 
-          <!-- Brand Breakdown (existing bar chart) -->
+          <!-- Brand Breakdown by count -->
           <div class="widget glass">
             <div class="widget-header"><h3><i class="fa-solid fa-store"></i> Brand Breakdown</h3></div>
             <div id="vendorChart" class="chart-area"></div>
           </div>
 
-          <!-- Status Mix (from Image 1 - bottom right) -->
-          <div class="widget glass">
-            <div class="widget-header"><h3><i class="fa-solid fa-chart-pie"></i> Status Mix</h3></div>
-            <div id="statusMixList" class="status-dist-list"></div>
-          </div>
-
-          <!-- Profit Leaderboard (from Image 1) -->
-          <div class="widget glass analytics-profit-lb">
-            <div class="widget-header"><h3><i class="fa-solid fa-trophy"></i> Profit Leaderboard</h3></div>
-            <div id="profitLeaderboard" class="profit-lb-list"></div>
-          </div>
-
-          <!-- Monthly Spend (existing) -->
+          <!-- Monthly Spend -->
           <div class="widget glass full-width">
             <div class="widget-header"><h3><i class="fa-solid fa-calendar-days"></i> Monthly Spend</h3></div>
             <div id="monthlyChart" class="chart-area tall"></div>
