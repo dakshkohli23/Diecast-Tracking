@@ -1040,17 +1040,87 @@ function renderAlerts() {
 }
 
 function renderPayments() {
-  const c=document.getElementById('paymentsContent'); if(!c) return;
-  if(!DB.orders.length){c.innerHTML=`<div class="widget glass full-width"><div class="widget-body"><div class="empty-state">No payment data yet</div></div></div>`;return;}
-  const rows=DB.orders.map(o=>`<tr>
-    <td>${escHtml(o.product_name||'—')}</td>
-    <td>${escHtml(o.brand||o.vendor||'—')}</td>
-    <td>₹${(o.total||0).toLocaleString('en-IN')}</td>
-    <td style="color:var(--green)">₹${(o.paid||0).toLocaleString('en-IN')}</td>
-    <td style="color:${(o.pending||0)>0?'var(--orange)':'var(--green)'}">₹${(o.pending||0).toLocaleString('en-IN')}</td>
-    <td><span class="badge badge-${(o.status||'').toLowerCase().replace(/\s+/g,'-')}">${escHtml(o.status||'Ordered')}</span></td>
-  </tr>`).join('');
-  c.innerHTML=`<div class="widget glass full-width"><div class="widget-header"><h3><i class="fa-solid fa-credit-card"></i> Payment Overview</h3></div><div class="table-wrap"><table class="orders-table"><thead><tr><th>Product</th><th>Brand</th><th>Total</th><th>Paid</th><th>Pending</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  const c = document.getElementById('paymentsContent'); if (!c) return;
+  if (!DB.orders.length) {
+    c.innerHTML = `<div class="widget glass full-width"><div class="widget-body"><div class="empty-state">No payment data yet</div></div></div>`;
+    return;
+  }
+
+  const fmt = v => `₹${v.toLocaleString('en-IN')}`;
+  const totalSpent   = DB.orders.reduce((s,o) => s+(o.total||0), 0);
+  const totalPaid    = DB.orders.reduce((s,o) => s+(o.paid||0), 0);
+  const totalPending = DB.orders.reduce((s,o) => s+(o.pending||0), 0);
+
+  // Desktop table rows
+  const rows = DB.orders.map(o => {
+    const sc = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+    const pb = (o.pending||0)<=0 ? 'badge-paid' : ((o.paid||0)>0 ? 'badge-partial' : 'badge-pending-b');
+    const pl = (o.pending||0)<=0 ? 'Paid'       : ((o.paid||0)>0 ? 'Partial'       : 'Pending');
+    return `<tr>
+      <td>
+        <div style="font-weight:600;font-size:0.85rem">${escHtml(o.product_name||'—')}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted)">${escHtml(o.brand||o.vendor||'—')} · ${escHtml(o.scale||'1:64')}</div>
+      </td>
+      <td>${fmt(o.total||0)}</td>
+      <td style="color:var(--green)">${fmt(o.paid||0)}</td>
+      <td style="color:${(o.pending||0)>0?'var(--orange)':'var(--green)'}">${fmt(o.pending||0)}</td>
+      <td><span class="badge ${pb}">${pl}</span></td>
+      <td><span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></td>
+      <td style="font-size:0.76rem;color:var(--text-muted)">${o.eta?formatDate(o.eta):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Mobile payment cards
+  const mobCards = DB.orders.map(o => {
+    const sc = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+    const pb = (o.pending||0)<=0 ? 'badge-paid' : ((o.paid||0)>0 ? 'badge-partial' : 'badge-pending-b');
+    const pl = (o.pending||0)<=0 ? 'Paid'       : ((o.paid||0)>0 ? 'Partial'       : 'Pending');
+    return `<div class="pay-mob-card glass">
+      <div class="pay-mob-top">
+        <div class="pay-mob-name">${escHtml(o.product_name||'—')}</div>
+        <span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:0.65rem">${escHtml(o.brand||o.vendor||'—')} · ${escHtml(o.scale||'1:64')}</div>
+      <div class="pay-mob-stats">
+        <div class="mob-stat"><span>Total</span><strong>${fmt(o.total||0)}</strong></div>
+        <div class="mob-stat"><span>Paid</span><strong style="color:var(--green)">${fmt(o.paid||0)}</strong></div>
+        <div class="mob-stat"><span>Pending</span><strong style="color:${(o.pending||0)>0?'var(--orange)':'var(--green)'}">${fmt(o.pending||0)}</strong></div>
+        <div class="mob-stat"><span>Status</span><strong><span class="badge ${pb}" style="font-size:0.68rem">${pl}</span></strong></div>
+      </div>
+      ${o.eta ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.4rem"><i class="fa-solid fa-calendar-days" style="color:var(--primary)"></i> ETA: ${formatDate(o.eta)}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  c.innerHTML = `
+    <div class="pay-summary-row">
+      <div class="pay-sum-card glass">
+        <div class="pay-sum-label"><i class="fa-solid fa-receipt"></i> Total Amount</div>
+        <div class="pay-sum-val">${fmt(totalSpent)}</div>
+      </div>
+      <div class="pay-sum-card glass">
+        <div class="pay-sum-label"><i class="fa-solid fa-circle-check" style="color:var(--green)"></i> Total Paid</div>
+        <div class="pay-sum-val" style="color:var(--green)">${fmt(totalPaid)}</div>
+      </div>
+      <div class="pay-sum-card glass">
+        <div class="pay-sum-label"><i class="fa-solid fa-hourglass-half" style="color:var(--orange)"></i> Total Pending</div>
+        <div class="pay-sum-val" style="color:${totalPending>0?'var(--orange)':'var(--green)'}">${fmt(totalPending)}</div>
+      </div>
+    </div>
+
+    <div class="widget glass full-width">
+      <div class="widget-header"><h3><i class="fa-solid fa-credit-card"></i> Payment Overview</h3></div>
+
+      <!-- Desktop table -->
+      <div class="table-wrap desktop-only" style="overflow-x:auto">
+        <table class="orders-table">
+          <thead><tr><th>Product</th><th>Total</th><th>Paid</th><th>Pending</th><th>Payment</th><th>Status</th><th>ETA</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+
+      <!-- Mobile cards -->
+      <div class="pay-mob-list mobile-only">${mobCards}</div>
+    </div>`;
 }
 
 function renderAnalytics() {
@@ -1149,21 +1219,72 @@ function renderAnalytics() {
 }
 
 function renderCatalog() {
-  const grid=document.getElementById('catalogGrid'); if(!grid) return;
-  if(!DB.orders.length){grid.innerHTML=`<div class="empty-state">No models tracked yet</div>`;return;}
-  grid.innerHTML=DB.orders.map(o=>{
-    const sc=(o.status||'').toLowerCase().replace(/\s+/g,'-');
-    return `<div class="catalog-card">
-      <div class="catalog-card-img">${o.image?`<img src="${o.image}" alt="${escHtml(o.product_name)}" />`:`<i class="fa-solid fa-car-side"></i>`}</div>
-      <div class="catalog-card-body">
-        <div class="catalog-card-name">${escHtml(o.product_name)}</div>
-        <div class="catalog-card-vendor">${escHtml(o.brand||o.vendor||'—')} • ${escHtml(o.scale||'1:64')}</div>
-        <div class="catalog-card-footer">
-          <span class="catalog-card-price">₹${(o.actual_price||0).toLocaleString('en-IN')}</span>
-          <span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span>
+  const grid = document.getElementById('catalogGrid'); if (!grid) return;
+  if (!DB.orders.length) { grid.innerHTML = `<div class="empty-state">No models tracked yet</div>`; return; }
+  const fmt = v => `₹${Number(v||0).toLocaleString('en-IN')}`;
+  grid.innerHTML = DB.orders.map(o => {
+    const sc      = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+    const hasImg  = !!o.image;
+    const pending = o.pending||0;
+    const payIcon = pending <= 0
+      ? `<span class="cc-pay-badge cc-paid"><i class="fa-solid fa-circle-check"></i> Paid</span>`
+      : `<span class="cc-pay-badge cc-pending"><i class="fa-solid fa-hourglass-half"></i> ₹${pending.toLocaleString('en-IN')} due</span>`;
+    const etaStr  = o.eta ? formatDate(o.eta) : null;
+    const isOverdue = o.eta && new Date(o.eta) < new Date() && o.status !== 'Delivered' && o.status !== 'Cancelled';
+
+    return `<div class="catalog-card cc-rich" onclick="viewOrder('${o.id}')">
+
+      <!-- Image / placeholder -->
+      <div class="cc-img ${hasImg?'cc-has-img':''}">
+        ${hasImg
+          ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />`
+          : `<div class="cc-img-placeholder"><i class="fa-solid fa-car-side"></i></div>`}
+        <span class="badge badge-${sc} cc-status-badge">${escHtml(o.status||'Ordered')}</span>
+      </div>
+
+      <!-- Body -->
+      <div class="cc-body">
+        <div class="cc-brand-row">
+          <span class="cc-brand">${escHtml(o.brand||o.vendor||'—')}</span>
+          <span class="cc-scale">${escHtml(o.scale||'1:64')}</span>
+        </div>
+        <div class="cc-name">${escHtml(o.product_name)}</div>
+        ${o.variant ? `<div class="cc-variant"><i class="fa-solid fa-cube"></i> ${escHtml(o.variant)}</div>` : ''}
+
+        <!-- Price row -->
+        <div class="cc-price-row">
+          <div class="cc-price-block">
+            <span class="cc-price-label">Buy Price</span>
+            <span class="cc-price-val">${fmt(o.actual_price)}</span>
+          </div>
+          <div class="cc-price-block">
+            <span class="cc-price-label">Qty</span>
+            <span class="cc-price-val">${o.quantity||1}</span>
+          </div>
+          <div class="cc-price-block">
+            <span class="cc-price-label">Total</span>
+            <span class="cc-price-val cc-total">${fmt(o.total)}</span>
+          </div>
+        </div>
+
+        <!-- Payment status -->
+        <div class="cc-footer-row">
+          ${payIcon}
+          ${etaStr
+            ? `<span class="cc-eta ${isOverdue?'cc-eta-overdue':''}">
+                <i class="fa-solid fa-${isOverdue?'triangle-exclamation':'calendar-days'}"></i> ${etaStr}
+               </span>`
+            : ''}
+        </div>
+
+        <!-- Actions -->
+        <div class="cc-actions" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost btn-icon cc-btn" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-danger btn-icon cc-btn" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
         </div>
       </div>
-    </div>`;}).join('');
+    </div>`;
+  }).join('');
 }
 
 /* ══════════════════════════════════════ HELPERS ══════════════════════════════════════ */
