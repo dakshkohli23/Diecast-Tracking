@@ -423,6 +423,143 @@ function initDashboard() {
   });
   document.getElementById('exportCsvBtn')?.addEventListener('click', exportCSV);
 
+  // ── ADD ORDER PAGE FORM ──
+  const pageForm = document.getElementById('addOrderPageForm');
+
+  // Page form brand dropdown
+  const pBrandSelect = document.getElementById('pBrandSelect');
+  const pNewBrandRow = document.getElementById('pNewBrandRow');
+  const pNewBrandIn  = document.getElementById('pNewBrand');
+  const pBrandHidden = document.getElementById('pBrand');
+  let   pageCustomBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
+
+  function rebuildPageBrandDropdown(selectVal) {
+    if (!pBrandSelect) return;
+    const base = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
+    const all  = [...base, ...pageCustomBrands];
+    while (pBrandSelect.options.length > 1) pBrandSelect.remove(1);
+    all.forEach(b => {
+      const op = document.createElement('option'); op.value = b; op.textContent = b;
+      pBrandSelect.insertBefore(op, pBrandSelect.lastElementChild);
+    });
+    if (selectVal) pBrandSelect.value = selectVal;
+  }
+  rebuildPageBrandDropdown();
+
+  pBrandSelect?.addEventListener('change', () => {
+    if (pBrandSelect.value === '__new__') {
+      pNewBrandRow?.classList.remove('hidden'); pNewBrandIn?.focus();
+      if (pBrandHidden) pBrandHidden.value = '';
+    } else {
+      pNewBrandRow?.classList.add('hidden');
+      if (pBrandHidden) pBrandHidden.value = pBrandSelect.value;
+    }
+  });
+  document.getElementById('pConfirmNewBrand')?.addEventListener('click', () => {
+    const name = pNewBrandIn?.value.trim();
+    if (!name) { showToast('Enter a brand name','warning'); return; }
+    if (!pageCustomBrands.includes(name)) {
+      pageCustomBrands.push(name);
+      localStorage.setItem('pretrack_brands', JSON.stringify(pageCustomBrands));
+      // also sync the modal dropdown list
+      customBrands = pageCustomBrands;
+    }
+    rebuildPageBrandDropdown(name); rebuildBrandDropdown(name);
+    if (pBrandHidden) pBrandHidden.value = name;
+    pNewBrandRow?.classList.add('hidden');
+    showToast(`Brand "${name}" added!`, 'success');
+  });
+  document.getElementById('pCancelNewBrand')?.addEventListener('click', () => {
+    pNewBrandRow?.classList.add('hidden');
+    if (pBrandSelect) pBrandSelect.value = '';
+    if (pBrandHidden) pBrandHidden.value = '';
+  });
+
+  // Page form status pills
+  document.querySelectorAll('#pStatusPillGroup .status-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('#pStatusPillGroup .status-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const r = pill.querySelector('input[type="radio"]');
+      if (r) { r.checked = true; const ps = document.getElementById('pStatus'); if(ps) ps.value = r.value; }
+    });
+  });
+
+  // Page form payment calc
+  ['pActualPrice','pQty','pShipping','pPaid'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', calcPageTotals);
+  });
+  function calcPageTotals() {
+    const price    = parseFloat(document.getElementById('pActualPrice')?.value) || 0;
+    const qty      = parseInt(document.getElementById('pQty')?.value)           || 1;
+    const ship     = parseFloat(document.getElementById('pShipping')?.value)    || 0;
+    const paidEach = parseFloat(document.getElementById('pPaid')?.value)        || 0;
+    const total    = (price * qty) + ship;
+    const pending  = Math.max(0, total - paidEach * qty);
+    const fmt = v => `₹${v.toLocaleString('en-IN')}`;
+    const td = document.getElementById('pTotalDisplay');   if(td) td.textContent = fmt(total);
+    const pd = document.getElementById('pPendingDisplay'); if(pd) { pd.textContent = fmt(pending); pd.classList.toggle('fg-calc-overdue', pending > 0); }
+    if(document.getElementById('pTotal'))   document.getElementById('pTotal').value   = total;
+    if(document.getElementById('pPending')) document.getElementById('pPending').value = pending;
+  }
+
+  // Page form clear
+  document.getElementById('addOrderPageClear')?.addEventListener('click', () => {
+    pageForm?.reset();
+    rebuildPageBrandDropdown();
+    if (pBrandHidden) pBrandHidden.value = '';
+    pNewBrandRow?.classList.add('hidden');
+    document.querySelectorAll('#pStatusPillGroup .status-pill').forEach(p => p.classList.remove('active'));
+    document.querySelector('#pStatusPillGroup .status-pill')?.classList.add('active');
+    const ps = document.getElementById('pStatus'); if(ps) ps.value = 'Ordered';
+    const td = document.getElementById('pTotalDisplay');   if(td) td.textContent = '₹0';
+    const pd = document.getElementById('pPendingDisplay'); if(pd) { pd.textContent = '₹0'; pd.classList.remove('fg-calc-overdue'); }
+  });
+
+  // Page form submit
+  pageForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById('addOrderPageSave');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
+    const price    = parseFloat(document.getElementById('pActualPrice')?.value) || 0;
+    const qty      = parseInt(document.getElementById('pQty')?.value)           || 1;
+    const ship     = parseFloat(document.getElementById('pShipping')?.value)    || 0;
+    const paidEach = parseFloat(document.getElementById('pPaid')?.value)        || 0;
+    const paidTotal = paidEach * qty;
+    const total    = (price * qty) + ship;
+    const pending  = Math.max(0, total - paidTotal);
+    try {
+      const order = {
+        product_name:   document.getElementById('pProductName')?.value.trim()  || '',
+        brand:          document.getElementById('pBrand')?.value.trim()         || document.getElementById('pBrandSelect')?.value || '',
+        order_number:   document.getElementById('pOrderNumber')?.value.trim()  || '',
+        scale:          document.getElementById('pScale')?.value               || '1:64',
+        variant:        document.getElementById('pVariant')?.value             || '',
+        notes:          document.getElementById('pNotes')?.value?.trim()       || '',
+        quantity: qty,
+        order_date:     document.getElementById('pOrderDate')?.value           || '',
+        eta:            document.getElementById('pEta')?.value                 || '',
+        status:         document.getElementById('pStatus')?.value              || 'Ordered',
+        preorder_price: parseFloat(document.getElementById('pPreorderPrice')?.value) || 0,
+        actual_price: price, shipping: ship,
+        paid_each: paidEach, paid: paidTotal, pending, total,
+        image: '', series: '', condition: 'Mint', vendor: '', location: '',
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+      };
+      await addDoc(collection(db,'orders'), order);
+      await addActivity('success', `Added — ${order.product_name}`);
+      showToast('Order saved!', 'success');
+      await fetchData();
+      // Reset form after save
+      document.getElementById('addOrderPageClear')?.click();
+      navigateTo('orders'); // go to collection to see it
+    } catch(err) {
+      console.error(err); showToast('Failed to save: ' + err.message, 'warning');
+    } finally {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Order'; }
+    }
+  });
+
   function exportCSV() {
     if (!DB.orders.length) { showToast('No orders to export', 'warning'); return; }
     const headers = ['ID','Product','Brand','Series','Scale','Condition','Order#','Vendor','Location','Variant','Qty','Buy Price','Market Value','Shipping','Paid','Pending','Total','Status','ETA','Order Date'];
@@ -545,45 +682,44 @@ function renderStats() {
   const o = DB.orders, n = o.length;
   const totalQty = o.reduce((s,x) => s + (x.quantity||1), 0);
 
-  // Market Value = total MRP (preorder_price × qty) — what they're worth
-  const marketVal = o.reduce((s,x) => s + ((x.preorder_price||0) * (x.quantity||1)), 0);
-
   // Investment = actual money spent = (buy_price × qty) + shipping for each order
   const investment = o.reduce((s,x) => {
-    const buyTotal = (x.actual_price||0) * (x.quantity||1);
-    const ship     = x.shipping||0;
-    return s + buyTotal + ship;
+    return s + ((x.actual_price||0) * (x.quantity||1)) + (x.shipping||0);
   }, 0);
 
-  // Pending = amount still owed across all orders
+  // Avg buy price per unit
+  const avgBuy = totalQty > 0 ? Math.round(investment / totalQty) : 0;
+
+  // Pending = amount still owed
   const pendingAmt = o.reduce((s,x) => s + (x.pending||0), 0);
 
   const pendingPO = o.filter(x => x.status==='Ordered'||x.status==='In Transit').length;
-  const delivered = o.filter(x => x.status==='Delivered'||x.status==='Owned').length;
+  const delivered = o.filter(x => x.status==='Delivered').length;
   const transit   = o.filter(x => x.status==='In Transit').length;
-  const overdue   = o.filter(x => x.eta && new Date(x.eta)<new Date() && x.status!=='Delivered' && x.status!=='Owned' && x.status!=='Cancelled').length;
-  const nc = {}; o.forEach(x => { const k=(x.product_name||'').toLowerCase().trim(); nc[k]=(nc[k]||0)+1; });
-  const dups = Object.values(nc).filter(v=>v>1).length;
+  const overdue   = o.filter(x => x.eta && new Date(x.eta)<new Date() && x.status!=='Delivered' && x.status!=='Cancelled').length;
+
+  // Top brand by quantity
+  const bm = {}; o.forEach(x => { const k=(x.brand||x.vendor||'—').trim(); bm[k]=(bm[k]||0)+(x.quantity||1); });
+  const topBrand = Object.entries(bm).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—';
 
   setText('statTotal', n);
   setText('statQty', totalQty);
-  setText('statMarketValue', '₹' + marketVal.toLocaleString('en-IN'));
-  setText('statInvestment',  '₹' + investment.toLocaleString('en-IN'));
-  setText('statPending',     '₹' + pendingAmt.toLocaleString('en-IN'));
+  setText('statAvgBuy',   avgBuy > 0 ? '₹' + avgBuy.toLocaleString('en-IN') : '₹0');
+  setText('statInvestment', '₹' + investment.toLocaleString('en-IN'));
+  setText('statPending',    '₹' + pendingAmt.toLocaleString('en-IN'));
   setText('statPendingPO', pendingPO);
-  setText('statDelivered',  delivered);
-  setText('statTransit',    transit);
-  setText('statOverdue',    overdue);
-  setText('statDuplicates', dups);
+  setText('statDelivered', delivered);
+  setText('statTransit',   transit);
+  setText('statOverdue',   overdue);
+  setText('statTopBrand',  topBrand);
 
   const pct = (x) => n > 0 ? Math.min(100, Math.round((x/n)*100)) : 0;
   const sb  = (id,v) => { const el=document.getElementById(id); if(el) el.style.width=v+'%'; };
-  sb('statDeliveredBar',   pct(delivered));
-  sb('statTransitBar',     pct(transit));
-  sb('statPendingPOBar',   pct(pendingPO));
-  sb('statOverdueBar',     pct(overdue));
-  sb('statDuplicatesBar',  pct(dups));
-  sb('statPendingBar',     investment > 0 ? Math.min(100, Math.round((pendingAmt/investment)*100)) : 0);
+  sb('statDeliveredBar',  pct(delivered));
+  sb('statTransitBar',    pct(transit));
+  sb('statPendingPOBar',  pct(pendingPO));
+  sb('statOverdueBar',    pct(overdue));
+  sb('statPendingBar',    investment > 0 ? Math.min(100, Math.round((pendingAmt/investment)*100)) : 0);
 
   const dot = document.getElementById('notifDot');
   if (dot) dot.classList.toggle('show', pendingAmt > 0 || overdue > 0);
@@ -624,60 +760,90 @@ function populateBrandFilter() {
   bf.value = cur;
 }
 
-/* ══════════════════════════════════════ TABLE — FULL COLUMNS ══════════════════════════════════════ */
+/* ══════════════════════════════════════ TABLE + MOBILE CARDS ══════════════════════════════════════ */
 function renderTable(orders) {
   const tbody = document.getElementById('ordersTableBody');
-  if (!tbody) return;
+  const mobileList = document.getElementById('mobileOrderList');
+
   if (!orders?.length) {
-    tbody.innerHTML = `<tr><td colspan="14" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="empty-row"><i class="fa-solid fa-inbox"></i> No items found</td></tr>`;
+    if (mobileList) mobileList.innerHTML = `<div class="empty-state"><i class="fa-solid fa-inbox"></i> No items found</div>`;
     return;
   }
 
-  tbody.innerHTML = orders.map(o => {
-    const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
-    const thumb = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
-    const cond  = o.condition || '';
-    const payPct = o.total ? Math.min(100,Math.round((o.paid/o.total)*100)) : 0;
-    const pb    = o.pending<=0?'badge-paid':(o.paid>0?'badge-partial':'badge-pending-b');
-    const pl    = o.pending<=0?'Paid':(o.paid>0?'Partial':'Pending');
+  // ── DESKTOP TABLE ──
+  if (tbody) {
+    tbody.innerHTML = orders.map(o => {
+      const sc     = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+      const thumb  = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
+      const payPct = o.total ? Math.min(100,Math.round(((o.paid||0)/o.total)*100)) : 0;
+      const pb     = (o.pending||0)<=0?'badge-paid':((o.paid||0)>0?'badge-partial':'badge-pending-b');
+      const pl     = (o.pending||0)<=0?'Paid':((o.paid||0)>0?'Partial':'Pending');
+      return `<tr>
+        <td>
+          <div class="order-product-cell">
+            <div class="order-thumb">${thumb}</div>
+            <div>
+              <div class="order-product-name">${escHtml(o.product_name)}</div>
+              <div style="font-size:0.7rem;opacity:0.6">${escHtml(o.brand||o.vendor||'—')} · ${escHtml(o.scale||'1:64')}</div>
+            </div>
+          </div>
+        </td>
+        <td>${escHtml(o.brand||o.vendor||'—')}</td>
+        <td><span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></td>
+        <td>${o.quantity||1}</td>
+        <td>₹${(o.actual_price||0).toLocaleString('en-IN')}</td>
+        <td><strong>₹${(o.total||0).toLocaleString('en-IN')}</strong></td>
+        <td style="color:var(--green)">₹${(o.paid||0).toLocaleString('en-IN')}</td>
+        <td>
+          <div class="pay-bar-wrap">
+            <span class="badge ${pb}">${pl}</span>
+            <div class="pay-bar"><div class="pay-fill" style="width:${payPct}%"></div></div>
+          </div>
+        </td>
+        <td style="font-size:0.76rem;color:var(--text-muted)">${o.eta?formatDate(o.eta):'—'}</td>
+        <td>
+          <div class="table-actions">
+            <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')" title="View"><i class="fa-solid fa-eye"></i></button>
+            <button class="btn btn-ghost btn-icon" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
 
-    return `<tr>
-      <td>
-        <div class="order-product-cell">
-          <div class="order-thumb">${thumb}</div>
-          <div>
-            <div class="order-product-name">${escHtml(o.product_name)}</div>
-            <div class="order-variant" style="font-size:0.7rem;opacity:0.65">${escHtml(cond)}${o.order_number ? ` • ${escHtml(o.order_number)}` : ''}</div>
+  // ── MOBILE CARDS ──
+  if (mobileList) {
+    mobileList.innerHTML = orders.map(o => {
+      const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+      const thumb = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
+      const pb    = (o.pending||0)<=0?'badge-paid':((o.paid||0)>0?'badge-partial':'badge-pending-b');
+      const pl    = (o.pending||0)<=0?'Paid':((o.paid||0)>0?'Partial':'Pending');
+      return `<div class="mob-order-card glass">
+        <div class="mob-card-top">
+          <div class="mob-thumb">${thumb}</div>
+          <div class="mob-card-info">
+            <div class="mob-card-name">${escHtml(o.product_name)}</div>
+            <div class="mob-card-brand">${escHtml(o.brand||o.vendor||'—')} · ${escHtml(o.scale||'1:64')}</div>
+            <span class="badge badge-${sc}" style="margin-top:0.3rem;display:inline-block">${escHtml(o.status||'Ordered')}</span>
           </div>
         </div>
-      </td>
-      <td>${escHtml(o.brand||o.vendor||'—')}</td>
-      <td>${escHtml(o.series||'—')}</td>
-      <td><code style="font-size:0.72rem">${escHtml(o.scale||'1:64')}</code></td>
-      <td><span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></td>
-      <td>${o.quantity||1}</td>
-      <td>₹${(o.actual_price||0).toLocaleString('en-IN')}</td>
-      <td>₹${(o.preorder_price||0).toLocaleString('en-IN')}</td>
-      <td><strong>₹${(o.total||0).toLocaleString('en-IN')}</strong></td>
-      <td style="color:var(--green)">₹${(o.paid||0).toLocaleString('en-IN')}</td>
-      <td>
-        <div class="pay-bar-wrap">
-          <span class="badge ${pb}">${pl}</span>
-          <div class="pay-bar"><div class="pay-fill" style="width:${payPct}%"></div></div>
+        <div class="mob-card-stats">
+          <div class="mob-stat"><span>Qty</span><strong>${o.quantity||1}</strong></div>
+          <div class="mob-stat"><span>Total</span><strong>₹${(o.total||0).toLocaleString('en-IN')}</strong></div>
+          <div class="mob-stat"><span>Paid</span><strong style="color:var(--green)">₹${(o.paid||0).toLocaleString('en-IN')}</strong></div>
+          <div class="mob-stat"><span>Pending</span><strong style="color:${(o.pending||0)>0?'var(--orange)':'var(--green)'}">₹${(o.pending||0).toLocaleString('en-IN')}</strong></div>
+          ${o.eta ? `<div class="mob-stat"><span>ETA</span><strong>${formatDate(o.eta)}</strong></div>` : ''}
         </div>
-      </td>
-      <td style="font-size:0.76rem;color:var(--text-muted)">${o.eta?formatDate(o.eta):'—'}</td>
-      <td style="font-size:0.76rem;color:var(--text-muted)">${escHtml(o.location||'—')}</td>
-      <td>
-        <div class="table-actions">
-          <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')" title="View"><i class="fa-solid fa-eye"></i></button>
-          <button class="btn btn-ghost btn-icon" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn btn-ghost btn-icon" onclick="duplicateOrder('${o.id}')" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
-          <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+        <div class="mob-card-actions">
+          <button class="btn btn-ghost btn-sm" onclick="viewOrder('${o.id}')"><i class="fa-solid fa-eye"></i> View</button>
+          <button class="btn btn-ghost btn-sm" onclick="editOrder('${o.id}')"><i class="fa-solid fa-pen"></i> Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteOrder('${o.id}')"><i class="fa-solid fa-trash"></i></button>
         </div>
-      </td>
-    </tr>`;
-  }).join('');
+      </div>`;
+    }).join('');
+  }
 }
 
 /* ══════════════════════════════════════ GLOBAL ACTIONS ══════════════════════════════════════ */
@@ -888,27 +1054,27 @@ function renderPayments() {
 }
 
 function renderAnalytics() {
-  // ── ROI SUMMARY CARDS ──
-  const totalCost      = DB.orders.reduce((s,o)=>(s+(o.total||0)),0);
-  const portfolioValue = DB.orders.reduce((s,o)=>(s+(o.preorder_price||o.actual_price||0)*(o.quantity||1)),0);
-  const roi            = totalCost > 0 ? Math.round(((portfolioValue - totalCost)/totalCost)*100) : 0;
-  const avgValue       = DB.orders.length ? Math.round(portfolioValue / DB.orders.length) : 0;
+  const o = DB.orders;
 
+  // ── SUMMARY CARDS ──
+  const totalCost   = o.reduce((s,x) => s + ((x.actual_price||0)*(x.quantity||1)) + (x.shipping||0), 0);
+  const totalPend   = o.reduce((s,x) => s + (x.pending||0), 0);
+  const totalUnits  = o.reduce((s,x) => s + (x.quantity||1), 0);
+  const avgBuy      = totalUnits > 0 ? Math.round(totalCost / totalUnits) : 0;
   const fmt = v => `₹${v.toLocaleString('en-IN')}`;
-  setText('roiPortfolioValue', fmt(portfolioValue));
-  setText('roiTotalCost',      fmt(totalCost));
-  setText('roiPercent',        `${roi >= 0 ? '+' : ''}${roi}%`);
-  setText('roiAvgValue',       fmt(avgValue));
-  const roiEl = document.getElementById('roiPercent');
-  if (roiEl) roiEl.style.color = roi >= 0 ? 'var(--green)' : 'var(--red)';
 
-  // ── BRAND VALUE COMPARISON ──
+  setText('roiTotalCost',    fmt(totalCost));
+  setText('roiTotalPending', fmt(totalPend));
+  setText('roiTotalUnits',   totalUnits.toString());
+  setText('roiAvgValue',     fmt(avgBuy));
+
+  // ── BRAND SPEND COMPARISON ──
   const bvc = document.getElementById('brandValueChart');
   if (bvc) {
     const bv = {};
-    DB.orders.forEach(o => {
-      const k = (o.brand||o.vendor||'Unknown').trim();
-      bv[k] = (bv[k]||0) + (o.preorder_price||o.actual_price||0)*(o.quantity||1);
+    o.forEach(x => {
+      const k = (x.brand||x.vendor||'Unknown').trim();
+      bv[k] = (bv[k]||0) + ((x.actual_price||0)*(x.quantity||1)) + (x.shipping||0);
     });
     const entries = Object.entries(bv).sort((a,b)=>b[1]-a[1]).slice(0,8);
     const maxVal  = entries[0]?.[1] || 1;
@@ -925,90 +1091,38 @@ function renderAnalytics() {
       : `<div class="empty-state">No data yet</div>`;
   }
 
-  // ── STATUS DISTRIBUTION (list, Image 1 style) ──
+  // ── STATUS DISTRIBUTION — only 4 statuses ──
   const sdEl = document.getElementById('statusDistList');
   if (sdEl) {
     const sm = {};
-    DB.orders.forEach(o => { const k=o.status||'Unknown'; sm[k]=(sm[k]||0)+1; });
-    const statusIcons = {
-      'Owned':'fa-box-open','Ordered':'fa-cart-shopping','In Transit':'fa-truck-moving',
-      'Preorder':'fa-clock','Sold':'fa-tag','Delivered':'fa-circle-check',
-      'Shipped':'fa-plane-departure','Processing':'fa-gear','Wishlist':'fa-heart','Unknown':'fa-circle-question'
-    };
-    const allStatuses = ['Owned','Ordered','In Transit','Preorder','Sold','Delivered','Shipped','Processing','Wishlist'];
-    sdEl.innerHTML = allStatuses.map(s => {
+    o.forEach(x => { const k=x.status||'Unknown'; sm[k]=(sm[k]||0)+1; });
+    const statusConfig = [
+      { s:'Ordered',    icon:'fa-cart-shopping',  grad:'linear-gradient(135deg,#6366f1,#7c5cfc)' },
+      { s:'In Transit', icon:'fa-truck-moving',   grad:'linear-gradient(135deg,#14b8a6,#06b6d4)' },
+      { s:'Delivered',  icon:'fa-box-open',        grad:'linear-gradient(135deg,#22c55e,#14b8a6)' },
+      { s:'Cancelled',  icon:'fa-ban',             grad:'linear-gradient(135deg,#ef4444,#f97316)' }
+    ];
+    const total = o.length || 1;
+    sdEl.innerHTML = statusConfig.map(({s,icon,grad}) => {
       const count = sm[s]||0;
-      const icon  = statusIcons[s]||'fa-circle';
+      const pct   = Math.round((count/total)*100);
       return `<div class="sd-item">
-        <div class="sd-icon"><i class="fa-solid ${icon}"></i></div>
+        <div class="sd-icon" style="background:${grad}"><i class="fa-solid ${icon}"></i></div>
         <div class="sd-info">
           <div class="sd-name">${s}</div>
-          <div class="sd-count">${count} item${count!==1?'s':''}</div>
+          <div class="sd-count">${count} item${count!==1?'s':''} · ${pct}%</div>
         </div>
         <span class="sd-badge">${count}</span>
       </div>`;
     }).join('');
   }
 
-  // ── STATUS MIX (same data, slightly different display) ──
-  const smEl = document.getElementById('statusMixList');
-  if (smEl) {
-    const sm = {};
-    DB.orders.forEach(o => { const k=o.status||'Unknown'; sm[k]=(sm[k]||0)+1; });
-    const total = DB.orders.length||1;
-    const statusColors = {
-      'Owned':'var(--green)','Ordered':'var(--indigo)','In Transit':'var(--teal)',
-      'Preorder':'var(--orange)','Sold':'var(--red)','Delivered':'var(--green)',
-      'Shipped':'var(--primary)','Processing':'var(--orange)','Wishlist':'var(--pink)'
-    };
-    smEl.innerHTML = Object.entries(sm).sort((a,b)=>b[1]-a[1]).map(([s,c])=>`
-      <div class="sd-item">
-        <div class="sd-icon" style="background:${statusColors[s]||'var(--primary)'}20">
-          <i class="fa-solid fa-layer-group" style="color:${statusColors[s]||'var(--primary)'}"></i>
-        </div>
-        <div class="sd-info">
-          <div class="sd-name">${escHtml(s)}</div>
-          <div class="sd-count">${c} item${c!==1?'s':''} · ${Math.round((c/total)*100)}%</div>
-        </div>
-        <span class="sd-badge">${c}</span>
-      </div>`).join('') || `<div class="empty-state">No data</div>`;
-  }
-
-  // ── PROFIT LEADERBOARD ──
-  const plbEl = document.getElementById('profitLeaderboard');
-  if (plbEl && DB.orders.length) {
-    const bm = {};
-    DB.orders.forEach(o => {
-      const k = (o.brand||o.vendor||'Unknown').trim();
-      if (!bm[k]) bm[k] = { cost:0, value:0 };
-      bm[k].cost  += o.total||0;
-      bm[k].value += (o.preorder_price||o.actual_price||0)*(o.quantity||1);
-    });
-    const sorted = Object.entries(bm).sort((a,b)=>(b[1].value-b[1].cost)-(a[1].value-a[1].cost)).slice(0,8);
-    const ranks = ['gold','silver','bronze'];
-    plbEl.innerHTML = sorted.map(([brand,d],i) => {
-      const profit = d.value - d.cost;
-      const cls = i < 3 ? ranks[i] : 'other';
-      const sign = profit >= 0 ? '+' : '';
-      return `<div class="plb-item">
-        <div class="plb-rank ${cls}">${i+1}</div>
-        <div class="plb-info">
-          <div class="plb-brand">${escHtml(brand)}</div>
-          <div class="plb-profit ${profit>=0?'positive':'negative'}">${sign}${fmt(Math.abs(profit))} profit potential</div>
-        </div>
-        <span class="plb-value">${fmt(d.value)}</span>
-      </div>`;
-    }).join('');
-  } else if (plbEl) {
-    plbEl.innerHTML = `<div class="empty-state">No data yet</div>`;
-  }
-
-  // ── BRAND BREAKDOWN ──
+  // ── BRAND BREAKDOWN by count ──
   const vc = document.getElementById('vendorChart');
   if (vc) {
     const vm = {};
-    DB.orders.forEach(o => { const k=o.brand||o.vendor||'Unknown'; vm[k]=(vm[k]||0)+1; });
-    vc.innerHTML = Object.entries(vm).map(([k,v])=>`
+    o.forEach(x => { const k=x.brand||x.vendor||'Unknown'; vm[k]=(vm[k]||0)+1; });
+    vc.innerHTML = Object.entries(vm).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
       <div class="mini-bar-row">
         <span>${escHtml(k)}</span>
         <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,v*20)}%"></div></div>
@@ -1020,17 +1134,17 @@ function renderAnalytics() {
   const mc = document.getElementById('monthlyChart');
   if (mc) {
     const mm = {};
-    DB.orders.forEach(o => {
-      if (!o.order_date) return;
-      const d=new Date(o.order_date), k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      mm[k] = (mm[k]||0) + (o.total||0);
+    o.forEach(x => {
+      if (!x.order_date) return;
+      const d=new Date(x.order_date), k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      mm[k] = (mm[k]||0) + ((x.actual_price||0)*(x.quantity||1)) + (x.shipping||0);
     });
     mc.innerHTML = Object.entries(mm).sort().map(([k,v])=>`
       <div class="mini-bar-row">
         <span>${escHtml(k)}</span>
         <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100,Math.round(v/500))}%"></div></div>
-        <strong>₹${v.toLocaleString('en-IN')}</strong>
-      </div>`).join('') || `<div class="empty-state">No data</div>`;
+        <strong>${fmt(v)}</strong>
+      </div>`).join('') || `<div class="empty-state">No spend data yet</div>`;
   }
 }
 
