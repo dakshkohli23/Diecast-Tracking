@@ -2679,7 +2679,6 @@ input, select, textarea { color-scheme: light; }
 
 /* Hide label on very small screens, keep icon */
 @media (max-width: 480px) {
-  .topbar-add-label { display: none; }
   .topbar-add-btn { padding: 0.5rem 0.7rem; }
 }
 
