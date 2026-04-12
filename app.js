@@ -187,69 +187,111 @@ function initDashboard() {
   });
 
   // ══════════════════════════════════════
-  // SHARED BRAND STORE — powers both modal + page form
+  // SHARED BRAND STORE — Firestore backed
   // ══════════════════════════════════════
-  let customBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
   const BASE_BRANDS = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
+  let customBrands = []; // loaded from Firestore 'brands' collection
 
-  function getAllBrands() { return [...BASE_BRANDS, ...customBrands]; }
+  async function loadBrandsFromFirestore() {
+    try {
+      const snap = await getDocs(collection(db, 'brands'));
+      customBrands = snap.docs.map(d => d.data().name).filter(Boolean);
+    } catch(e) {
+      // fallback to localStorage if Firestore unavailable
+      customBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
+    }
+    rebuildAllBrandDropdowns();
+  }
 
-  function addCustomBrand(name) {
-    if (!name || customBrands.includes(name) || BASE_BRANDS.includes(name)) return false;
-    customBrands.push(name);
-    localStorage.setItem('pretrack_brands', JSON.stringify(customBrands));
+  async function addCustomBrand(name) {
+    if (!name) return false;
+    const all = [...BASE_BRANDS, ...customBrands];
+    if (all.includes(name)) return false;
+    try {
+      await addDoc(collection(db, 'brands'), { name, createdAt: serverTimestamp() });
+      customBrands.push(name);
+    } catch(e) {
+      // fallback to localStorage
+      customBrands.push(name);
+      localStorage.setItem('pretrack_brands', JSON.stringify(customBrands));
+    }
     return true;
   }
 
-  // Rebuild a specific <select> element with current brand list
+  function getAllBrands() { return [...BASE_BRANDS, ...customBrands]; }
+
+  // Rebuild a <select> fully: clear everything, add placeholder + brands + __new__
   function rebuildDropdown(selectEl, selectedVal) {
     if (!selectEl) return;
-    while (selectEl.options.length > 1) selectEl.remove(1);
+    // Remove ALL options
+    while (selectEl.options.length > 0) selectEl.remove(0);
+    // Add placeholder
+    const placeholder = document.createElement('option');
+    placeholder.value = ''; placeholder.textContent = 'Select Brand';
+    selectEl.appendChild(placeholder);
+    // Add all brands
     getAllBrands().forEach(b => {
       const o = document.createElement('option'); o.value = b; o.textContent = b;
-      selectEl.insertBefore(o, selectEl.lastElementChild);
+      selectEl.appendChild(o);
     });
+    // Add "+ Add New Brand" at end
+    const newOpt = document.createElement('option');
+    newOpt.value = '__new__'; newOpt.textContent = '＋ Add New Brand';
+    selectEl.appendChild(newOpt);
+    // Set selected value
     if (selectedVal) selectEl.value = selectedVal;
   }
 
-  // Rebuild ALL brand dropdowns at once
   function rebuildAllBrandDropdowns(selectedVal) {
     rebuildDropdown(document.getElementById('fBrandSelect'), selectedVal);
     rebuildDropdown(document.getElementById('pBrandSelect'), selectedVal);
   }
-
-  // Alias for modal
   function rebuildBrandDropdown(val) { rebuildDropdown(document.getElementById('fBrandSelect'), val); }
 
-  rebuildAllBrandDropdowns();
+  // Load brands from Firestore on startup
+  loadBrandsFromFirestore();
 
   // ── MODAL brand dropdown ──
-  const brandSelect   = document.getElementById('fBrandSelect');
-  const newBrandRow   = document.getElementById('newBrandRow');
-  const fNewBrand     = document.getElementById('fNewBrand');
-  const fBrandHidden  = document.getElementById('fBrand');
+  const brandSelect  = document.getElementById('fBrandSelect');
+  const newBrandRow  = document.getElementById('newBrandRow');
+  const fNewBrand    = document.getElementById('fNewBrand');
+  const fBrandHidden = document.getElementById('fBrand');
 
   brandSelect?.addEventListener('change', () => {
     if (brandSelect.value === '__new__') {
       newBrandRow?.classList.remove('hidden'); fNewBrand?.focus();
       if (fBrandHidden) fBrandHidden.value = '';
+      brandSelect.value = ''; // reset select to placeholder
     } else {
       newBrandRow?.classList.add('hidden');
       if (fBrandHidden) fBrandHidden.value = brandSelect.value;
     }
   });
-  document.getElementById('confirmNewBrand')?.addEventListener('click', () => {
+
+  document.getElementById('confirmNewBrand')?.addEventListener('click', async () => {
     const name = fNewBrand?.value.trim();
     if (!name) { showToast('Enter a brand name','warning'); return; }
-    addCustomBrand(name);
-    rebuildAllBrandDropdowns(name);
-    if (fBrandHidden) fBrandHidden.value = name;
+    const btn = document.getElementById('confirmNewBrand');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+    const added = await addCustomBrand(name);
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Add'; }
+    if (added) {
+      rebuildAllBrandDropdowns(name);
+      if (fBrandHidden) fBrandHidden.value = name;
+      if (brandSelect) brandSelect.value = name;
+      showToast(`Brand "${name}" saved!`, 'success');
+    } else {
+      showToast(`"${name}" already exists`, 'warning');
+      if (brandSelect) brandSelect.value = name;
+      if (fBrandHidden) fBrandHidden.value = name;
+    }
     newBrandRow?.classList.add('hidden');
     if (fNewBrand) fNewBrand.value = '';
-    showToast(`Brand "${name}" added!`, 'success');
   });
+
   document.getElementById('cancelNewBrand')?.addEventListener('click', () => {
     newBrandRow?.classList.add('hidden');
+    if (fNewBrand) fNewBrand.value = '';
     if (brandSelect) brandSelect.value = '';
     if (fBrandHidden) fBrandHidden.value = '';
   });
@@ -446,23 +488,37 @@ function initDashboard() {
     if (pBrandSelect.value === '__new__') {
       pNewBrandRow?.classList.remove('hidden'); pNewBrandIn?.focus();
       if (pBrandHidden) pBrandHidden.value = '';
+      pBrandSelect.value = ''; // reset to placeholder
     } else {
       pNewBrandRow?.classList.add('hidden');
       if (pBrandHidden) pBrandHidden.value = pBrandSelect.value;
     }
   });
-  document.getElementById('pConfirmNewBrand')?.addEventListener('click', () => {
+
+  document.getElementById('pConfirmNewBrand')?.addEventListener('click', async () => {
     const name = pNewBrandIn?.value.trim();
     if (!name) { showToast('Enter a brand name','warning'); return; }
-    addCustomBrand(name);
-    rebuildAllBrandDropdowns(name);
-    if (pBrandHidden) pBrandHidden.value = name;
+    const btn = document.getElementById('pConfirmNewBrand');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+    const added = await addCustomBrand(name);
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Add'; }
+    if (added) {
+      rebuildAllBrandDropdowns(name);
+      if (pBrandHidden) pBrandHidden.value = name;
+      if (pBrandSelect) pBrandSelect.value = name;
+      showToast(`Brand "${name}" saved!`, 'success');
+    } else {
+      showToast(`"${name}" already exists`, 'warning');
+      if (pBrandSelect) pBrandSelect.value = name;
+      if (pBrandHidden) pBrandHidden.value = name;
+    }
     pNewBrandRow?.classList.add('hidden');
     if (pNewBrandIn) pNewBrandIn.value = '';
-    showToast(`Brand "${name}" added!`, 'success');
   });
+
   document.getElementById('pCancelNewBrand')?.addEventListener('click', () => {
     pNewBrandRow?.classList.add('hidden');
+    if (pNewBrandIn) pNewBrandIn.value = '';
     if (pBrandSelect) pBrandSelect.value = '';
     if (pBrandHidden) pBrandHidden.value = '';
   });
@@ -870,33 +926,20 @@ window.editOrder = function(id) {
   const paidEachEl = document.getElementById('fPaid');
   if (paidEachEl) paidEachEl.value = o.paid_each ?? (o.paid || 0);
 
-  // Set brand dropdown
+  // Set brand dropdown using shared rebuildDropdown
   const brandSel = document.getElementById('fBrandSelect');
   const fBrandH  = document.getElementById('fBrand');
-  const customBrandsStored = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
-  if (brandSel) {
-    // Rebuild dropdown so custom brands are present
-    const base = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
-    const all  = [...base, ...customBrandsStored];
-    while (brandSel.options.length > 1) brandSel.remove(1);
-    all.forEach(b => {
-      const opt = document.createElement('option'); opt.value = b; opt.textContent = b;
-      brandSel.insertBefore(opt, brandSel.lastElementChild);
-    });
-    const brand = o.brand || o.vendor || '';
-    brandSel.value = brand;
-    if (brandSel.value !== brand && brand) {
-      // It's a custom brand not in list yet — add it
-      const opt = document.createElement('option'); opt.value = brand; opt.textContent = brand;
-      brandSel.insertBefore(opt, brandSel.lastElementChild);
-      brandSel.value = brand;
-    }
-    if (fBrandH) fBrandH.value = brand;
+  const brand    = o.brand || o.vendor || '';
+  // If the brand isn't in the list yet, add it to customBrands so it shows
+  if (brand && !getAllBrands().includes(brand)) {
+    customBrands.push(brand);
   }
+  rebuildDropdown(brandSel, brand);
+  if (fBrandH) fBrandH.value = brand;
 
-  // Set status pills
+  // Set status pills (modal scoped)
   const status = o.status || 'Ordered';
-  document.querySelectorAll('.status-pill').forEach(p => {
+  document.querySelectorAll('#orderModal .status-pill').forEach(p => {
     p.classList.remove('active');
     const r = p.querySelector('input[type="radio"]');
     if (r && r.value === status) { p.classList.add('active'); r.checked = true; }
