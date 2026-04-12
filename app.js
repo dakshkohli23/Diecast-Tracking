@@ -186,76 +186,84 @@ function initDashboard() {
     applyCollectionFilters();
   });
 
-  // ── BRAND DROPDOWN LOGIC ──
-  const brandSelect    = document.getElementById('fBrandSelect');
-  const newBrandRow    = document.getElementById('newBrandRow');
-  const fNewBrand      = document.getElementById('fNewBrand');
-  const confirmNewBrand = document.getElementById('confirmNewBrand');
-  const cancelNewBrand  = document.getElementById('cancelNewBrand');
-  const fBrandHidden   = document.getElementById('fBrand');
-
-  // Custom brands stored in localStorage
+  // ══════════════════════════════════════
+  // SHARED BRAND STORE — powers both modal + page form
+  // ══════════════════════════════════════
   let customBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
+  const BASE_BRANDS = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
 
-  function rebuildBrandDropdown(selectVal) {
-    if (!brandSelect) return;
-    const base = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
-    const all  = [...base, ...customBrands];
-    // Remove all options except first (placeholder) and last (+Add New)
-    while (brandSelect.options.length > 1) brandSelect.remove(1);
-    all.forEach(b => {
-      const o = document.createElement('option'); o.value = b; o.textContent = b;
-      brandSelect.insertBefore(o, brandSelect.lastElementChild);
-    });
-    if (selectVal) brandSelect.value = selectVal;
+  function getAllBrands() { return [...BASE_BRANDS, ...customBrands]; }
+
+  function addCustomBrand(name) {
+    if (!name || customBrands.includes(name) || BASE_BRANDS.includes(name)) return false;
+    customBrands.push(name);
+    localStorage.setItem('pretrack_brands', JSON.stringify(customBrands));
+    return true;
   }
-  rebuildBrandDropdown();
+
+  // Rebuild a specific <select> element with current brand list
+  function rebuildDropdown(selectEl, selectedVal) {
+    if (!selectEl) return;
+    while (selectEl.options.length > 1) selectEl.remove(1);
+    getAllBrands().forEach(b => {
+      const o = document.createElement('option'); o.value = b; o.textContent = b;
+      selectEl.insertBefore(o, selectEl.lastElementChild);
+    });
+    if (selectedVal) selectEl.value = selectedVal;
+  }
+
+  // Rebuild ALL brand dropdowns at once
+  function rebuildAllBrandDropdowns(selectedVal) {
+    rebuildDropdown(document.getElementById('fBrandSelect'), selectedVal);
+    rebuildDropdown(document.getElementById('pBrandSelect'), selectedVal);
+  }
+
+  // Alias for modal
+  function rebuildBrandDropdown(val) { rebuildDropdown(document.getElementById('fBrandSelect'), val); }
+
+  rebuildAllBrandDropdowns();
+
+  // ── MODAL brand dropdown ──
+  const brandSelect   = document.getElementById('fBrandSelect');
+  const newBrandRow   = document.getElementById('newBrandRow');
+  const fNewBrand     = document.getElementById('fNewBrand');
+  const fBrandHidden  = document.getElementById('fBrand');
 
   brandSelect?.addEventListener('change', () => {
     if (brandSelect.value === '__new__') {
-      newBrandRow?.classList.remove('hidden');
-      fNewBrand?.focus();
-      fBrandHidden && (fBrandHidden.value = '');
+      newBrandRow?.classList.remove('hidden'); fNewBrand?.focus();
+      if (fBrandHidden) fBrandHidden.value = '';
     } else {
       newBrandRow?.classList.add('hidden');
-      fBrandHidden && (fBrandHidden.value = brandSelect.value);
+      if (fBrandHidden) fBrandHidden.value = brandSelect.value;
     }
   });
-
-  confirmNewBrand?.addEventListener('click', () => {
+  document.getElementById('confirmNewBrand')?.addEventListener('click', () => {
     const name = fNewBrand?.value.trim();
-    if (!name) { showToast('Enter a brand name', 'warning'); return; }
-    if (!customBrands.includes(name)) {
-      customBrands.push(name);
-      localStorage.setItem('pretrack_brands', JSON.stringify(customBrands));
-    }
-    rebuildBrandDropdown(name);
-    fBrandHidden && (fBrandHidden.value = name);
+    if (!name) { showToast('Enter a brand name','warning'); return; }
+    addCustomBrand(name);
+    rebuildAllBrandDropdowns(name);
+    if (fBrandHidden) fBrandHidden.value = name;
     newBrandRow?.classList.add('hidden');
+    if (fNewBrand) fNewBrand.value = '';
     showToast(`Brand "${name}" added!`, 'success');
   });
-
-  cancelNewBrand?.addEventListener('click', () => {
+  document.getElementById('cancelNewBrand')?.addEventListener('click', () => {
     newBrandRow?.classList.add('hidden');
-    brandSelect && (brandSelect.value = '');
-    fBrandHidden && (fBrandHidden.value = '');
+    if (brandSelect) brandSelect.value = '';
+    if (fBrandHidden) fBrandHidden.value = '';
   });
 
-  // ── STATUS PILL LOGIC ──
-  document.querySelectorAll('.status-pill').forEach(pill => {
+  // ── STATUS PILL LOGIC (modal only — scoped to modal form) ──
+  document.querySelectorAll('#orderModal .status-pill').forEach(pill => {
     pill.addEventListener('click', () => {
-      document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('#orderModal .status-pill').forEach(p => p.classList.remove('active'));
       pill.classList.add('active');
       const radio = pill.querySelector('input[type="radio"]');
-      if (radio) {
-        radio.checked = true;
-        const fStatus = document.getElementById('fStatus');
-        if (fStatus) fStatus.value = radio.value;
-      }
+      if (radio) { radio.checked = true; const fs = document.getElementById('fStatus'); if(fs) fs.value = radio.value; }
     });
   });
-  // Activate first pill by default
-  document.querySelector('.status-pill')?.classList.add('active');
+  document.querySelector('#orderModal .status-pill')?.classList.add('active');
 
   // ── MODAL OPEN/CLOSE ──
   function openModal() {
@@ -273,11 +281,11 @@ function initDashboard() {
     _currentImageFile = null; _currentImageB64 = '';
     // Reset brand
     rebuildBrandDropdown();
-    newBrandRow?.classList.add('hidden');
-    if (fBrandHidden) fBrandHidden.value = '';
-    // Reset status pills
-    document.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
-    document.querySelector('.status-pill')?.classList.add('active');
+    document.getElementById('newBrandRow')?.classList.add('hidden');
+    if (document.getElementById('fBrand')) document.getElementById('fBrand').value = '';
+    // Reset status pills (modal scoped)
+    document.querySelectorAll('#orderModal .status-pill').forEach(p => p.classList.remove('active'));
+    document.querySelector('#orderModal .status-pill')?.classList.add('active');
     const fStatusEl = document.getElementById('fStatus'); if (fStatusEl) fStatusEl.value = 'Ordered';
     // Reset calc displays
     const td = document.getElementById('fTotalDisplay');   if (td) td.textContent = '₹0';
@@ -424,27 +432,15 @@ function initDashboard() {
   document.getElementById('exportCsvBtn')?.addEventListener('click', exportCSV);
 
   // ── ADD ORDER PAGE FORM ──
-  const pageForm = document.getElementById('addOrderPageForm');
-
-  // Page form brand dropdown
+  const pageForm     = document.getElementById('addOrderPageForm');
   const pBrandSelect = document.getElementById('pBrandSelect');
   const pNewBrandRow = document.getElementById('pNewBrandRow');
   const pNewBrandIn  = document.getElementById('pNewBrand');
   const pBrandHidden = document.getElementById('pBrand');
-  let   pageCustomBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
+  let _pageImageFile = null;
 
-  function rebuildPageBrandDropdown(selectVal) {
-    if (!pBrandSelect) return;
-    const base = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
-    const all  = [...base, ...pageCustomBrands];
-    while (pBrandSelect.options.length > 1) pBrandSelect.remove(1);
-    all.forEach(b => {
-      const op = document.createElement('option'); op.value = b; op.textContent = b;
-      pBrandSelect.insertBefore(op, pBrandSelect.lastElementChild);
-    });
-    if (selectVal) pBrandSelect.value = selectVal;
-  }
-  rebuildPageBrandDropdown();
+  // Page brand dropdown uses shared store
+  rebuildDropdown(pBrandSelect);
 
   pBrandSelect?.addEventListener('change', () => {
     if (pBrandSelect.value === '__new__') {
@@ -458,15 +454,11 @@ function initDashboard() {
   document.getElementById('pConfirmNewBrand')?.addEventListener('click', () => {
     const name = pNewBrandIn?.value.trim();
     if (!name) { showToast('Enter a brand name','warning'); return; }
-    if (!pageCustomBrands.includes(name)) {
-      pageCustomBrands.push(name);
-      localStorage.setItem('pretrack_brands', JSON.stringify(pageCustomBrands));
-      // also sync the modal dropdown list
-      customBrands = pageCustomBrands;
-    }
-    rebuildPageBrandDropdown(name); rebuildBrandDropdown(name);
+    addCustomBrand(name);
+    rebuildAllBrandDropdowns(name);
     if (pBrandHidden) pBrandHidden.value = name;
     pNewBrandRow?.classList.add('hidden');
+    if (pNewBrandIn) pNewBrandIn.value = '';
     showToast(`Brand "${name}" added!`, 'success');
   });
   document.getElementById('pCancelNewBrand')?.addEventListener('click', () => {
@@ -475,7 +467,7 @@ function initDashboard() {
     if (pBrandHidden) pBrandHidden.value = '';
   });
 
-  // Page form status pills
+  // Page status pills (scoped)
   document.querySelectorAll('#pStatusPillGroup .status-pill').forEach(pill => {
     pill.addEventListener('click', () => {
       document.querySelectorAll('#pStatusPillGroup .status-pill').forEach(p => p.classList.remove('active'));
@@ -485,7 +477,21 @@ function initDashboard() {
     });
   });
 
-  // Page form payment calc
+  // Page image upload
+  document.getElementById('pImageUploadArea')?.addEventListener('click', () => document.getElementById('pImage')?.click());
+  document.getElementById('pImage')?.addEventListener('change', (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { showToast('Image too large (max 5MB)','warning'); return; }
+    _pageImageFile = file;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const prev = document.getElementById('pImagePreview');
+      if (prev) prev.innerHTML = `<img src="${ev.target.result}" alt="preview" />`;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Page payment calc
   ['pActualPrice','pQty','pShipping','pPaid'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', calcPageTotals);
   });
@@ -503,18 +509,22 @@ function initDashboard() {
     if(document.getElementById('pPending')) document.getElementById('pPending').value = pending;
   }
 
-  // Page form clear
-  document.getElementById('addOrderPageClear')?.addEventListener('click', () => {
+  function resetPageForm() {
     pageForm?.reset();
-    rebuildPageBrandDropdown();
+    rebuildDropdown(pBrandSelect);
     if (pBrandHidden) pBrandHidden.value = '';
     pNewBrandRow?.classList.add('hidden');
     document.querySelectorAll('#pStatusPillGroup .status-pill').forEach(p => p.classList.remove('active'));
     document.querySelector('#pStatusPillGroup .status-pill')?.classList.add('active');
     const ps = document.getElementById('pStatus'); if(ps) ps.value = 'Ordered';
-    const td = document.getElementById('pTotalDisplay');   if(td) td.textContent = '₹0';
-    const pd = document.getElementById('pPendingDisplay'); if(pd) { pd.textContent = '₹0'; pd.classList.remove('fg-calc-overdue'); }
-  });
+    ['pTotalDisplay','pPendingDisplay'].forEach(id => { const el=document.getElementById(id); if(el){el.textContent='₹0';el.classList.remove('fg-calc-overdue');} });
+    const prev = document.getElementById('pImagePreview');
+    if (prev) prev.innerHTML = '<i class="fa-solid fa-camera"></i><p>Click to upload photo</p><span>JPG, PNG, WEBP · max 5MB</span>';
+    const pi = document.getElementById('pImage'); if (pi) pi.value = '';
+    _pageImageFile = null;
+  }
+
+  document.getElementById('addOrderPageClear')?.addEventListener('click', resetPageForm);
 
   // Page form submit
   pageForm?.addEventListener('submit', async (e) => {
@@ -529,9 +539,11 @@ function initDashboard() {
     const total    = (price * qty) + ship;
     const pending  = Math.max(0, total - paidTotal);
     try {
+      let imageUrl = '';
+      if (_pageImageFile) imageUrl = await uploadImageToSupabase(_pageImageFile);
       const order = {
         product_name:   document.getElementById('pProductName')?.value.trim()  || '',
-        brand:          document.getElementById('pBrand')?.value.trim()         || document.getElementById('pBrandSelect')?.value || '',
+        brand:          (document.getElementById('pBrand')?.value.trim() || document.getElementById('pBrandSelect')?.value || '').replace('__new__',''),
         order_number:   document.getElementById('pOrderNumber')?.value.trim()  || '',
         scale:          document.getElementById('pScale')?.value               || '1:64',
         variant:        document.getElementById('pVariant')?.value             || '',
@@ -543,16 +555,16 @@ function initDashboard() {
         preorder_price: parseFloat(document.getElementById('pPreorderPrice')?.value) || 0,
         actual_price: price, shipping: ship,
         paid_each: paidEach, paid: paidTotal, pending, total,
-        image: '', series: '', condition: 'Mint', vendor: '', location: '',
+        image: imageUrl, series: '', condition: 'Mint', vendor: '', location: '',
         createdAt: serverTimestamp(), updatedAt: serverTimestamp()
       };
+      if (!order.brand) { showToast('Please select a brand','warning'); return; }
       await addDoc(collection(db,'orders'), order);
       await addActivity('success', `Added — ${order.product_name}`);
-      showToast('Order saved!', 'success');
+      showToast('Order saved! 🎉', 'success');
       await fetchData();
-      // Reset form after save
-      document.getElementById('addOrderPageClear')?.click();
-      navigateTo('orders'); // go to collection to see it
+      resetPageForm();
+      navigateTo('orders');
     } catch(err) {
       console.error(err); showToast('Failed to save: ' + err.message, 'warning');
     } finally {
@@ -721,8 +733,7 @@ function renderStats() {
   sb('statOverdueBar',    pct(overdue));
   sb('statPendingBar',    investment > 0 ? Math.min(100, Math.round((pendingAmt/investment)*100)) : 0);
 
-  const dot = document.getElementById('notifDot');
-  if (dot) dot.classList.toggle('show', pendingAmt > 0 || overdue > 0);
+  // (notification dot removed)
 }
 
 /* ══════════════════════════════════════ UNIFIED COLLECTION FILTERS ══════════════════════════════════════ */
@@ -776,32 +787,28 @@ function renderTable(orders) {
     tbody.innerHTML = orders.map(o => {
       const sc     = (o.status||'').toLowerCase().replace(/\s+/g,'-');
       const thumb  = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
-      const payPct = o.total ? Math.min(100,Math.round(((o.paid||0)/o.total)*100)) : 0;
       const pb     = (o.pending||0)<=0?'badge-paid':((o.paid||0)>0?'badge-partial':'badge-pending-b');
       const pl     = (o.pending||0)<=0?'Paid':((o.paid||0)>0?'Partial':'Pending');
       return `<tr>
         <td>
           <div class="order-product-cell">
             <div class="order-thumb">${thumb}</div>
-            <div>
+            <div style="min-width:0">
               <div class="order-product-name">${escHtml(o.product_name)}</div>
-              <div style="font-size:0.7rem;opacity:0.6">${escHtml(o.brand||o.vendor||'—')} · ${escHtml(o.scale||'1:64')}</div>
+              <div style="font-size:0.7rem;opacity:0.6;white-space:nowrap">${escHtml(o.scale||'1:64')}</div>
             </div>
           </div>
         </td>
-        <td>${escHtml(o.brand||o.vendor||'—')}</td>
+        <td style="white-space:nowrap">${escHtml(o.brand||o.vendor||'—')}</td>
         <td><span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></td>
-        <td>${o.quantity||1}</td>
-        <td>₹${(o.actual_price||0).toLocaleString('en-IN')}</td>
-        <td><strong>₹${(o.total||0).toLocaleString('en-IN')}</strong></td>
-        <td style="color:var(--green)">₹${(o.paid||0).toLocaleString('en-IN')}</td>
+        <td style="text-align:center">${o.quantity||1}</td>
+        <td style="white-space:nowrap"><strong>₹${(o.total||0).toLocaleString('en-IN')}</strong></td>
         <td>
           <div class="pay-bar-wrap">
-            <span class="badge ${pb}">${pl}</span>
-            <div class="pay-bar"><div class="pay-fill" style="width:${payPct}%"></div></div>
+            <span class="badge ${pb}" style="font-size:0.68rem">${pl}</span>
           </div>
         </td>
-        <td style="font-size:0.76rem;color:var(--text-muted)">${o.eta?formatDate(o.eta):'—'}</td>
+        <td style="font-size:0.76rem;color:var(--text-muted);white-space:nowrap">${o.eta?formatDate(o.eta):'—'}</td>
         <td>
           <div class="table-actions">
             <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')" title="View"><i class="fa-solid fa-eye"></i></button>
