@@ -8,6 +8,13 @@ import {
   getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+// CHANGE existing firebase-app import to:
+import { initializeApp, initializeApp as initSecondary } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+// CHANGE existing firebase-auth import to add getAuth as getSecondaryAuth:
+import {
+  getAuth, getAuth as getSecondaryAuth,
+  signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
 // ── FIREBASE ──
 const firebaseConfig = {
@@ -21,6 +28,10 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+
+// ── SECONDARY APP (create users without logging out admin) ──
+const secondaryApp  = initSecondary(firebaseConfig, 'secondary');
+const secondaryAuth = getSecondaryAuth(secondaryApp);
 
 // ── SUPABASE ──
 const SUPABASE_URL      = 'https://ifzioqfkgjkqkirmtgly.supabase.co';
@@ -80,6 +91,15 @@ function initLoginPage() {
     loginBtn.disabled  = true;
     try {
       await signInWithEmailAndPassword(auth, email, password);
+
+      // ── CHECK IF DISABLED ──
+      const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAt','desc')));
+      const profile = snap.docs.map(d => d.data()).find(u => u.email === email);
+      if (profile && profile.status === 'disabled') {
+        await signOut(auth);
+        throw new Error('Your account has been disabled. Contact the admin.');
+      }
+
       window.location.href = 'index.html';
     } catch (error) {
       loginErr.classList.remove('hidden');
@@ -160,6 +180,51 @@ function initDashboard() {
     try { await signOut(auth); window.location.href = 'login.html'; }
     catch (e) { showToast('Logout failed', 'warning'); }
   });
+
+  // ── USER MANAGEMENT ──
+document.getElementById('openAddUserBtn')?.addEventListener('click', () => {
+  document.getElementById('addUserModal')?.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+});
+function closeAddUserModal() {
+  document.getElementById('addUserModal')?.classList.add('hidden');
+  document.body.style.overflow = '';
+  document.getElementById('newUserEmail').value    = '';
+  document.getElementById('newUserPassword').value = '';
+  document.getElementById('addUserErr').textContent = '';
+}
+document.getElementById('addUserModalClose')?.addEventListener('click', closeAddUserModal);
+document.getElementById('addUserCancelBtn')?.addEventListener('click', closeAddUserModal);
+
+document.getElementById('addUserConfirmBtn')?.addEventListener('click', async () => {
+  const email    = document.getElementById('newUserEmail')?.value.trim();
+  const password = document.getElementById('newUserPassword')?.value;
+  const role     = document.getElementById('newUserRole')?.value || 'viewer';
+  const errEl    = document.getElementById('addUserErr');
+  const btn      = document.getElementById('addUserConfirmBtn');
+
+  if (!email || !password) { errEl.textContent = 'Email and password are required'; return; }
+  if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
+
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
+  try {
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    await secondaryAuth.signOut();
+    await addDoc(collection(db, 'users'), {
+      uid: cred.user.uid, email, role, status: 'active', createdAt: serverTimestamp()
+    });
+    showToast(`User ${email} created!`, 'success');
+    closeAddUserModal();
+    renderUsers();
+  } catch (err) {
+    const msg = err.code === 'auth/email-already-in-use' ? 'Email already in use'
+              : err.code === 'auth/invalid-email'        ? 'Invalid email address'
+              : err.message;
+    errEl.textContent = msg;
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create User';
+  }
+});
 
   // ── SELLER TABS ──
 document.querySelectorAll('.sellers-tab').forEach(tab => {
@@ -844,6 +909,9 @@ function renderAll() {
   renderBrandLeaderboard();
   renderCatalog();
   renderSellers();
+  renderUsers();
+  toggleUserStatus();
+  removeUser();
   renderSettingsInfo();
 
   const ss = document.getElementById('systemStatus');
@@ -1369,6 +1437,72 @@ function renderSellers() {
       </div>
     </div>`).join('');
 }
+
+/* ══════════════════════════════════════ USERS ══════════════════════════════════════ */
+async function renderUsers() {
+  const tbody = document.getElementById('usersTableBody'); if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="5" class="empty-row"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
+  try {
+    const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')));
+    const users = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
+    if (!users.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No users added yet</td></tr>`; return;
+    }
+    const roleStyle = { admin: 'badge-ordered', editor: 'badge-transit', viewer: 'badge-delivered' };
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.6rem">
+            <div class="user-avatar-sm"><i class="fa-solid fa-user"></i></div>
+            <div>
+              <div style="font-weight:700;font-size:0.85rem">${escHtml(u.email)}</div>
+              <div style="font-size:0.7rem;color:var(--text-muted)">UID: ${escHtml(u.uid||'—').slice(0,12)}...</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge ${roleStyle[u.role]||'badge-ordered'}">${escHtml(u.role||'viewer')}</span></td>
+        <td>
+          <span class="badge ${u.status==='active'?'badge-delivered':'badge-cancelled'}">
+            <i class="fa-solid fa-${u.status==='active'?'circle-check':'ban'}"></i>
+            ${u.status==='active'?'Active':'Disabled'}
+          </span>
+        </td>
+        <td style="font-size:0.78rem;color:var(--text-muted)">${u.createdAt?.toDate?.()?.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})||'—'}</td>
+        <td>
+          <div class="table-actions">
+            <button class="btn btn-ghost btn-icon" title="${u.status==='active'?'Disable':'Enable'} user"
+              onclick="toggleUserStatus('${u.docId}','${u.status}')">
+              <i class="fa-solid fa-${u.status==='active'?'user-slash':'user-check'}"></i>
+            </button>
+            <button class="btn btn-danger btn-icon" title="Remove user" onclick="removeUser('${u.docId}','${escHtml(u.email)}')">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Failed to load users</td></tr>`;
+  }
+}
+
+window.toggleUserStatus = async function(docId, currentStatus) {
+  const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
+  try {
+    await updateDoc(doc(db, 'users', docId), { status: newStatus });
+    showToast(`User ${newStatus === 'active' ? 'enabled' : 'disabled'}`, 'success');
+    renderUsers();
+  } catch(e) { showToast('Failed to update status', 'warning'); }
+};
+
+window.removeUser = async function(docId, email) {
+  if (!confirm(`Remove ${email} from PreTrack?\n\nThey won't be able to log in.`)) return;
+  try {
+    await deleteDoc(doc(db, 'users', docId));
+    showToast('User removed', 'success');
+    renderUsers();
+  } catch(e) { showToast('Failed to remove user', 'warning'); }
+};
+
 /* ══════════════════════════════════════ HELPERS ══════════════════════════════════════ */
 function setText(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; }
 function setVal(id,val) { const el=document.getElementById(id); if(el) el.value=val??''; }
