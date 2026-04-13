@@ -1,3 +1,4 @@
+// KEEP only these imports at top (lines 1-10), delete the duplicate block below them
 'use strict';
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
@@ -8,13 +9,16 @@ import {
   getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
-// CHANGE existing firebase-app import to:
-import { initializeApp, initializeApp as initSecondary } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-// CHANGE existing firebase-auth import to add getAuth as getSecondaryAuth:
-import {
-  getAuth, getAuth as getSecondaryAuth,
-  signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+// ── FIREBASE ──
+const firebaseConfig = { ... }; // keep as-is
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ── SECONDARY APP (reuses same imported functions, just different instance name) ──
+const secondaryApp  = initializeApp(firebaseConfig, 'secondary');
+const secondaryAuth = getAuth(secondaryApp);
 
 // ── FIREBASE ──
 const firebaseConfig = {
@@ -910,8 +914,6 @@ function renderAll() {
   renderCatalog();
   renderSellers();
   renderUsers();
-  toggleUserStatus();
-  removeUser();
   renderSettingsInfo();
 
   const ss = document.getElementById('systemStatus');
@@ -964,9 +966,10 @@ function renderStats() {
   sb('statPendingPOBar',  pct(pendingPO));
   sb('statOverdueBar',    pct(overdue));
   sb('statPendingBar',    investment > 0 ? Math.min(100, Math.round((pendingAmt/investment)*100)) : 0);
+  const sellerCount = new Set(DB.orders.map(o => (o.brand||o.vendor||'Unknown').trim())).size;
+setText('statSellers', sellerCount)
 }
-const sellerCount = new Set(DB.orders.map(o => (o.brand||o.vendor||'Unknown').trim())).size;
-setText('statSellers', sellerCount);
+
 /* ══════════════════════════════════════ UNIFIED COLLECTION FILTERS ══════════════════════════════════════ */
 function applyCollectionFilters() {
   const q      = (document.getElementById('invSearch')?.value      || '').toLowerCase();
