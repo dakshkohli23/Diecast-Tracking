@@ -48,6 +48,9 @@
       <a href="#" class="nav-item" data-section="payments" data-tooltip="Payments">
         <i class="fa-solid fa-wallet"></i><span>Payments</span>
       </a>
+      <a href="#" class="nav-item" data-section="users" data-tooltip="Users">
+  <i class="fa-solid fa-users-gear"></i><span>Users</span>
+</a>
       <a href="#" class="nav-item" data-section="settings" data-tooltip="Settings">
         <i class="fa-solid fa-sliders"></i><span>Settings</span>
       </a>
@@ -655,6 +658,78 @@
     <div class="empty-state">No sellers yet</div>
   </div>
 </section>
+      <!-- ═══ SECTION: USERS ═══ -->
+<section class="section" id="section-users">
+  <div class="section-header">
+    <div>
+      <h2 class="section-title">User Management</h2>
+      <p class="section-sub">Create and manage accounts that can access PreTrack</p>
+    </div>
+    <button class="btn btn-primary" id="openAddUserBtn">
+      <i class="fa-solid fa-user-plus"></i> Add User
+    </button>
+  </div>
+
+  <div class="users-table-wrap glass" id="usersTableWrap">
+    <table class="orders-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="usersTableBody">
+        <tr><td colspan="5" class="empty-row">Loading users...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ ADD USER MODAL ═══ -->
+<div class="modal-overlay hidden" id="addUserModal">
+  <div class="modal glass modal-sm" id="addUserModalBox">
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <div class="modal-header-icon" style="background:var(--grad-indigo)">
+          <i class="fa-solid fa-user-plus"></i>
+        </div>
+        <div>
+          <h3>Add New User</h3>
+          <p class="modal-header-sub">They'll use these credentials to log in</p>
+        </div>
+      </div>
+      <button class="modal-close" id="addUserModalClose"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body" style="padding:1.5rem">
+      <div class="form-group" style="margin-bottom:1rem">
+        <label class="fg-label"><i class="fa-solid fa-envelope"></i> Email</label>
+        <input type="email" id="newUserEmail" class="fg-input" placeholder="user@example.com" />
+      </div>
+      <div class="form-group" style="margin-bottom:1rem">
+        <label class="fg-label"><i class="fa-solid fa-lock"></i> Password</label>
+        <input type="password" id="newUserPassword" class="fg-input" placeholder="Min 6 characters" />
+      </div>
+      <div class="form-group" style="margin-bottom:1.25rem">
+        <label class="fg-label"><i class="fa-solid fa-shield-halved"></i> Role</label>
+        <select id="newUserRole" class="fg-input fg-select">
+          <option value="viewer">Viewer — can view only</option>
+          <option value="editor">Editor — can add & edit</option>
+          <option value="admin">Admin — full access</option>
+        </select>
+      </div>
+      <div id="addUserErr" style="color:var(--red);font-size:0.78rem;min-height:1.2em;margin-bottom:0.75rem"></div>
+      <div style="display:flex;gap:0.6rem;justify-content:flex-end">
+        <button type="button" class="btn btn-ghost" id="addUserCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="addUserConfirmBtn">
+          <i class="fa-solid fa-user-plus"></i> Create User
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
     </main>
   </div>
 
