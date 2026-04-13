@@ -1316,7 +1316,8 @@ function renderSellers() {
 
   const map = {};
   DB.orders.forEach(o => {
-    const name = (o.brand || o.vendor || 'Unknown').trim();
+    // FIXED (vendor = seller name field)
+    const name = (o.vendor || 'Unknown Seller').trim();
     if (!map[name]) map[name] = { name, orders: [], total: 0, pending: 0, paid: 0 };
     map[name].orders.push(o);
     map[name].total   += ((o.actual_price||0) * (o.quantity||1)) + (o.shipping||0);
