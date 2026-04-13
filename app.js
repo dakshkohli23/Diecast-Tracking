@@ -161,6 +161,15 @@ function initDashboard() {
     catch (e) { showToast('Logout failed', 'warning'); }
   });
 
+  // ── SELLER TABS ──
+document.querySelectorAll('.sellers-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.sellers-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    renderSellers();
+  });
+});
+
   // ── GLOBAL SEARCH → goes to orders ──
   document.getElementById('globalSearch')?.addEventListener('input', (e) => {
     const q = e.target.value.trim();
@@ -761,13 +770,11 @@ function initDashboard() {
       <div class="view-grid">
         <div><strong>Product:</strong> ${escHtml(o.product_name||'—')}</div>
         <div><strong>Brand:</strong> ${escHtml(o.brand||o.vendor||'—')}</div>
-        <div><strong>Series:</strong> ${escHtml(o.series||'—')}</div>
         <div><strong>Scale:</strong> ${escHtml(o.scale||'1:64')}</div>
         <div><strong>Condition:</strong> ${escHtml(o.condition||'—')}</div>
         <div><strong>Status:</strong> <span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span></div>
         <div><strong>Order #:</strong> ${escHtml(o.order_number||'—')}</div>
         <div><strong>Seller:</strong> ${escHtml(o.vendor||'—')}</div>
-        <div><strong>Location:</strong> ${escHtml(o.location||'—')}</div>
         <div><strong>Qty:</strong> ${o.quantity||1}</div>
         <div><strong>Order Date:</strong> ${formatDate(o.order_date)}</div>
         <div><strong>ETA:</strong> ${formatDate(o.eta)}</div>
@@ -836,6 +843,7 @@ function renderAll() {
   renderAnalytics();
   renderBrandLeaderboard();
   renderCatalog();
+  renderSellers();
   renderSettingsInfo();
 
   const ss = document.getElementById('systemStatus');
@@ -889,7 +897,8 @@ function renderStats() {
   sb('statOverdueBar',    pct(overdue));
   sb('statPendingBar',    investment > 0 ? Math.min(100, Math.round((pendingAmt/investment)*100)) : 0);
 }
-
+const sellerCount = new Set(DB.orders.map(o => (o.brand||o.vendor||'Unknown').trim())).size;
+setText('statSellers', sellerCount);
 /* ══════════════════════════════════════ UNIFIED COLLECTION FILTERS ══════════════════════════════════════ */
 function applyCollectionFilters() {
   const q      = (document.getElementById('invSearch')?.value      || '').toLowerCase();
@@ -1301,7 +1310,64 @@ function renderCatalog() {
     </div>`;
   }).join('');
 }
+/* ══════════════════════════════════════ SELLERS ══════════════════════════════════════ */
+function renderSellers() {
+  const grid = document.getElementById('sellerGrid'); if (!grid) return;
 
+  const map = {};
+  DB.orders.forEach(o => {
+    const name = (o.brand || o.vendor || 'Unknown').trim();
+    if (!map[name]) map[name] = { name, orders: [], total: 0, pending: 0, paid: 0 };
+    map[name].orders.push(o);
+    map[name].total   += ((o.actual_price||0) * (o.quantity||1)) + (o.shipping||0);
+    map[name].pending += (o.pending||0);
+    map[name].paid    += (o.paid||0);
+  });
+
+  const sellers = Object.values(map).sort((a,b) => b.total - a.total);
+  const fmt = v => `₹${v.toLocaleString('en-IN')}`;
+
+  setText('stCountAll',     sellers.length);
+  setText('stCountPending', sellers.filter(s => s.pending > 0).length);
+  setText('stCountPaid',    sellers.filter(s => s.pending <= 0).length);
+
+  const activeFilter = document.querySelector('.sellers-tab.active')?.dataset.filter || 'all';
+  const filtered = activeFilter === 'pending' ? sellers.filter(s => s.pending > 0)
+                 : activeFilter === 'paid'    ? sellers.filter(s => s.pending <= 0)
+                 : sellers;
+
+  if (!filtered.length) { grid.innerHTML = `<div class="empty-state">No sellers found</div>`; return; }
+
+  grid.innerHTML = filtered.map(s => `
+    <div class="seller-card glass">
+      <div class="seller-card-top">
+        <div class="seller-avatar"><i class="fa-solid fa-store"></i></div>
+        <div class="seller-info">
+          <div class="seller-name">${escHtml(s.name)}</div>
+          <div class="seller-meta">${s.orders.length} order${s.orders.length !== 1 ? 's' : ''}</div>
+        </div>
+        <span class="seller-dot ${s.pending > 0 ? 'dot-due' : 'dot-clear'}"></span>
+      </div>
+      <div class="seller-stats">
+        <div class="seller-stat">
+          <span class="seller-stat-label">Total Spend</span>
+          <span class="seller-stat-val">${fmt(s.total)}</span>
+        </div>
+        <div class="seller-stat">
+          <span class="seller-stat-label">Paid</span>
+          <span class="seller-stat-val s-green">${fmt(s.paid)}</span>
+        </div>
+        <div class="seller-stat">
+          <span class="seller-stat-label">Pending</span>
+          <span class="seller-stat-val ${s.pending > 0 ? 's-pink' : 's-green'}">${fmt(s.pending)}</span>
+        </div>
+      </div>
+      <div class="seller-models">
+        ${s.orders.slice(0,3).map(o => `<span class="seller-chip">${escHtml(o.product_name)}</span>`).join('')}
+        ${s.orders.length > 3 ? `<span class="seller-chip seller-chip-more">+${s.orders.length - 3} more</span>` : ''}
+      </div>
+    </div>`).join('');
+}
 /* ══════════════════════════════════════ HELPERS ══════════════════════════════════════ */
 function setText(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; }
 function setVal(id,val) { const el=document.getElementById(id); if(el) el.value=val??''; }
