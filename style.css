@@ -3213,3 +3213,15 @@ input, select, textarea { color-scheme: light; }
 .seller-chip-more {
   background: var(--bg-elevated); color: var(--text-muted);
 }
+/* ═══════════════════════════════
+   USERS SECTION
+═══════════════════════════════ */
+.users-table-wrap {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.user-avatar-sm {
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+  background: var(--grad-indigo); display: flex; align-items: center;
+  justify-content: center; color: #fff; font-size: 0.85rem;
+}
