@@ -813,11 +813,18 @@
                 <textarea id="fNotes" class="fg-input fg-textarea" placeholder="Any extra notes about this order..." rows="2"></textarea>
               </div>
 
-              <!-- Keep hidden fields for data compatibility -->
-              <input type="hidden" id="fSeries" />
-              <input type="hidden" id="fCondition" value="Mint" />
-              <input type="hidden" id="fVendor" />
-              <input type="hidden" id="fLocation" />
+             <!-- Seller Name visible field -->
+<div class="form-group fg-half">
+  <label class="fg-label">
+    <i class="fa-solid fa-store"></i> Seller Name
+  </label>
+  <input type="text" id="fVendor" class="fg-input" placeholder="e.g. Karz & Dolls" />
+</div>
+
+<!-- Keep hidden fields for data compatibility -->
+<input type="hidden" id="fSeries" />
+<input type="hidden" id="fCondition" value="Mint" />
+<input type="hidden" id="fLocation" />
 
             </div>
           </details>
