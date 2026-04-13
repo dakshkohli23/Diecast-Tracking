@@ -1,4 +1,3 @@
-// KEEP only these imports at top (lines 1-10), delete the duplicate block below them
 'use strict';
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
@@ -11,16 +10,6 @@ import {
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 // ── FIREBASE ──
-const firebaseConfig = { ... }; // keep as-is
-const app  = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db   = getFirestore(app);
-
-// ── SECONDARY APP (reuses same imported functions, just different instance name) ──
-const secondaryApp  = initializeApp(firebaseConfig, 'secondary');
-const secondaryAuth = getAuth(secondaryApp);
-
-// ── FIREBASE ──
 const firebaseConfig = {
   apiKey: "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
   authDomain: "diecast-tracking-471f7.firebaseapp.com",
@@ -29,13 +18,14 @@ const firebaseConfig = {
   messagingSenderId: "1042711268055",
   appId: "1:1042711268055:web:9b09ded970a85532767e92"
 };
-const app  = initializeApp(firebaseConfig);
+
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db   = getFirestore(app);
+const db = getFirestore(app);
 
 // ── SECONDARY APP (create users without logging out admin) ──
-const secondaryApp  = initSecondary(firebaseConfig, 'secondary');
-const secondaryAuth = getSecondaryAuth(secondaryApp);
+const secondaryApp = initializeApp(firebaseConfig, 'secondary');
+const secondaryAuth = getAuth(secondaryApp);
 
 // ── SUPABASE ──
 const SUPABASE_URL      = 'https://ifzioqfkgjkqkirmtgly.supabase.co';
