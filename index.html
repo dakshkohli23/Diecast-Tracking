@@ -32,6 +32,9 @@
       <a href="#" class="nav-item" data-section="catalog" data-tooltip="Catalog">
         <i class="fa-solid fa-shop"></i><span>Catalog</span>
       </a>
+      <a href="#" class="nav-item" data-section="sellers" data-tooltip="Sellers">
+      <i class="fa-solid fa-store"></i><span>Sellers</span>
+      </a>
       <a href="#" class="nav-item" data-section="add-order" data-tooltip="Add Order">
         <i class="fa-solid fa-circle-plus"></i><span>Add Order</span>
       </a>
@@ -190,6 +193,13 @@
             <div class="stat-footer"><i class="fa-solid fa-ranking-star s-indigo"></i><span class="s-indigo">By quantity</span></div>
             <div class="stat-bar"><div class="stat-bar-fill s-indigo" style="width:80%"></div></div>
           </div>
+          <div class="stat-card glass">
+  <div class="stat-card-top"><div class="stat-icon blue"><i class="fa-solid fa-store"></i></div><span class="stat-badge s-blue">Vendors</span></div>
+  <div class="stat-label">Total Sellers</div>
+  <div class="stat-value" id="statSellers">0</div>
+  <div class="stat-footer"><i class="fa-solid fa-handshake s-blue"></i><span class="s-blue">Unique vendors</span></div>
+  <div class="stat-bar"><div class="stat-bar-fill s-blue" id="statSellersBar" style="width:60%"></div></div>
+</div>
         </div>
 
         <!-- WIDGETS ROW -->
@@ -624,7 +634,34 @@
           </div>
         </div>
       </section>
+<!-- ═══ SECTION: SELLERS ═══ -->
+<section class="section" id="section-sellers">
+  <div class="section-header">
+    <div>
+      <h2 class="section-title">Sellers</h2>
+      <p class="section-sub">Track your vendors and their order performance</p>
+    </div>
+  </div>
 
+  <div class="sellers-tab-bar">
+    <button class="sellers-tab active" data-filter="all">
+      <i class="fa-solid fa-list"></i> All
+      <span class="sellers-tab-count" id="stCountAll">0</span>
+    </button>
+    <button class="sellers-tab" data-filter="pending">
+      <i class="fa-solid fa-hourglass-half"></i> Has Dues
+      <span class="sellers-tab-count" id="stCountPending">0</span>
+    </button>
+    <button class="sellers-tab" data-filter="paid">
+      <i class="fa-solid fa-circle-check"></i> Fully Paid
+      <span class="sellers-tab-count" id="stCountPaid">0</span>
+    </button>
+  </div>
+
+  <div class="seller-grid" id="sellerGrid">
+    <div class="empty-state">No sellers yet</div>
+  </div>
+</section>
     </main>
   </div>
 
