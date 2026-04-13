@@ -4,8 +4,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/fireba
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+// REPLACE the firestore import line with:
 import {
-  getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp
+  getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
@@ -19,6 +20,8 @@ const firebaseConfig = {
   appId: "1:1042711268055:web:9b09ded970a85532767e92"
 };
 
+const SUPER_ADMIN = 'dlaize@dlaize.com';
+let _currentUser = null;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -97,7 +100,7 @@ function initLoginPage() {
       window.location.href = 'index.html';
     } catch (error) {
       loginErr.classList.remove('hidden');
-      errMsg.textContent = 'Invalid email or password';
+      errMsg.textContent = error.message?.includes('disabled') ? error.message : 'Invalid email or password';
       loginBtn.innerHTML = '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>';
       loginBtn.disabled  = false;
       setTimeout(() => loginErr.classList.add('hidden'), 4000);
@@ -110,6 +113,7 @@ if (document.getElementById('pageContent')) {
   onAuthStateChanged(auth, async (user) => {
     _authReady = true;
     if (!user) { window.location.href = 'login.html'; return; }
+    _currentUser = user;
     const el = document.getElementById('profileName');
     if (el) el.textContent = user.email || 'Admin';
     await fetchData();
@@ -147,6 +151,13 @@ function initDashboard() {
 
   initGreeting();
 
+  // ── ADMIN GATE ──
+  const isAdmin = auth.currentUser?.email === SUPER_ADMIN;
+  if (!isAdmin) {
+    document.querySelector('.nav-item[data-section="users"]')?.setAttribute('style','display:none');
+    document.getElementById('openAddUserBtn')?.setAttribute('style','display:none');
+    document.getElementById('clearDataBtn')?.setAttribute('style','display:none');
+  }
   // ── NAV ──
   function navigateTo(section) {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -191,6 +202,7 @@ document.getElementById('addUserModalClose')?.addEventListener('click', closeAdd
 document.getElementById('addUserCancelBtn')?.addEventListener('click', closeAddUserModal);
 
 document.getElementById('addUserConfirmBtn')?.addEventListener('click', async () => {
+  if (auth.currentUser?.email !== SUPER_ADMIN) { showToast('Admin only', 'warning'); return; } // ← ADD THIS LINE
   const email    = document.getElementById('newUserEmail')?.value.trim();
   const password = document.getElementById('newUserPassword')?.value;
   const role     = document.getElementById('newUserRole')?.value || 'viewer';
@@ -259,9 +271,14 @@ document.querySelectorAll('.sellers-tab').forEach(tab => {
   const BASE_BRANDS = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
   let customBrands = [];
 
-  async function loadBrandsFromFirestore() {
+    async function loadBrandsFromFirestore() {
+    const user = auth.currentUser;
+    const isAdmin = user?.email === SUPER_ADMIN;
     try {
-      const snap = await getDocs(collection(db, 'brands'));
+      const q = isAdmin
+        ? collection(db, 'brands')
+        : query(collection(db, 'brands'), where('ownerUid','==', user?.uid||''));
+      const snap = await getDocs(q);
       customBrands = snap.docs.map(d => d.data().name).filter(Boolean);
     } catch(e) {
       customBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
@@ -274,7 +291,10 @@ document.querySelectorAll('.sellers-tab').forEach(tab => {
     const all = [...BASE_BRANDS, ...customBrands];
     if (all.includes(name)) return false;
     try {
-      await addDoc(collection(db, 'brands'), { name, createdAt: serverTimestamp() });
+     await addDoc(collection(db, 'brands'), {
+        name, createdAt: serverTimestamp(),
+        ownerUid: auth.currentUser?.uid||'', ownerEmail: auth.currentUser?.email||''
+      });
       customBrands.push(name);
     } catch(e) {
       customBrands.push(name);
@@ -493,7 +513,9 @@ document.querySelectorAll('.sellers-tab').forEach(tab => {
         preorder_price: parseFloat(document.getElementById('fPreorderPrice')?.value) || 0,
         actual_price: price, shipping: ship,
         paid_each: paidEach, paid: paidTotal, pending, total,
-        image: imageUrl, updatedAt: serverTimestamp()
+        image: imageUrl, updatedAt: serverTimestamp(),
+        ownerUid:   auth.currentUser?.uid   || '',   // ← ADD
+        ownerEmail: auth.currentUser?.email || ''    // ← ADD
       };
 
       if (editId) {
@@ -659,7 +681,9 @@ document.querySelectorAll('.sellers-tab').forEach(tab => {
         actual_price: price, shipping: ship,
         paid_each: paidEach, paid: paidTotal, pending, total,
         image: imageUrl, series: '', condition: 'Mint', vendor: '', location: '',
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        ownerUid:   auth.currentUser?.uid   || '',   // ← ADD
+        ownerEmail: auth.currentUser?.email || ''    // ← ADD
       };
       if (!order.brand) { showToast('Please select a brand','warning'); return; }
       await addDoc(collection(db,'orders'), order);
@@ -852,10 +876,23 @@ document.querySelectorAll('.sellers-tab').forEach(tab => {
 /* ══════════════════════════════════════ FIRESTORE ══════════════════════════════════════ */
 async function fetchData() {
   try {
-    const os = await getDocs(query(collection(db,'orders'),   orderBy('createdAt','desc')));
-    const as = await getDocs(query(collection(db,'activity'), orderBy('createdAt','desc')));
-    DB.orders   = os.docs.map(d => ({ id: d.id, ...d.data() }));
-    DB.activity = as.docs.map(d => ({ id: d.id, ...d.data() }));
+    const user = auth.currentUser;
+    if (!user) return;
+    const isAdmin = user.email === SUPER_ADMIN;
+
+    const [os, as] = await Promise.all([
+      getDocs(isAdmin
+        ? query(collection(db,'orders'), orderBy('createdAt','desc'))
+        : query(collection(db,'orders'), where('ownerUid','==',user.uid))),
+      getDocs(isAdmin
+        ? query(collection(db,'activity'), orderBy('createdAt','desc'))
+        : query(collection(db,'activity'), where('ownerUid','==',user.uid)))
+    ]);
+
+    DB.orders   = os.docs.map(d => ({ id: d.id, ...d.data() }))
+                    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+    DB.activity = as.docs.map(d => ({ id: d.id, ...d.data() }))
+                    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     renderAll();
   } catch (err) {
     console.error(err); DB = { orders:[], activity:[] }; renderAll();
@@ -863,8 +900,13 @@ async function fetchData() {
 }
 
 async function addActivity(type, msg) {
-  try { await addDoc(collection(db,'activity'), { type, msg, time: new Date().toLocaleString(), createdAt: serverTimestamp() }); }
-  catch (e) { console.error(e); }
+  const user = auth.currentUser;
+  try {
+    await addDoc(collection(db,'activity'), {
+      type, msg, time: new Date().toLocaleString(), createdAt: serverTimestamp(),
+      ownerUid: user?.uid||'', ownerEmail: user?.email||''
+    });
+  } catch (e) { console.error(e); }
 }
 
 /* ══════════════════════════════════════ GREETING ══════════════════════════════════════ */
@@ -956,8 +998,8 @@ function renderStats() {
   sb('statPendingPOBar',  pct(pendingPO));
   sb('statOverdueBar',    pct(overdue));
   sb('statPendingBar',    investment > 0 ? Math.min(100, Math.round((pendingAmt/investment)*100)) : 0);
-  const sellerCount = new Set(DB.orders.map(o => (o.brand||o.vendor||'Unknown').trim())).size;
-setText('statSellers', sellerCount)
+  const sellerCount = new Set(DB.orders.map(o => (o.vendor||'Unknown').trim())).size;
+  setText('statSellers', sellerCount);
 }
 
 /* ══════════════════════════════════════ UNIFIED COLLECTION FILTERS ══════════════════════════════════════ */
