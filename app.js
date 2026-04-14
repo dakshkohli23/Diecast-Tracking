@@ -172,12 +172,28 @@ function initDashboard() {
   initGreeting();
 
   // ── ADMIN GATE ──
-  const isAdmin = auth.currentUser?.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
-  if (!isAdmin) {
-    document.querySelector('.nav-item[data-section="users"]')?.setAttribute('style','display:none');
-    document.getElementById('openAddUserBtn')?.setAttribute('style','display:none');
-    document.getElementById('clearDataBtn')?.setAttribute('style','display:none');
-  }
+  // ── ADMIN GATE ──
+const isAdmin = auth.currentUser?.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
+
+// Access Requests nav item
+const accessRequestsNav = document.querySelector('.nav-item[data-section="access-requests"]');
+
+// Users nav item
+const usersNav = document.querySelector('.nav-item[data-section="users"]');
+
+if (isAdmin) {
+  // SHOW admin-only items
+  usersNav?.style.setProperty('display', '');
+  accessRequestsNav?.style.setProperty('display', '');
+  document.getElementById('openAddUserBtn')?.style.setProperty('display', '');
+  document.getElementById('clearDataBtn')?.style.setProperty('display', '');
+} else {
+  // HIDE admin-only items
+  usersNav?.style.setProperty('display', 'none');
+  accessRequestsNav?.style.setProperty('display', 'none');
+  document.getElementById('openAddUserBtn')?.style.setProperty('display', 'none');
+  document.getElementById('clearDataBtn')?.style.setProperty('display', 'none');
+}
   // ── NAV ──
   function navigateTo(section) {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
