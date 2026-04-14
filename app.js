@@ -276,6 +276,15 @@ document.querySelectorAll('.sellers-tab').forEach(tab => {
     renderSellers();
   });
 });
+
+  // ── UPCOMING TABS ──
+  document.querySelectorAll('.upcoming-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.upcoming-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderUpcoming();
+    });
+  });
   // ── ACCESS REQUESTS ──
 document.getElementById('refreshAccessRequestsBtn')?.addEventListener('click', async () => {
   await fetchData();
@@ -1014,6 +1023,7 @@ function renderAll() {
   renderBrandLeaderboard();
   renderCatalog();
   renderSellers();
+  renderUpcoming();
   renderUsers();
   renderAccessRequests();
   renderSettingsInfo();
@@ -1483,6 +1493,95 @@ function renderCatalog() {
     </div>`;
   }).join('');
 }
+
+/* ══ UPCOMING DELIVERIES ══ */
+function renderUpcoming() {
+  const grid = document.getElementById('upcomingGrid'); if (!grid) return;
+
+  const items = DB.orders.filter(o =>
+    o.status !== 'Delivered' && o.status !== 'Cancelled'
+  ).sort((a,b) => {
+    const aEta = a.eta ? new Date(a.eta) : null;
+    const bEta = b.eta ? new Date(b.eta) : null;
+    const now  = new Date();
+    const aOvr = aEta && aEta < now;
+    const bOvr = bEta && bEta < now;
+    if (aOvr && !bOvr) return -1;
+    if (!aOvr && bOvr) return 1;
+    if (aEta && bEta)  return aEta - bEta;
+    if (aEta && !bEta) return -1;
+    if (!aEta && bEta) return 1;
+    return 0;
+  });
+
+  const setText2 = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+  setText2('upStatOrdered', items.filter(o=>o.status==='Ordered').length);
+  setText2('upStatTransit', items.filter(o=>o.status==='In Transit').length);
+  const now2 = new Date();
+  setText2('upStatOverdue', items.filter(o=>o.eta&&new Date(o.eta)<now2).length);
+  setText2('upStatPending', items.filter(o=>(o.pending||0)>0).length);
+
+  const badge = document.getElementById('upcomingBadge');
+  if (badge) { badge.textContent=items.length; badge.style.display=items.length>0?'inline-flex':'none'; }
+
+  const activeTab = document.querySelector('.upcoming-tab.active')?.dataset.filter || 'all';
+  let filtered = items;
+  if (activeTab === 'overdue') filtered = items.filter(o => o.eta && new Date(o.eta) < new Date());
+  else if (activeTab !== 'all') filtered = items.filter(o => o.status === activeTab);
+
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;padding:3rem"><i class="fa-solid fa-truck-fast" style="font-size:2rem;opacity:0.25"></i><p style="margin-top:0.75rem">No upcoming deliveries</p></div>';
+    return;
+  }
+
+  const fmt = v => '\u20B9' + Number(v||0).toLocaleString('en-IN');
+  const today = new Date();
+
+  grid.innerHTML = filtered.map(o => {
+    const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+    const thumb = o.image
+      ? '<img src="' + o.image + '" alt="' + escHtml(o.product_name) + '" />'
+      : '<i class="fa-solid fa-car-side"></i>';
+
+    let etaChip = '<span class="upcoming-eta-chip eta-no-date"><i class="fa-solid fa-calendar"></i> No ETA</span>';
+    if (o.eta) {
+      const d   = Math.ceil((new Date(o.eta) - today) / (1000*60*60*24));
+      const cls = d < 0 ? 'eta-overdue' : d <= 7 ? 'eta-soon' : 'eta-ok';
+      const lbl = d < 0 ? Math.abs(d)+'d overdue' : d === 0 ? 'Today!' : d+'d left';
+      etaChip = '<span class="upcoming-eta-chip ' + cls + '"><i class="fa-solid fa-calendar-days"></i> ' + lbl + '</span>';
+    }
+
+    const payChip = (o.pending||0) > 0
+      ? '<span class="upcoming-eta-chip eta-soon"><i class="fa-solid fa-hourglass-half"></i> ' + fmt(o.pending) + ' due</span>'
+      : '<span class="upcoming-eta-chip eta-ok"><i class="fa-solid fa-circle-check"></i> Paid</span>';
+
+    const vendorChip = o.vendor
+      ? '<span class="upcoming-eta-chip eta-no-date"><i class="fa-solid fa-store"></i> ' + escHtml(o.vendor) + '</span>'
+      : '';
+
+    const etaFooter = o.eta
+      ? '<span>ETA: ' + formatDate(o.eta) + '</span>'
+      : '<span style="opacity:0.4">No ETA set</span>';
+
+    return '<div class="upcoming-card glass" onclick="viewOrder(\'' + o.id + '\')">' +
+      '<div class="upcoming-card-top">' +
+        '<div class="upcoming-card-thumb">' + thumb + '</div>' +
+        '<div style="min-width:0;flex:1">' +
+          '<div class="upcoming-card-name">' + escHtml(o.product_name) + '</div>' +
+          '<div class="upcoming-card-brand">' + escHtml(o.brand||o.vendor||'—') + ' · ' + escHtml(o.scale||'1:64') + '</div>' +
+          '<span class="badge badge-' + sc + '" style="margin-top:4px;display:inline-block;font-size:0.65rem">' + escHtml(o.status) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="upcoming-card-chips">' + etaChip + payChip + vendorChip + '</div>' +
+      '<div class="upcoming-card-footer">' +
+        '<span>Qty: <strong>' + (o.quantity||1) + '</strong></span>' +
+        '<span>Total: <strong>' + fmt(o.total) + '</strong></span>' +
+        etaFooter +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
 /* ══════════════════════════════════════ SELLERS ══════════════════════════════════════ */
 function renderSellers() {
   const grid = document.getElementById('sellerGrid'); if (!grid) return;
