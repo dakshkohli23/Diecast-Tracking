@@ -1,148 +1,161 @@
 <div align="center">
 
-<img src="https://readme-typing-svg.demolab.com?font=Orbitron&size=30&duration=2000&pause=800&color=F5C542&center=true&vCenter=true&width=800&lines=PRETRACK+PEGASUS+v4.1;Track+Every+Preorder;Own+Every+Detail;Built+for+Serious+Collectors" />
+<img src="https://readme-typing-svg.demolab.com?font=Orbitron&weight=600&size=32&duration=1800&pause=700&color=F5C542&center=true&vCenter=true&width=900&lines=PRETRACK+PEGASUS;CONTROL+YOUR+COLLECTION;PRECISION+TRACKING+SYSTEM" />
 
 <br/>
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f0f0f,100:F5C542&height=140&section=header&text=PRETRACK%20PEGASUS&fontSize=30&fontColor=ffffff&animation=fadeIn"/>
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0:0a0a0a,100:1a1a1a&height=160&section=header&text=PRETRACK%20PEGASUS&fontSize=34&fontColor=F5C542&animation=fadeIn"/>
 
 <br/>
 
 <a href="https://dakshkohli23.github.io/Diecast-Tracking/login.html">
-  <img src="https://img.shields.io/badge/🚀_ENTER_APPLICATION-LAUNCH-gold?style=for-the-badge">
+  <img src="https://img.shields.io/badge/ENTER_SYSTEM-→-F5C542?style=for-the-badge&logo=vercel&logoColor=black">
 </a>
 
 <br/><br/>
 
-<img src="https://img.shields.io/badge/STATUS-LIVE-success?style=flat-square&color=gold">
-<img src="https://img.shields.io/badge/SYNC-REALTIME-black?style=flat-square">
-<img src="https://img.shields.io/badge/UI-PREMIUM-black?style=flat-square">
+<img src="https://img.shields.io/badge/MODE-PRODUCTION-0a0a0a?style=flat-square">
+<img src="https://img.shields.io/badge/SYNC-REALTIME-0a0a0a?style=flat-square">
+<img src="https://img.shields.io/badge/INTERFACE-PREMIUM-F5C542?style=flat-square">
 
 </div>
 
 ---
 
-## ⚡ SYSTEM OVERVIEW
+## ⬛ SYSTEM STATE
 
 ```diff
-+ SYSTEM        : PRETRACK PEGASUS
-+ MODE          : ACTIVE
-+ TRACKING      : ENABLED
-+ SYNC          : REAL-TIME
-+ STATE         : FULL CONTROL
++ CORE         : ACTIVE
++ TRACKING     : ONLINE
++ PAYMENTS     : MONITORED
++ ANALYTICS    : PROCESSING
++ STATUS       : STABLE
 ```
 
 ---
 
-## 🧠 EXPERIENCE
+## 🧠 EXPERIENCE LAYER
 
-> Built like a system. Designed like a product.
+> Minimal surface. Maximum control.
 
 ---
 
-### 📦 ORDER ENGINE
+### 📦 ORDER MATRIX
 
 <details>
-<summary>Expand</summary>
+<summary>Expand Module</summary>
 
-* Track every preorder in one place
-* Monitor ETAs and delivery timelines
-* Instantly view incoming vs delivered
+```
+→ Track all incoming units
+→ Monitor ETA signals
+→ Identify delays instantly
+→ Maintain full pipeline visibility
+```
 
 </details>
 
 ---
 
-### 💳 PAYMENT CORE
+### 💳 PAYMENT GRID
 
 <details>
-<summary>Expand</summary>
+<summary>Expand Module</summary>
 
-* Per-piece payment tracking
-* Outstanding balance visibility
-* Full financial clarity across orders
+```
+→ Piece-level financial tracking
+→ Outstanding balance detection
+→ Complete payment clarity
+```
 
 </details>
 
 ---
 
-### 📊 ANALYTICS LAYER
+### 📊 ANALYTICS CORE
 
 <details>
-<summary>Expand</summary>
+<summary>Expand Module</summary>
 
-* Brand-wise breakdown
-* Monthly spend insights
-* Collection-level intelligence
+```
+→ Brand distribution mapping
+→ Monthly spend intelligence
+→ Collection behavior insights
+```
 
 </details>
 
 ---
 
-### 🔄 SYNC ENGINE
+### 🔄 SYNC PROTOCOL
 
 <details>
-<summary>Expand</summary>
+<summary>Expand Module</summary>
 
-* Firebase-powered real-time updates
-* Multi-device continuity
-* Always up-to-date state
+```
+→ Firebase real-time engine
+→ Cross-device continuity
+→ Zero-latency updates
+```
 
 </details>
 
 ---
 
-## 🎬 LIVE PREVIEW
+## 🎬 VISUAL INTERFACE
 
 <div align="center">
 
-<!-- 🔥 REPLACE THIS WITH YOUR REAL GIF -->
+<!-- 🔥 Replace with your real dashboard GIF -->
 
-<img src="https://dummyimage.com/900x450/0f0f0f/ffffff&text=PreTrack+Dashboard+Preview" />
+<img src="https://dummyimage.com/900x450/0a0a0a/F5C542&text=SYSTEM+INTERFACE+PREVIEW" />
 
 </div>
 
 ---
 
-## 🖥️ SYSTEM INITIALIZATION
+## 🖥️ SYSTEM BOOT SEQUENCE
 
 ```bash
-> booting pretrack...
+> initializing pretrack.core
 
-✔ loading orders
-✔ syncing database
-✔ calculating analytics
-✔ rendering dashboard
+[■■□□□□□□□□] loading modules
+[■■■■■□□□□□] syncing database
+[■■■■■■■■□□] compiling analytics
+[■■■■■■■■■■] rendering interface
 
-SYSTEM READY
+SYSTEM ONLINE
 ```
 
 ---
 
-## 🎯 PERFORMANCE METRICS
+## ⚡ PERFORMANCE GRID
 
 ```
-Tracking Accuracy      ████████████████████  100%
-Financial Clarity      ██████████████████░░   92%
-Collection Visibility  ███████████████████░   96%
-User Experience        ████████████████████  100%
+Tracking Engine       ████████████████████ 100%
+Payment Visibility    ██████████████████░░  92%
+Data Sync             ████████████████████ 100%
+UI Responsiveness     ████████████████████ 100%
 ```
 
 ---
 
-## 🎨 DESIGN PHILOSOPHY
+## 🎨 DESIGN LANGUAGE
 
-> Precision. Clarity. Control.
+> Inspired by precision systems.
 
-* No clutter
-* No noise
-* No compromises
+* Matte black surfaces
+* Gold-highlighted actions
+* Zero visual noise
+* Subtle futuristic tone
 
-Built to feel like a **tool you depend on**, not just an app you open.
+Feels like:
+→ Apple hardware
+→ Trading terminal
+→ Control system
 
 ---
 
-## ⚙️ TECH STACK
+## ⚙️ CORE STACK
 
 <div align="center">
 
@@ -152,23 +165,21 @@ Built to feel like a **tool you depend on**, not just an app you open.
 
 ---
 
-## 🧪 SYSTEM ARCHITECTURE
+## 🧪 ARCHITECTURE
 
-```
-Frontend   →  HTML / CSS / JS
-Logic      →  Vanilla JavaScript
-Backend    →  Firebase Authentication
-Database   →  Firestore (Real-time)
-Hosting    →  GitHub Pages
+```yaml
+frontend: html_css_js
+backend: firebase_auth
+database: firestore
+sync: realtime_listener
+deployment: github_pages
 ```
 
 ---
 
-## 🚀 ACCESS
+## 🚀 ACCESS NODE
 
 <div align="center">
-
-### 🔗 Launch
 
 https://dakshkohli23.github.io/Diecast-Tracking/login.html
 
@@ -176,14 +187,10 @@ https://dakshkohli23.github.io/Diecast-Tracking/login.html
 
 ---
 
-## 🧬 PRODUCT DNA
+## 🧬 SYSTEM PHILOSOPHY
 
-```yaml
-focus: collectors
-experience: premium
-design: minimal
-performance: fast
-philosophy: total_control
+```
+COLLECT → TRACK → UNDERSTAND → CONTROL
 ```
 
 ---
