@@ -961,8 +961,9 @@ async function fetchData() {
       )
     ]);
 
-    DB.orders   = os.docs.map(d => ({ id: d.id, ...d.data() }))
-                    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+    DB.orders = os.docs.map(d => ({ id: d.id, ...d.data() }))
+  .filter(o => isAdmin ? true : o.ownerUid === user.uid)
+  .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     DB.activity = as.docs.map(d => ({ id: d.id, ...d.data() }))
                     .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     renderAll();
