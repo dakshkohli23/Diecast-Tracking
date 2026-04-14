@@ -941,10 +941,10 @@ async function fetchData() {
     const isAdmin = user.email === SUPER_ADMIN;
 
     const [os, as] = await Promise.all([
-      getDocs(isAdmin
-        ? query(collection(db,'orders'), orderBy('createdAt','desc'))
-        : query(collection(db,'orders'), where('ownerUid','==',user.uid), orderBy('createdAt','desc'))
-      getDocs(isAdmin
+  getDocs(isAdmin
+    ? query(collection(db,'orders'), orderBy('createdAt','desc'))
+    : query(collection(db,'orders'), where('ownerUid','==',user.uid), orderBy('createdAt','desc'))
+  getDocs(isAdmin
         ? query(collection(db,'activity'), orderBy('createdAt','desc'))
         : query(collection(db,'activity'), where('ownerUid','==',user.uid), orderBy('createdAt','desc'))
     ]);
