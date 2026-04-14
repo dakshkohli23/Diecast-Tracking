@@ -330,9 +330,10 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
   const BASE_BRANDS = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
   let customBrands = [];
 
-  async function loadBrandsFromFirestore() {
+    async function loadBrandsFromFirestore() {
   const user = auth.currentUser;
   const currentEmail = (user?.email || '').toLowerCase().trim();
+  const isAdmin = currentEmail === SUPER_ADMIN.toLowerCase().trim();
 
   try {
     const snap = await getDocs(collection(db, 'brands'));
@@ -340,6 +341,8 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
 
     customBrands = allBrands
       .filter(b => {
+        if (isAdmin) return true;
+
         const ownerUid = (b.ownerUid || '').trim();
         const ownerEmail = (b.ownerEmail || '').toLowerCase().trim();
 
@@ -978,7 +981,7 @@ async function fetchData() {
       getDocs(collection(db, 'brands'))
     ];
 
-    // Only admin collections for super admin
+    // Admin only collections
     if (isAdmin) {
       tasks.push(getDocs(collection(db, 'access_requests')));
       tasks.push(getDocs(collection(db, 'users')));
@@ -992,10 +995,13 @@ async function fetchData() {
     const ars = isAdmin ? results[3] : null;
     const us = isAdmin ? results[4] : null;
 
-    // ── ORDERS: EVERYONE ONLY THEIR OWN ──
-    DB.orders = os.docs
-      .map(d => ({ id: d.id, ...d.data() }))
+    // ── ORDERS ──
+    const allOrders = os.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    DB.orders = allOrders
       .filter(o => {
+        if (isAdmin) return true;
+
         const ownerUid = (o.ownerUid || '').trim();
         const ownerEmail = (o.ownerEmail || '').toLowerCase().trim();
 
@@ -1004,12 +1010,19 @@ async function fetchData() {
           ownerEmail === currentEmail
         );
       })
-      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      .sort((a, b) => {
+        const aTime = a.createdAt?.seconds || 0;
+        const bTime = b.createdAt?.seconds || 0;
+        return bTime - aTime;
+      });
 
-    // ── ACTIVITY: EVERYONE ONLY THEIR OWN ──
-    DB.activity = as.docs
-      .map(d => ({ id: d.id, ...d.data() }))
+    // ── ACTIVITY ──
+    const allActivity = as.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    DB.activity = allActivity
       .filter(a => {
+        if (isAdmin) return true;
+
         const ownerUid = (a.ownerUid || '').trim();
         const ownerEmail = (a.ownerEmail || '').toLowerCase().trim();
 
@@ -1018,14 +1031,20 @@ async function fetchData() {
           ownerEmail === currentEmail
         );
       })
-      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      .sort((a, b) => {
+        const aTime = a.createdAt?.seconds || 0;
+        const bTime = b.createdAt?.seconds || 0;
+        return bTime - aTime;
+      });
 
-    // ── BRANDS: EVERYONE ONLY THEIR OWN CUSTOM BRANDS ──
+    // ── BRANDS ──
     const allBrands = bs.docs.map(d => ({ id: d.id, ...d.data() }));
 
     if (typeof customBrands !== 'undefined') {
       customBrands = allBrands
         .filter(b => {
+          if (isAdmin) return true;
+
           const ownerUid = (b.ownerUid || '').trim();
           const ownerEmail = (b.ownerEmail || '').toLowerCase().trim();
 
@@ -1038,18 +1057,22 @@ async function fetchData() {
         .filter(Boolean);
     }
 
-    // ── ACCESS REQUESTS: ADMIN ONLY ──
+    // ── ACCESS REQUESTS (admin only) ──
     DB.accessRequests = isAdmin && ars
       ? ars.docs
           .map(d => ({ id: d.id, ...d.data() }))
           .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       : [];
 
-    // ── USERS: ADMIN ONLY ──
+    // ── USERS (admin only) ──
     DB.users = isAdmin && us
       ? us.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+          .sort((a, b) => {
+            const aTime = a.createdAt?.seconds || 0;
+            const bTime = b.createdAt?.seconds || 0;
+            return bTime - aTime;
+          })
       : [];
 
     renderAll();
@@ -1059,8 +1082,6 @@ async function fetchData() {
     renderAll();
   }
 }
-
-
 async function addActivity(type, msg) {
   const user = auth.currentUser;
   try {
