@@ -224,6 +224,15 @@ if (!isAdmin) {
     try { await signOut(auth); window.location.href = 'login.html'; }
     catch (e) { showToast('Logout failed', 'warning'); }
   });
+  document.getElementById('refreshAccessRequestsBtn')?.addEventListener('click', renderAccessRequests);
+
+document.querySelectorAll('.ar-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.ar-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    renderAccessRequests();
+  });
+});
 
   // ── USER MANAGEMENT ──
 document.getElementById('openAddUserBtn')?.addEventListener('click', () => {
