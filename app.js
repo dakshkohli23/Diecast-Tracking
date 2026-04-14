@@ -1620,3 +1620,82 @@ function showToast(message, type='info') {
   clearTimeout(window.__toastTimer);
   window.__toastTimer = setTimeout(() => { t.style.transform='translateY(20px)'; t.style.opacity='0'; }, 2500);
 }
+/* ══════════════════════════════════════ ACCESS REQUESTS ══════════════════════════════════════ */
+async function loadAccessRequestsBadge() {
+  try {
+    const snap = await getDocs(query(collection(db, 'access_requests'), where('status','==','pending')));
+    const count = snap.size;
+    const badge = document.getElementById('accessRequestsBadge');
+    if (badge) {
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'inline-flex' : 'none';
+    }
+  } catch(e) { /* silent */ }
+}
+
+async function renderAccessRequests() {
+  const list = document.getElementById('accessRequestsList'); if (!list) return;
+  list.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>`;
+  try {
+    const snap = await getDocs(query(collection(db, 'access_requests'), orderBy('createdAt','desc')));
+    const all  = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
+    const pending  = all.filter(r => r.status==='pending').length;
+    const approved = all.filter(r => r.status==='approved').length;
+    const rejected = all.filter(r => r.status==='rejected').length;
+    const el = id => document.getElementById(id);
+    if(el('arCountPending'))  el('arCountPending').textContent  = pending;
+    if(el('arCountApproved')) el('arCountApproved').textContent = approved;
+    if(el('arCountRejected')) el('arCountRejected').textContent = rejected;
+    const badge = el('accessRequestsBadge');
+    if(badge){ badge.textContent=pending; badge.style.display=pending>0?'inline-flex':'none'; }
+    const activeFilter = document.querySelector('.ar-tab.active')?.dataset.filter || 'all';
+    const filtered = activeFilter==='all' ? all : all.filter(r=>r.status===activeFilter);
+    if (!filtered.length) {
+      list.innerHTML = `<div class="empty-state" style="padding:2.5rem">No ${activeFilter==='all'?'':activeFilter} requests yet</div>`;
+      return;
+    }
+    list.innerHTML = filtered.map(r => {
+      const ts = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+      const statusBadge = r.status==='pending'
+        ? `<span class="ar-badge-pending">Pending</span>`
+        : r.status==='approved'
+        ? `<span class="ar-badge-approved">Approved</span>`
+        : `<span class="ar-badge-rejected">Rejected</span>`;
+      const actions = r.status==='pending' ? `
+        <div class="ar-actions">
+          <button class="btn btn-icon btn-ar-approve" onclick="approveAccessRequest('${r.docId}','${escHtml(r.email)}','${escHtml(r.name)}')"><i class="fa-solid fa-check"></i></button>
+          <button class="btn btn-icon btn-ar-reject"  onclick="rejectAccessRequest('${r.docId}')"><i class="fa-solid fa-xmark"></i></button>
+        </div>` : '';
+      return `<div class="ar-row">
+        <div class="ar-avatar"><i class="fa-solid fa-user"></i></div>
+        <div class="ar-info">
+          <div class="ar-name">${escHtml(r.name||'—')} ${statusBadge}</div>
+          <div class="ar-email">${escHtml(r.email||'—')}</div>
+          ${r.reason&&r.reason!=='(no reason provided)'?`<div class="ar-reason">${escHtml(r.reason)}</div>`:''}
+        </div>
+        <div class="ar-time">${ts}</div>
+        ${actions}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = `<div class="empty-state">Failed to load. Check Firestore rules.</div>`;
+  }
+}
+
+window.approveAccessRequest = async function(docId, email, name) {
+  if (!confirm(`Approve access for ${name} (${email})?`)) return;
+  try {
+    await updateDoc(doc(db,'access_requests',docId), { status:'approved', reviewedAt: serverTimestamp() });
+    showToast(`Approved: ${name}`, 'success');
+    renderAccessRequests();
+  } catch(e) { showToast('Failed','warning'); }
+};
+
+window.rejectAccessRequest = async function(docId) {
+  if (!confirm('Reject this request?')) return;
+  try {
+    await updateDoc(doc(db,'access_requests',docId), { status:'rejected', reviewedAt: serverTimestamp() });
+    showToast('Rejected', 'info');
+    renderAccessRequests();
+  } catch(e) { showToast('Failed','warning'); }
+};
