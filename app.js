@@ -84,59 +84,26 @@ function initLoginPage() {
     e.preventDefault();
     const email    = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
-
-    const resetBtn = () => {
-      loginBtn.innerHTML = '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>';
-      loginBtn.disabled  = false;
-    };
-    const showErr = (msg) => {
-      loginErr.classList.remove('hidden');
-      errMsg.textContent = msg;
-      resetBtn();
-      setTimeout(() => loginErr.classList.add('hidden'), 5000);
-    };
-
     loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
     loginBtn.disabled  = true;
-
     try {
-      // Step 1 — Firebase Auth sign in
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, email, password);
 
-      // Step 2 — Super admin bypasses Firestore check
-      if (email === SUPER_ADMIN) {
-        window.location.href = 'index.html'; return;
-      }
-
-      // Step 3 — Check user exists in Firestore users collection
-      const snap    = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
-      if (snap.empty) {
-        // Firebase Auth account exists but not registered in PreTrack
+      // ── CHECK IF DISABLED ──
+      const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAt','desc')));
+      const profile = snap.docs.map(d => d.data()).find(u => u.email === email);
+      if (profile && profile.status === 'disabled') {
         await signOut(auth);
-        showErr('Your account is not registered in PreTrack. Contact the admin to get access.');
-        return;
+        throw new Error('Your account has been disabled. Contact the admin.');
       }
 
-      const profile = snap.docs[0].data();
-
-      // Step 4 — Check disabled
-      if (profile.status === 'disabled') {
-        await signOut(auth);
-        showErr('Your account has been disabled. Please contact the admin.');
-        return;
-      }
-
-      // All good → redirect
       window.location.href = 'index.html';
-
     } catch (error) {
-      if (error.message?.includes('not registered') || error.message?.includes('disabled')) return; // already shown
-      const code = error.code || '';
-      let msg = 'Invalid email or password. Please try again.';
-      if (code === 'auth/too-many-requests')      msg = 'Too many attempts. Please wait a moment.';
-      if (code === 'auth/network-request-failed') msg = 'Network error. Check your connection.';
-      if (code === 'auth/user-disabled')          msg = 'This account has been disabled by Firebase.';
-      showErr(msg);
+      loginErr.classList.remove('hidden');
+      errMsg.textContent = error.message?.includes('disabled') ? error.message : 'Invalid email or password';
+      loginBtn.innerHTML = '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>';
+      loginBtn.disabled  = false;
+      setTimeout(() => loginErr.classList.add('hidden'), 4000);
     }
   });
 }
@@ -149,9 +116,29 @@ if (document.getElementById('pageContent')) {
     _currentUser = user;
     const el = document.getElementById('profileName');
     if (el) el.textContent = user.email || 'Admin';
+    if (user.email !== SUPER_ADMIN) await ensureUserProfile(user);
     await fetchData();
     initDashboard();
   });
+}
+
+async function ensureUserProfile(user) {
+  try {
+    const snap = await getDocs(query(collection(db, 'users'), where('email','==', user.email)));
+    if (snap.empty) {
+      await addDoc(collection(db, 'users'), {
+        uid: user.uid, email: user.email,
+        role: 'viewer', status: 'active',
+        createdAt: serverTimestamp()
+      });
+      console.log('Auto-created profile for:', user.email);
+    } else {
+      const docData = snap.docs[0].data();
+      if (!docData.uid || docData.uid !== user.uid) {
+        await updateDoc(snap.docs[0].ref, { uid: user.uid });
+      }
+    }
+  } catch(e) { console.warn('ensureUserProfile:', e.message); }
 }
 
 function initDashboard() {
@@ -185,17 +172,12 @@ function initDashboard() {
   initGreeting();
 
   // ── ADMIN GATE ──
-const isAdmin = auth.currentUser?.email === SUPER_ADMIN;
-if (!isAdmin) {
-  document.querySelector('.nav-item[data-section="users"]')?.setAttribute('style','display:none');
-  document.querySelector('.nav-item[data-section="access-requests"]')?.setAttribute('style','display:none');
-  document.getElementById('openAddUserBtn')?.setAttribute('style','display:none');
-  document.getElementById('clearDataBtn')?.setAttribute('style','display:none');
-} else {
-  document.querySelector('.nav-item[data-section="users"]')?.removeAttribute('style');
-  document.querySelector('.nav-item[data-section="access-requests"]')?.removeAttribute('style');
-  loadAccessRequestsBadge();
-}
+  const isAdmin = auth.currentUser?.email === SUPER_ADMIN;
+  if (!isAdmin) {
+    document.querySelector('.nav-item[data-section="users"]')?.setAttribute('style','display:none');
+    document.getElementById('openAddUserBtn')?.setAttribute('style','display:none');
+    document.getElementById('clearDataBtn')?.setAttribute('style','display:none');
+  }
   // ── NAV ──
   function navigateTo(section) {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -208,7 +190,6 @@ if (!isAdmin) {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       navigateTo(item.dataset.section);
-      if (item.dataset.section === 'access-requests') renderAccessRequests();
       if (isMobile()) {
         closeMobileSidebar();
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -224,15 +205,6 @@ if (!isAdmin) {
     try { await signOut(auth); window.location.href = 'login.html'; }
     catch (e) { showToast('Logout failed', 'warning'); }
   });
-  document.getElementById('refreshAccessRequestsBtn')?.addEventListener('click', renderAccessRequests);
-
-document.querySelectorAll('.ar-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.ar-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    renderAccessRequests();
-  });
-});
 
   // ── USER MANAGEMENT ──
 document.getElementById('openAddUserBtn')?.addEventListener('click', () => {
@@ -250,7 +222,7 @@ document.getElementById('addUserModalClose')?.addEventListener('click', closeAdd
 document.getElementById('addUserCancelBtn')?.addEventListener('click', closeAddUserModal);
 
 document.getElementById('addUserConfirmBtn')?.addEventListener('click', async () => {
-  if (auth.currentUser?.email !== SUPER_ADMIN) { showToast('Admin only', 'warning'); return; }
+  if (auth.currentUser?.email !== SUPER_ADMIN) { showToast('Admin only', 'warning'); return; } // ← ADD THIS LINE
   const email    = document.getElementById('newUserEmail')?.value.trim();
   const password = document.getElementById('newUserPassword')?.value;
   const role     = document.getElementById('newUserRole')?.value || 'viewer';
@@ -261,41 +233,19 @@ document.getElementById('addUserConfirmBtn')?.addEventListener('click', async ()
   if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
 
   btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
-  errEl.textContent = '';
-
   try {
-    // Check if email already exists in Firestore users (might be a deleted doc re-add)
-    const existingSnap = await getDocs(query(collection(db, 'users'), where('email','==', email)));
-    if (!existingSnap.empty) {
-      errEl.textContent = 'This email already exists in the users list. Remove it first.';
-      btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create User';
-      return;
-    }
-
-    let uid = '';
-    try {
-      // Try creating fresh Firebase Auth user
-      const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-      uid = cred.user.uid;
-      await secondaryAuth.signOut();
-    } catch (authErr) {
-      if (authErr.code === 'auth/email-already-in-use') {
-        // Auth account exists (leftover from previous delete) — show helpful message
-        errEl.textContent = 'This email has a leftover Firebase Auth account. Please use a different email, or ask admin to delete the Auth account from the Firebase Console → Authentication tab.';
-        btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create User';
-        return;
-      }
-      throw authErr;
-    }
-
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    await secondaryAuth.signOut();
     await addDoc(collection(db, 'users'), {
-      uid, email, role, status: 'active', createdAt: serverTimestamp()
+      uid: cred.user.uid, email, role, status: 'active', createdAt: serverTimestamp()
     });
     showToast(`User ${email} created!`, 'success');
     closeAddUserModal();
     renderUsers();
   } catch (err) {
-    const msg = err.code === 'auth/invalid-email' ? 'Invalid email address' : err.message;
+    const msg = err.code === 'auth/email-already-in-use' ? 'Email already in use'
+              : err.code === 'auth/invalid-email'        ? 'Invalid email address'
+              : err.message;
     errEl.textContent = msg;
   } finally {
     btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create User';
@@ -952,20 +902,22 @@ async function fetchData() {
 
     const [os, as] = await Promise.all([
       getDocs(isAdmin
-        ? query(collection(db,'orders'), orderBy('createdAt','desc'))
-        : query(collection(db,'orders'), where('ownerUid','==',user.uid), orderBy('createdAt','desc'))
+        ? collection(db,'orders')
+        : query(collection(db,'orders'), where('ownerUid','==',user.uid))
       ),
       getDocs(isAdmin
-        ? query(collection(db,'activity'), orderBy('createdAt','desc'))
-        : query(collection(db,'activity'), where('ownerUid','==',user.uid), orderBy('createdAt','desc'))
+        ? collection(db,'activity')
+        : query(collection(db,'activity'), where('ownerUid','==',user.uid))
       )
     ]);
 
+    // Filter client-side as extra safety — no Firestore index needed
     DB.orders = os.docs.map(d => ({ id: d.id, ...d.data() }))
-  .filter(o => isAdmin ? true : o.ownerUid === user.uid)
-  .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+      .filter(o => isAdmin ? true : o.ownerUid === user.uid)
+      .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     DB.activity = as.docs.map(d => ({ id: d.id, ...d.data() }))
-                    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+      .filter(a => isAdmin ? true : a.ownerUid === user.uid)
+      .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     renderAll();
   } catch (err) {
     console.error(err); DB = { orders:[], activity:[] }; renderAll();
@@ -1551,7 +1503,7 @@ async function renderUsers() {
   const tbody = document.getElementById('usersTableBody'); if (!tbody) return;
   tbody.innerHTML = `<tr><td colspan="5" class="empty-row"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
   try {
-    const snap = await getDocs(collection(db, 'users'));
+    const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')));
     const users = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
     if (!users.length) {
       tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No users added yet</td></tr>`; return;
@@ -1603,16 +1555,10 @@ window.toggleUserStatus = async function(docId, currentStatus) {
 };
 
 window.removeUser = async function(docId, email) {
-  const confirmed = confirm(
-    `Remove "${email}" from PreTrack?\n\n` +
-    `⚠️ NOTE: This removes them from the users list.\n` +
-    `If you want to reuse this email later, also delete the Auth account from:\n` +
-    `Firebase Console → Authentication → Users → find & delete ${email}`
-  );
-  if (!confirmed) return;
+  if (!confirm(`Remove ${email} from PreTrack?\n\nThey won't be able to log in.`)) return;
   try {
     await deleteDoc(doc(db, 'users', docId));
-    showToast('User removed from PreTrack', 'success');
+    showToast('User removed', 'success');
     renderUsers();
   } catch(e) { showToast('Failed to remove user', 'warning'); }
 };
@@ -1631,82 +1577,3 @@ function showToast(message, type='info') {
   clearTimeout(window.__toastTimer);
   window.__toastTimer = setTimeout(() => { t.style.transform='translateY(20px)'; t.style.opacity='0'; }, 2500);
 }
-/* ══════════════════════════════════════ ACCESS REQUESTS ══════════════════════════════════════ */
-async function loadAccessRequestsBadge() {
-  try {
-    const snap = await getDocs(query(collection(db, 'access_requests'), where('status','==','pending')));
-    const count = snap.size;
-    const badge = document.getElementById('accessRequestsBadge');
-    if (badge) {
-      badge.textContent = count;
-      badge.style.display = count > 0 ? 'inline-flex' : 'none';
-    }
-  } catch(e) { /* silent */ }
-}
-
-async function renderAccessRequests() {
-  const list = document.getElementById('accessRequestsList'); if (!list) return;
-  list.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>`;
-  try {
-    const snap = await getDocs(query(collection(db, 'access_requests'), orderBy('createdAt','desc')));
-    const all  = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
-    const pending  = all.filter(r => r.status==='pending').length;
-    const approved = all.filter(r => r.status==='approved').length;
-    const rejected = all.filter(r => r.status==='rejected').length;
-    const el = id => document.getElementById(id);
-    if(el('arCountPending'))  el('arCountPending').textContent  = pending;
-    if(el('arCountApproved')) el('arCountApproved').textContent = approved;
-    if(el('arCountRejected')) el('arCountRejected').textContent = rejected;
-    const badge = el('accessRequestsBadge');
-    if(badge){ badge.textContent=pending; badge.style.display=pending>0?'inline-flex':'none'; }
-    const activeFilter = document.querySelector('.ar-tab.active')?.dataset.filter || 'all';
-    const filtered = activeFilter==='all' ? all : all.filter(r=>r.status===activeFilter);
-    if (!filtered.length) {
-      list.innerHTML = `<div class="empty-state" style="padding:2.5rem">No ${activeFilter==='all'?'':activeFilter} requests yet</div>`;
-      return;
-    }
-    list.innerHTML = filtered.map(r => {
-      const ts = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—';
-      const statusBadge = r.status==='pending'
-        ? `<span class="ar-badge-pending">Pending</span>`
-        : r.status==='approved'
-        ? `<span class="ar-badge-approved">Approved</span>`
-        : `<span class="ar-badge-rejected">Rejected</span>`;
-      const actions = r.status==='pending' ? `
-        <div class="ar-actions">
-          <button class="btn btn-icon btn-ar-approve" onclick="approveAccessRequest('${r.docId}','${escHtml(r.email)}','${escHtml(r.name)}')"><i class="fa-solid fa-check"></i></button>
-          <button class="btn btn-icon btn-ar-reject"  onclick="rejectAccessRequest('${r.docId}')"><i class="fa-solid fa-xmark"></i></button>
-        </div>` : '';
-      return `<div class="ar-row">
-        <div class="ar-avatar"><i class="fa-solid fa-user"></i></div>
-        <div class="ar-info">
-          <div class="ar-name">${escHtml(r.name||'—')} ${statusBadge}</div>
-          <div class="ar-email">${escHtml(r.email||'—')}</div>
-          ${r.reason&&r.reason!=='(no reason provided)'?`<div class="ar-reason">${escHtml(r.reason)}</div>`:''}
-        </div>
-        <div class="ar-time">${ts}</div>
-        ${actions}
-      </div>`;
-    }).join('');
-  } catch(e) {
-    list.innerHTML = `<div class="empty-state">Failed to load. Check Firestore rules.</div>`;
-  }
-}
-
-window.approveAccessRequest = async function(docId, email, name) {
-  if (!confirm(`Approve access for ${name} (${email})?`)) return;
-  try {
-    await updateDoc(doc(db,'access_requests',docId), { status:'approved', reviewedAt: serverTimestamp() });
-    showToast(`Approved: ${name}`, 'success');
-    renderAccessRequests();
-  } catch(e) { showToast('Failed','warning'); }
-};
-
-window.rejectAccessRequest = async function(docId) {
-  if (!confirm('Reject this request?')) return;
-  try {
-    await updateDoc(doc(db,'access_requests',docId), { status:'rejected', reviewedAt: serverTimestamp() });
-    showToast('Rejected', 'info');
-    renderAccessRequests();
-  } catch(e) { showToast('Failed','warning'); }
-};
