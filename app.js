@@ -2,9 +2,9 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
+  getAuth, setPersistence, browserLocalPersistence,
+  signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-// REPLACE the firestore import line with:
 import {
   getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
@@ -22,12 +22,15 @@ const firebaseConfig = {
 
 const SUPER_ADMIN = 'dlaize@dlaize.com';
 let _currentUser = null;
-const app = initializeApp(firebaseConfig);
+const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db   = getFirestore(app);
+
+// Ensure token persists across page reloads
+setPersistence(auth, browserLocalPersistence).catch(console.warn);
 
 // ── SECONDARY APP (create users without logging out admin) ──
-const secondaryApp = initializeApp(firebaseConfig, 'secondary');
+const secondaryApp  = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
 // ── SUPABASE ──
@@ -155,8 +158,15 @@ function initDashboard() {
   const isAdmin = auth.currentUser?.email === SUPER_ADMIN;
   if (!isAdmin) {
     document.querySelector('.nav-item[data-section="users"]')?.setAttribute('style','display:none');
+    document.querySelector('.nav-item[data-section="access-requests"]')?.setAttribute('style','display:none');
     document.getElementById('openAddUserBtn')?.setAttribute('style','display:none');
     document.getElementById('clearDataBtn')?.setAttribute('style','display:none');
+  } else {
+    // Show admin-only nav items
+    document.querySelector('.nav-item[data-section="users"]')?.removeAttribute('style');
+    document.querySelector('.nav-item[data-section="access-requests"]')?.removeAttribute('style');
+    // Load access requests badge count
+    loadAccessRequestsBadge();
   }
   // ── NAV ──
   function navigateTo(section) {
@@ -170,10 +180,23 @@ function initDashboard() {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       navigateTo(item.dataset.section);
+      if (item.dataset.section === 'access-requests') renderAccessRequests();
+      if (item.dataset.section === 'users') renderUsers();
       if (isMobile()) {
         closeMobileSidebar();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
+    });
+  });
+
+  document.getElementById('refreshAccessRequestsBtn')?.addEventListener('click', renderAccessRequests);
+
+  // Access Requests filter tabs
+  document.querySelectorAll('.ar-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.ar-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderAccessRequests();
     });
   });
 
@@ -874,19 +897,42 @@ document.querySelectorAll('.sellers-tab').forEach(tab => {
 } // ← end of initDashboard()
 
 /* ══════════════════════════════════════ FIRESTORE ══════════════════════════════════════ */
+// Cache for current user's role profile
+let _userProfile = null;
+
+async function fetchUserProfile(user) {
+  if (!user) return null;
+  if (user.email === SUPER_ADMIN) return { role: 'admin', status: 'active' };
+  try {
+    const snap = await getDocs(query(collection(db, 'users'), where('email','==', user.email)));
+    if (snap.empty) return null;
+    return snap.docs[0].data();
+  } catch(e) { return null; }
+}
+
 async function fetchData() {
   try {
     const user = auth.currentUser;
     if (!user) return;
     const isAdmin = user.email === SUPER_ADMIN;
 
+    // Load user profile (role + status check) for non-admin
+    if (!isAdmin && !_userProfile) {
+      _userProfile = await fetchUserProfile(user);
+      if (!_userProfile || _userProfile.status === 'disabled') {
+        await signOut(auth); window.location.href = 'login.html'; return;
+      }
+      // Apply role-based UI restrictions
+      applyRoleRestrictions(_userProfile.role);
+    }
+
     const [os, as] = await Promise.all([
       getDocs(isAdmin
         ? query(collection(db,'orders'), orderBy('createdAt','desc'))
-        : query(collection(db,'orders'), where('ownerUid','==',user.uid))),
+        : query(collection(db,'orders'), where('ownerUid','==',user.uid), orderBy('createdAt','desc'))),
       getDocs(isAdmin
         ? query(collection(db,'activity'), orderBy('createdAt','desc'))
-        : query(collection(db,'activity'), where('ownerUid','==',user.uid)))
+        : query(collection(db,'activity'), where('ownerUid','==',user.uid), orderBy('createdAt','desc')))
     ]);
 
     DB.orders   = os.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -896,6 +942,26 @@ async function fetchData() {
     renderAll();
   } catch (err) {
     console.error(err); DB = { orders:[], activity:[] }; renderAll();
+  }
+}
+
+function applyRoleRestrictions(role) {
+  // viewer: hide add/edit/delete controls
+  if (role === 'viewer') {
+    const selectors = [
+      '#topbarAddBtn','#quickAddBtn','#qaAddOrder','#addOrderBtn',
+      '#openAddUserBtn','#clearDataBtn',
+      '.nav-item[data-section="add-order"]'
+    ];
+    selectors.forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => el.style.display='none');
+    });
+    // Override profile role label
+    const roleEl = document.querySelector('.profile-role');
+    if (roleEl) roleEl.textContent = 'Viewer';
+  } else if (role === 'editor') {
+    const roleEl = document.querySelector('.profile-role');
+    if (roleEl) roleEl.textContent = 'Editor';
   }
 }
 
@@ -1519,6 +1585,106 @@ async function renderUsers() {
     tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Failed to load users</td></tr>`;
   }
 }
+
+/* ══════════════════════════════════════ ACCESS REQUESTS ══════════════════════════════════════ */
+async function loadAccessRequestsBadge() {
+  try {
+    const snap = await getDocs(query(collection(db, 'access_requests'), where('status','==','pending')));
+    const count = snap.size;
+    const badge = document.getElementById('accessRequestsBadge');
+    if (badge) {
+      if (count > 0) { badge.textContent = count; badge.style.display = 'inline-flex'; }
+      else { badge.style.display = 'none'; }
+    }
+  } catch(e) { /* silent */ }
+}
+
+async function renderAccessRequests() {
+  const list = document.getElementById('accessRequestsList'); if (!list) return;
+  list.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>`;
+
+  try {
+    const snap = await getDocs(query(collection(db, 'access_requests'), orderBy('createdAt', 'desc')));
+    const all  = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
+
+    // Update stat counts
+    const pending  = all.filter(r => r.status === 'pending').length;
+    const approved = all.filter(r => r.status === 'approved').length;
+    const rejected = all.filter(r => r.status === 'rejected').length;
+    document.getElementById('arCountPending')?.setAttribute('data-val', ''); 
+    const setText2 = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+    setText2('arCountPending',  pending);
+    setText2('arCountApproved', approved);
+    setText2('arCountRejected', rejected);
+
+    // Update badge
+    const badge = document.getElementById('accessRequestsBadge');
+    if (badge) { badge.textContent = pending; badge.style.display = pending > 0 ? 'inline-flex' : 'none'; }
+
+    // Apply tab filter
+    const activeFilter = document.querySelector('.ar-tab.active')?.dataset.filter || 'all';
+    const filtered = activeFilter === 'all' ? all : all.filter(r => r.status === activeFilter);
+
+    if (!filtered.length) {
+      list.innerHTML = `<div class="empty-state" style="padding:2.5rem">
+        <i class="fa-solid fa-inbox" style="font-size:2rem;opacity:0.3"></i>
+        <p style="margin-top:0.5rem">No ${activeFilter === 'all' ? '' : activeFilter} requests yet</p>
+      </div>`;
+      return;
+    }
+
+    list.innerHTML = filtered.map(r => {
+      const ts = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+      const statusBadge = r.status === 'pending'
+        ? `<span class="ar-badge-pending"><i class="fa-solid fa-hourglass-half"></i> Pending</span>`
+        : r.status === 'approved'
+        ? `<span class="ar-badge-approved"><i class="fa-solid fa-circle-check"></i> Approved</span>`
+        : `<span class="ar-badge-rejected"><i class="fa-solid fa-circle-xmark"></i> Rejected</span>`;
+
+      const actions = r.status === 'pending' ? `
+        <div class="ar-actions">
+          <button class="btn btn-icon btn-ar-approve" title="Approve" onclick="approveAccessRequest('${r.docId}','${escHtml(r.email)}','${escHtml(r.name)}')">
+            <i class="fa-solid fa-check"></i>
+          </button>
+          <button class="btn btn-icon btn-ar-reject" title="Reject" onclick="rejectAccessRequest('${r.docId}')">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>` : `<div style="width:80px"></div>`;
+
+      return `<div class="ar-row">
+        <div class="ar-avatar"><i class="fa-solid fa-user"></i></div>
+        <div class="ar-info">
+          <div class="ar-name">${escHtml(r.name||'—')} ${statusBadge}</div>
+          <div class="ar-email"><i class="fa-solid fa-envelope" style="opacity:0.5;font-size:0.65rem"></i> ${escHtml(r.email||'—')}</div>
+          ${r.reason && r.reason !== '(no reason provided)' ? `<div class="ar-reason"><i class="fa-solid fa-comment-dots" style="opacity:0.5;font-size:0.65rem"></i> ${escHtml(r.reason)}</div>` : ''}
+        </div>
+        <div class="ar-time">${ts}</div>
+        ${actions}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = `<div class="empty-state">Failed to load requests. Check Firestore rules.</div>`;
+    console.error(e);
+  }
+}
+
+window.approveAccessRequest = async function(docId, email, name) {
+  if (!confirm(`Approve access for ${name} (${email})?\n\nYou will need to create their account from the Users tab.`)) return;
+  try {
+    await updateDoc(doc(db, 'access_requests', docId), { status: 'approved', reviewedAt: serverTimestamp(), reviewedBy: auth.currentUser?.email||'' });
+    showToast(`Approved: ${name}`, 'success');
+    renderAccessRequests();
+  } catch(e) { showToast('Failed to approve request', 'warning'); }
+};
+
+window.rejectAccessRequest = async function(docId) {
+  if (!confirm('Reject this access request?')) return;
+  try {
+    await updateDoc(doc(db, 'access_requests', docId), { status: 'rejected', reviewedAt: serverTimestamp(), reviewedBy: auth.currentUser?.email||'' });
+    showToast('Request rejected', 'info');
+    renderAccessRequests();
+  } catch(e) { showToast('Failed to reject request', 'warning'); }
+};
 
 window.toggleUserStatus = async function(docId, currentStatus) {
   const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
