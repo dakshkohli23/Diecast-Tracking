@@ -56,7 +56,7 @@ async function deleteImageFromSupabase(imageUrl) {
 }
 
 // ── STATE ──
-let DB = { orders: [], activity: [], accessRequests: [] };
+let DB = { orders: [], activity: [], accessRequests: [], users: [] };
 let _currentImageFile = null;
 let _currentImageB64  = '';
 let _authReady = false;
@@ -238,7 +238,8 @@ document.getElementById('addUserModalClose')?.addEventListener('click', closeAdd
 document.getElementById('addUserCancelBtn')?.addEventListener('click', closeAddUserModal);
 
 document.getElementById('addUserConfirmBtn')?.addEventListener('click', async () => {
-  if (auth.currentUser?.email !== SUPER_ADMIN) { showToast('Admin only', 'warning'); return; } // ← ADD THIS LINE
+ const isAdmin = (auth.currentUser?.email || '').toLowerCase().trim() === SUPER_ADMIN.toLowerCase().trim();
+if (!isAdmin) { showToast('Admin only', 'warning'); return; }
   const email    = document.getElementById('newUserEmail')?.value.trim();
   const password = document.getElementById('newUserPassword')?.value;
   const role     = document.getElementById('newUserRole')?.value || 'viewer';
@@ -330,36 +331,58 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
   let customBrands = [];
 
     async function loadBrandsFromFirestore() {
-    const user = auth.currentUser;
-    const isAdmin = user?.email === SUPER_ADMIN;
-    try {
-      const q = isAdmin
-        ? collection(db, 'brands')
-        : query(collection(db, 'brands'), where('ownerUid','==', user?.uid||''));
-      const snap = await getDocs(q);
-      customBrands = snap.docs.map(d => d.data().name).filter(Boolean);
-    } catch(e) {
-      customBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
-    }
-    rebuildAllBrandDropdowns();
+  const user = auth.currentUser;
+  const currentEmail = (user?.email || '').toLowerCase().trim();
+  const isAdmin = currentEmail === SUPER_ADMIN.toLowerCase().trim();
+
+  try {
+    const snap = await getDocs(collection(db, 'brands'));
+    const allBrands = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    customBrands = allBrands
+      .filter(b => {
+        if (isAdmin) return true;
+
+        const ownerUid = (b.ownerUid || '').trim();
+        const ownerEmail = (b.ownerEmail || '').toLowerCase().trim();
+
+        return (
+          ownerUid === user?.uid ||
+          ownerEmail === currentEmail
+        );
+      })
+      .map(b => b.name)
+      .filter(Boolean);
+  } catch (e) {
+    customBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
   }
 
+  rebuildAllBrandDropdowns();
+}
+
   async function addCustomBrand(name) {
-    if (!name) return false;
-    const all = [...BASE_BRANDS, ...customBrands];
-    if (all.includes(name)) return false;
-    try {
-     await addDoc(collection(db, 'brands'), {
-        name, createdAt: serverTimestamp(),
-        ownerUid: auth.currentUser?.uid||'', ownerEmail: auth.currentUser?.email||''
-      });
-      customBrands.push(name);
-    } catch(e) {
-      customBrands.push(name);
-      localStorage.setItem('pretrack_brands', JSON.stringify(customBrands));
-    }
-    return true;
+  if (!name) return false;
+
+  const normalized = name.trim();
+  const all = [...BASE_BRANDS, ...customBrands].map(x => (x || '').toLowerCase().trim());
+
+  if (all.includes(normalized.toLowerCase())) return false;
+
+  try {
+    await addDoc(collection(db, 'brands'), {
+      name: normalized,
+      createdAt: serverTimestamp(),
+      ownerUid: auth.currentUser?.uid || '',
+      ownerEmail: auth.currentUser?.email || ''
+    });
+    customBrands.push(normalized);
+  } catch (e) {
+    customBrands.push(normalized);
+    localStorage.setItem('pretrack_brands', JSON.stringify(customBrands));
   }
+
+  return true;
+}
 
   function getAllBrands() { return [...BASE_BRANDS, ...customBrands]; }
 
@@ -936,47 +959,116 @@ async function fetchData() {
   try {
     const user = auth.currentUser;
     if (!user) return;
-    const isAdmin = user.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
+
+    const currentEmail = (user.email || '').toLowerCase().trim();
+    const isAdmin = currentEmail === SUPER_ADMIN.toLowerCase().trim();
 
     const tasks = [
-  getDocs(query(collection(db,'orders'),   where('ownerUid','==',user.uid))),
-  getDocs(query(collection(db,'activity'), where('ownerUid','==',user.uid)))
-];
+      getDocs(collection(db, 'orders')),
+      getDocs(collection(db, 'activity')),
+      getDocs(collection(db, 'brands'))
+    ];
 
-    // Admin only: load access requests
+    // Admin only collections
     if (isAdmin) {
       tasks.push(getDocs(collection(db, 'access_requests')));
+      tasks.push(getDocs(collection(db, 'users')));
     }
 
-    const [os, as, ars] = await Promise.all(tasks);
+    const results = await Promise.all(tasks);
 
-    DB.orders = os.docs.map(d => ({ id: d.id, ...d.data() }))
-  .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+    const os = results[0];
+    const as = results[1];
+    const bs = results[2];
+    const ars = isAdmin ? results[3] : null;
+    const us = isAdmin ? results[4] : null;
 
-DB.activity = as.docs.map(d => ({ id: d.id, ...d.data() }))
-  .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+    // ── ORDERS ──
+    const allOrders = os.docs.map(d => ({ id: d.id, ...d.data() }));
 
+    DB.orders = allOrders
+      .filter(o => {
+        if (isAdmin) return true;
+
+        const ownerUid = (o.ownerUid || '').trim();
+        const ownerEmail = (o.ownerEmail || '').toLowerCase().trim();
+
+        return (
+          ownerUid === user.uid ||
+          ownerEmail === currentEmail
+        );
+      })
+      .sort((a, b) => {
+        const aTime = a.createdAt?.seconds || 0;
+        const bTime = b.createdAt?.seconds || 0;
+        return bTime - aTime;
+      });
+
+    // ── ACTIVITY ──
+    const allActivity = as.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    DB.activity = allActivity
+      .filter(a => {
+        if (isAdmin) return true;
+
+        const ownerUid = (a.ownerUid || '').trim();
+        const ownerEmail = (a.ownerEmail || '').toLowerCase().trim();
+
+        return (
+          ownerUid === user.uid ||
+          ownerEmail === currentEmail
+        );
+      })
+      .sort((a, b) => {
+        const aTime = a.createdAt?.seconds || 0;
+        const bTime = b.createdAt?.seconds || 0;
+        return bTime - aTime;
+      });
+
+    // ── BRANDS ──
+    const allBrands = bs.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    if (typeof customBrands !== 'undefined') {
+      customBrands = allBrands
+        .filter(b => {
+          if (isAdmin) return true;
+
+          const ownerUid = (b.ownerUid || '').trim();
+          const ownerEmail = (b.ownerEmail || '').toLowerCase().trim();
+
+          return (
+            ownerUid === user.uid ||
+            ownerEmail === currentEmail
+          );
+        })
+        .map(b => b.name)
+        .filter(Boolean);
+    }
+
+    // ── ACCESS REQUESTS (admin only) ──
     DB.accessRequests = isAdmin && ars
-      ? ars.docs.map(d => ({ id: d.id, ...d.data() }))
-          .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0))
+      ? ars.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+      : [];
+
+    // ── USERS (admin only) ──
+    DB.users = isAdmin && us
+      ? us.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const aTime = a.createdAt?.seconds || 0;
+            const bTime = b.createdAt?.seconds || 0;
+            return bTime - aTime;
+          })
       : [];
 
     renderAll();
   } catch (err) {
     console.error('fetchData error:', err);
-    DB = { orders: [], activity: [], accessRequests: [] };
+    DB = { orders: [], activity: [], accessRequests: [], users: [] };
     renderAll();
   }
-}
-
-async function addActivity(type, msg) {
-  const user = auth.currentUser;
-  try {
-    await addDoc(collection(db,'activity'), {
-      type, msg, time: new Date().toLocaleString(), createdAt: serverTimestamp(),
-      ownerUid: user?.uid||'', ownerEmail: user?.email||''
-    });
-  } catch (e) { console.error(e); }
 }
 
 /* ══════════════════════════════════════ GREETING ══════════════════════════════════════ */
