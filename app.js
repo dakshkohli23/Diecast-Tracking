@@ -208,6 +208,7 @@ if (!isAdmin) {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       navigateTo(item.dataset.section);
+      if (item.dataset.section === 'access-requests') renderAccessRequests();
       if (isMobile()) {
         closeMobileSidebar();
         window.scrollTo({ top: 0, behavior: 'smooth' });
