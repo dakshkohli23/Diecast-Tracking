@@ -90,7 +90,7 @@ function initLoginPage() {
       await signInWithEmailAndPassword(auth, email, password);
 
       // ── CHECK IF DISABLED ──
-      const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAt','desc')));
+      const snap = await getDocs(collection(db, 'access_requests'));
       const profile = snap.docs.map(d => d.data()).find(u => u.email === email);
       if (profile && profile.status === 'disabled') {
         await signOut(auth);
