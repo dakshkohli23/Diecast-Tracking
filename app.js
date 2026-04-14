@@ -185,12 +185,17 @@ function initDashboard() {
   initGreeting();
 
   // ── ADMIN GATE ──
-  const isAdmin = auth.currentUser?.email === SUPER_ADMIN;
-  if (!isAdmin) {
-    document.querySelector('.nav-item[data-section="users"]')?.setAttribute('style','display:none');
-    document.getElementById('openAddUserBtn')?.setAttribute('style','display:none');
-    document.getElementById('clearDataBtn')?.setAttribute('style','display:none');
-  }
+const isAdmin = auth.currentUser?.email === SUPER_ADMIN;
+if (!isAdmin) {
+  document.querySelector('.nav-item[data-section="users"]')?.setAttribute('style','display:none');
+  document.querySelector('.nav-item[data-section="access-requests"]')?.setAttribute('style','display:none');
+  document.getElementById('openAddUserBtn')?.setAttribute('style','display:none');
+  document.getElementById('clearDataBtn')?.setAttribute('style','display:none');
+} else {
+  document.querySelector('.nav-item[data-section="users"]')?.removeAttribute('style');
+  document.querySelector('.nav-item[data-section="access-requests"]')?.removeAttribute('style');
+  loadAccessRequestsBadge();
+}
   // ── NAV ──
   function navigateTo(section) {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
