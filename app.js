@@ -601,11 +601,19 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
 
       if (editId) {
         await updateDoc(doc(db, 'orders', editId), order);
-        await addActivity('info', `Updated — ${order.product_name}`);
+        try {
+  await addActivity('info', `Updated — ${order.product_name}`);
+} catch (e) {
+  console.warn('Activity log failed:', e);
+}
         showToast('Order updated!', 'success');
       } else {
         await addDoc(collection(db, 'orders'), { ...order, createdAt: serverTimestamp() });
-        await addActivity('success', `Added — ${order.product_name}`);
+        try {
+  await addActivity('success', `Added — ${order.product_name}`);
+} catch (e) {
+  console.warn('Activity log failed:', e);
+}
         showToast('Order added!', 'success');
       }
       await fetchData(); closeModal();
@@ -768,7 +776,11 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
       };
       if (!order.brand) { showToast('Please select a brand','warning'); return; }
       await addDoc(collection(db,'orders'), order);
-      await addActivity('success', `Added — ${order.product_name}`);
+      try {
+  await addActivity('success', `Added — ${order.product_name}`);
+} catch (e) {
+  console.warn('Activity log failed:', e);
+}
       showToast('Order saved! 🎉', 'success');
       await fetchData();
       resetPageForm();
@@ -1070,7 +1082,21 @@ async function fetchData() {
     renderAll();
   }
 }
-
+async function addActivity(type, msg) {
+  const user = auth.currentUser;
+  try {
+    await addDoc(collection(db, 'activity'), {
+      type,
+      msg,
+      time: new Date().toLocaleString(),
+      createdAt: serverTimestamp(),
+      ownerUid: user?.uid || '',
+      ownerEmail: user?.email || ''
+    });
+  } catch (e) {
+    console.error('addActivity error:', e);
+  }
+}
 /* ══════════════════════════════════════ GREETING ══════════════════════════════════════ */
 function initGreeting() {
   const gt = document.getElementById('greetingText');
