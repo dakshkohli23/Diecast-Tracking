@@ -939,15 +939,9 @@ async function fetchData() {
     const isAdmin = user.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
 
     const tasks = [
-      getDocs(isAdmin
-        ? collection(db,'orders')
-        : query(collection(db,'orders'), where('ownerUid','==',user.uid))
-      ),
-      getDocs(isAdmin
-        ? collection(db,'activity')
-        : query(collection(db,'activity'), where('ownerUid','==',user.uid))
-      )
-    ];
+  getDocs(query(collection(db,'orders'),   where('ownerUid','==',user.uid))),
+  getDocs(query(collection(db,'activity'), where('ownerUid','==',user.uid)))
+];
 
     // Admin only: load access requests
     if (isAdmin) {
@@ -957,12 +951,10 @@ async function fetchData() {
     const [os, as, ars] = await Promise.all(tasks);
 
     DB.orders = os.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(o => isAdmin ? true : o.ownerUid === user.uid)
-      .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+  .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 
-    DB.activity = as.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(a => isAdmin ? true : a.ownerUid === user.uid)
-      .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+DB.activity = as.docs.map(d => ({ id: d.id, ...d.data() }))
+  .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 
     DB.accessRequests = isAdmin && ars
       ? ars.docs.map(d => ({ id: d.id, ...d.data() }))
