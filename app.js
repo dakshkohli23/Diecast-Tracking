@@ -1550,7 +1550,7 @@ async function renderUsers() {
   const tbody = document.getElementById('usersTableBody'); if (!tbody) return;
   tbody.innerHTML = `<tr><td colspan="5" class="empty-row"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
   try {
-    const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')));
+    const snap = await getDocs(collection(db, 'users'));
     const users = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
     if (!users.length) {
       tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No users added yet</td></tr>`; return;
