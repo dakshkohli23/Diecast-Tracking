@@ -770,10 +770,12 @@
 
   <script type="module">
     import { initializeApp }          from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged }
+    import { getAuth, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, signOut, onAuthStateChanged }
                                       from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-    import { getFirestore, addDoc, collection, serverTimestamp }
+    import { getFirestore, addDoc, getDocs, collection, query, where, serverTimestamp }
                                       from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
+    const SUPER_ADMIN = 'dlaize@dlaize.com';
 
     const app  = initializeApp({
       apiKey:            "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
@@ -785,6 +787,9 @@
     });
     const auth = getAuth(app);
     const db   = getFirestore(app);
+
+    // Persist token across page reloads
+    setPersistence(auth, browserLocalPersistence).catch(() => {});
 
     // Auto-redirect if already signed in
     onAuthStateChanged(auth, user => { if (user) window.location.href = 'index.html'; });
@@ -799,7 +804,8 @@
     });
 
     // ── LOGIN ──
-    document.getElementById('loginForm')?.addEventListener('submit', async () => {
+    document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
       const email = document.getElementById('username').value.trim();
       const pw    = document.getElementById('password').value;
       const btn   = document.getElementById('loginBtn');
@@ -811,19 +817,51 @@
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Signing in…</span>';
 
+      const resetBtn = () => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> <span>Sign In to Dashboard</span>';
+      };
+      const showErr = (m) => {
+        msg.textContent = m;
+        err.classList.remove('hidden');
+        resetBtn();
+        setTimeout(() => err.classList.add('hidden'), 6000);
+      };
+
       try {
         await signInWithEmailAndPassword(auth, email, pw);
+
+        // Super admin — always allow
+        if (email === SUPER_ADMIN) {
+          btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> <span>Redirecting…</span>';
+          window.location.href = 'index.html'; return;
+        }
+
+        // Check if user exists in PreTrack users collection
+        const snap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+        if (snap.empty) {
+          await signOut(auth);
+          showErr('You are not registered in PreTrack. Use "Request Access" below or contact the admin.');
+          return;
+        }
+
+        const profile = snap.docs[0].data();
+        if (profile.status === 'disabled') {
+          await signOut(auth);
+          showErr('Your account has been disabled. Please contact the admin.');
+          return;
+        }
+
         btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> <span>Redirecting…</span>';
         window.location.href = 'index.html';
+
       } catch (e) {
+        if (e.message?.includes('not registered') || e.message?.includes('disabled')) return;
         let m = 'Invalid email or password. Please try again.';
         if (e.code === 'auth/too-many-requests')      m = 'Too many attempts. Please wait a moment.';
         if (e.code === 'auth/network-request-failed') m = 'Network error. Check your connection.';
         if (e.code === 'auth/user-disabled')          m = 'This account has been disabled.';
-        msg.textContent = m;
-        err.classList.remove('hidden');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> <span>Sign In to Dashboard</span>';
+        showErr(m);
       }
     });
 
@@ -838,7 +876,6 @@
     function closeModal() {
       modal.classList.add('hidden');
       document.body.style.overflow = '';
-      // Reset
       document.getElementById('modalFormState').classList.remove('hidden');
       document.getElementById('modalSuccessState').classList.add('hidden');
       document.getElementById('reqError').classList.add('hidden');
@@ -858,7 +895,8 @@
     });
 
     // ── ACCESS REQUEST ──
-    document.getElementById('accessForm')?.addEventListener('submit', async () => {
+    document.getElementById('accessForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
       const name   = document.getElementById('aName').value.trim();
       const email  = document.getElementById('aEmail').value.trim();
       const reason = document.getElementById('aReason').value.trim();
@@ -885,7 +923,12 @@
         document.getElementById('modalFormState').classList.add('hidden');
         document.getElementById('modalSuccessState').classList.remove('hidden');
       } catch (e) {
-        msg.textContent = 'Failed to send. Please check your connection.';
+        console.error('Access request error:', e);
+        // Most likely cause: Firestore rules blocking unauthenticated writes
+        const isRulesError = e.code === 'permission-denied' || e.message?.includes('permission');
+        msg.textContent = isRulesError
+          ? 'Permission denied. Ask admin to update Firestore rules to allow access_requests writes.'
+          : 'Failed to send. Please check your connection and try again.';
         err.classList.remove('hidden');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Request';
