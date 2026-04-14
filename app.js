@@ -943,10 +943,10 @@ async function fetchData() {
     const [os, as] = await Promise.all([
       getDocs(isAdmin
         ? query(collection(db,'orders'), orderBy('createdAt','desc'))
-        : query(collection(db,'orders'), where('ownerUid','==',user.uid))),
+        : query(collection(db,'orders'), where('ownerUid','==',user.uid), orderBy('createdAt','desc'))
       getDocs(isAdmin
         ? query(collection(db,'activity'), orderBy('createdAt','desc'))
-        : query(collection(db,'activity'), where('ownerUid','==',user.uid)))
+        : query(collection(db,'activity'), where('ownerUid','==',user.uid), orderBy('createdAt','desc'))
     ]);
 
     DB.orders   = os.docs.map(d => ({ id: d.id, ...d.data() }))
