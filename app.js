@@ -56,7 +56,7 @@ async function deleteImageFromSupabase(imageUrl) {
 }
 
 // ── STATE ──
-let DB = { orders: [], activity: [] };
+let DB = { orders: [], activity: [], accessRequests: [] };
 let _currentImageFile = null;
 let _currentImageB64  = '';
 let _authReady = false;
@@ -274,6 +274,19 @@ document.querySelectorAll('.sellers-tab').forEach(tab => {
     document.querySelectorAll('.sellers-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     renderSellers();
+  });
+});
+  // ── ACCESS REQUESTS ──
+document.getElementById('refreshAccessRequestsBtn')?.addEventListener('click', async () => {
+  await fetchData();
+  showToast('Access requests refreshed', 'info');
+});
+
+document.querySelectorAll('.ar-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.ar-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    renderAccessRequests();
   });
 });
 
@@ -914,9 +927,9 @@ async function fetchData() {
   try {
     const user = auth.currentUser;
     if (!user) return;
-    const isAdmin = user.email === SUPER_ADMIN;
+    const isAdmin = user.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
 
-    const [os, as] = await Promise.all([
+    const tasks = [
       getDocs(isAdmin
         ? collection(db,'orders')
         : query(collection(db,'orders'), where('ownerUid','==',user.uid))
@@ -925,18 +938,33 @@ async function fetchData() {
         ? collection(db,'activity')
         : query(collection(db,'activity'), where('ownerUid','==',user.uid))
       )
-    ]);
+    ];
 
-    // Filter client-side as extra safety — no Firestore index needed
+    // Admin only: load access requests
+    if (isAdmin) {
+      tasks.push(getDocs(collection(db, 'access_requests')));
+    }
+
+    const [os, as, ars] = await Promise.all(tasks);
+
     DB.orders = os.docs.map(d => ({ id: d.id, ...d.data() }))
       .filter(o => isAdmin ? true : o.ownerUid === user.uid)
       .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
     DB.activity = as.docs.map(d => ({ id: d.id, ...d.data() }))
       .filter(a => isAdmin ? true : a.ownerUid === user.uid)
       .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
+    DB.accessRequests = isAdmin && ars
+      ? ars.docs.map(d => ({ id: d.id, ...d.data() }))
+          .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0))
+      : [];
+
     renderAll();
   } catch (err) {
-    console.error(err); DB = { orders:[], activity:[] }; renderAll();
+    console.error('fetchData error:', err);
+    DB = { orders: [], activity: [], accessRequests: [] };
+    renderAll();
   }
 }
 
@@ -987,6 +1015,7 @@ function renderAll() {
   renderCatalog();
   renderSellers();
   renderUsers();
+  renderAccessRequests();
   renderSettingsInfo();
 
   const ss = document.getElementById('systemStatus');
@@ -1593,3 +1622,145 @@ function showToast(message, type='info') {
   clearTimeout(window.__toastTimer);
   window.__toastTimer = setTimeout(() => { t.style.transform='translateY(20px)'; t.style.opacity='0'; }, 2500);
 }
+function renderAccessRequests() {
+  const list = document.getElementById('accessRequestsList');
+  const badge = document.getElementById('accessRequestsBadge');
+  const pendingEl = document.getElementById('arCountPending');
+  const approvedEl = document.getElementById('arCountApproved');
+  const rejectedEl = document.getElementById('arCountRejected');
+
+  if (!list) return;
+
+  const user = auth.currentUser;
+  const isAdmin = user?.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
+
+  if (!isAdmin) {
+    list.innerHTML = `<div class="empty-state"><i class="fa-solid fa-lock"></i> Admin only</div>`;
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+
+  const activeTab = document.querySelector('.ar-tab.active')?.dataset.filter || 'all';
+  let requests = [...(DB.accessRequests || [])];
+
+  const pendingCount = requests.filter(r => (r.status || 'pending').toLowerCase() === 'pending').length;
+  const approvedCount = requests.filter(r => (r.status || '').toLowerCase() === 'approved').length;
+  const rejectedCount = requests.filter(r => (r.status || '').toLowerCase() === 'rejected').length;
+
+  if (pendingEl) pendingEl.textContent = pendingCount;
+  if (approvedEl) approvedEl.textContent = approvedCount;
+  if (rejectedEl) rejectedEl.textContent = rejectedCount;
+
+  if (badge) {
+    if (pendingCount > 0) {
+      badge.style.display = 'inline-flex';
+      badge.textContent = pendingCount;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if (activeTab !== 'all') {
+    requests = requests.filter(r => (r.status || 'pending').toLowerCase() === activeTab);
+  }
+
+  if (!requests.length) {
+    list.innerHTML = `<div class="empty-state"><i class="fa-solid fa-inbox"></i> No access requests found</div>`;
+    return;
+  }
+
+  list.innerHTML = requests.map(r => {
+    const status = (r.status || 'pending').toLowerCase();
+    const badgeClass =
+      status === 'approved' ? 'ar-badge-approved' :
+      status === 'rejected' ? 'ar-badge-rejected' :
+      'ar-badge-pending';
+
+    const requestedAt = r.createdAt?.seconds
+      ? new Date(r.createdAt.seconds * 1000).toLocaleString('en-IN')
+      : '—';
+
+    const displayName = r.name || r.fullName || (r.email ? r.email.split('@')[0] : 'Unknown User');
+    const email = r.email || 'No email';
+    const reason = r.reason || r.message || r.note || '';
+
+    return `
+      <div class="ar-row">
+        <div class="ar-avatar">
+          <i class="fa-solid fa-user"></i>
+        </div>
+
+        <div class="ar-info">
+          <div class="ar-name">
+            ${escHtml(displayName)}
+            <span class="${badgeClass}" style="margin-left:8px;">${escHtml(status.toUpperCase())}</span>
+          </div>
+          <div class="ar-email">${escHtml(email)}</div>
+          ${reason ? `<div class="ar-reason">${escHtml(reason)}</div>` : ''}
+        </div>
+
+        <div class="ar-time">${requestedAt}</div>
+
+        <div class="ar-actions">
+          <button class="btn btn-sm btn-ar-approve" onclick="approveAccessRequest('${r.id}')" ${status === 'approved' ? 'disabled' : ''}>
+            <i class="fa-solid fa-check"></i>
+          </button>
+          <button class="btn btn-sm btn-ar-reject" onclick="rejectAccessRequest('${r.id}')" ${status === 'rejected' ? 'disabled' : ''}>
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+window.approveAccessRequest = async function(id) {
+  try {
+    const req = DB.accessRequests.find(x => x.id === id);
+    if (!req) return;
+
+    await updateDoc(doc(db, 'access_requests', id), {
+      status: 'approved',
+      updatedAt: serverTimestamp()
+    });
+
+    const existingUser = await getDocs(query(collection(db, 'users'), where('email', '==', req.email)));
+    if (existingUser.empty) {
+      await addDoc(collection(db, 'users'), {
+        email: req.email,
+        uid: req.uid || '',
+        role: 'viewer',
+        status: 'active',
+        createdAt: serverTimestamp()
+      });
+    } else {
+      await updateDoc(existingUser.docs[0].ref, {
+        status: 'active',
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    showToast(`Approved ${req.email}`, 'success');
+    await fetchData();
+  } catch (err) {
+    console.error(err);
+    showToast('Approve failed: ' + err.message, 'warning');
+  }
+};
+
+window.rejectAccessRequest = async function(id) {
+  try {
+    const req = DB.accessRequests.find(x => x.id === id);
+    if (!req) return;
+
+    await updateDoc(doc(db, 'access_requests', id), {
+      status: 'rejected',
+      updatedAt: serverTimestamp()
+    });
+
+    showToast(`Rejected ${req.email}`, 'warning');
+    await fetchData();
+  } catch (err) {
+    console.error(err);
+    showToast('Reject failed: ' + err.message, 'warning');
+  }
+};
