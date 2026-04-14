@@ -172,7 +172,7 @@ function initDashboard() {
   initGreeting();
 
   // ── ADMIN GATE ──
-  const isAdmin = auth.currentUser?.email === SUPER_ADMIN;
+  const isAdmin = auth.currentUser?.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
   if (!isAdmin) {
     document.querySelector('.nav-item[data-section="users"]')?.setAttribute('style','display:none');
     document.getElementById('openAddUserBtn')?.setAttribute('style','display:none');
