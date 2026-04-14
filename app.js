@@ -1701,14 +1701,14 @@ function renderAccessRequests() {
 
         <div class="ar-time">${requestedAt}</div>
 
-        <div class="ar-actions">
-          <button class="btn btn-sm btn-ar-approve" onclick="approveAccessRequest('${r.id}')" ${status === 'approved' ? 'disabled' : ''}>
-            <i class="fa-solid fa-check"></i>
-          </button>
-          <button class="btn btn-sm btn-ar-reject" onclick="rejectAccessRequest('${r.id}')" ${status === 'rejected' ? 'disabled' : ''}>
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
+        <div class="ar-actions" style="visibility:${status === 'pending' ? 'visible' : 'hidden'};">
+  <button class="btn btn-sm btn-ar-approve" onclick="approveAccessRequest('${r.id}')">
+    <i class="fa-solid fa-check"></i>
+  </button>
+  <button class="btn btn-sm btn-ar-reject" onclick="rejectAccessRequest('${r.id}')">
+    <i class="fa-solid fa-xmark"></i>
+  </button>
+</div>
       </div>
     `;
   }).join('');
