@@ -38,6 +38,10 @@
       <a href="#" class="nav-item" data-section="add-order" data-tooltip="Add Order">
         <i class="fa-solid fa-circle-plus"></i><span>Add Order</span>
       </a>
+      <a href="#" class="nav-item" data-section="upcoming" data-tooltip="Upcoming Deliveries">
+        <i class="fa-solid fa-truck-fast"></i><span>Upcoming</span>
+        <span class="nav-badge" id="upcomingBadge" style="display:none"></span>
+      </a>
 
       <div class="nav-group-label">REPORTS</div>
       <a href="#" class="nav-item" data-section="analytics" data-tooltip="Analytics">
@@ -635,6 +639,49 @@
           </div>
         </div>
       </section>
+<!-- ═══ SECTION: UPCOMING DELIVERIES ═══ -->
+<section class="section" id="section-upcoming">
+  <div class="section-header">
+    <div>
+      <h2 class="section-title">Upcoming Deliveries</h2>
+      <p class="section-sub">All pending, ordered and in-transit items — excludes delivered</p>
+    </div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="upcoming-stats-row">
+    <div class="upcoming-stat glass">
+      <div class="upcoming-stat-icon" style="background:rgba(99,102,241,0.15);color:#6366f1"><i class="fa-solid fa-cart-shopping"></i></div>
+      <div><div class="upcoming-stat-val" id="upStatOrdered">0</div><div class="upcoming-stat-label">Ordered</div></div>
+    </div>
+    <div class="upcoming-stat glass">
+      <div class="upcoming-stat-icon" style="background:rgba(20,184,166,0.15);color:#14b8a6"><i class="fa-solid fa-truck-moving"></i></div>
+      <div><div class="upcoming-stat-val" id="upStatTransit">0</div><div class="upcoming-stat-label">In Transit</div></div>
+    </div>
+    <div class="upcoming-stat glass">
+      <div class="upcoming-stat-icon" style="background:rgba(239,68,68,0.15);color:#ef4444"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div><div class="upcoming-stat-val" id="upStatOverdue">0</div><div class="upcoming-stat-label">Overdue</div></div>
+    </div>
+    <div class="upcoming-stat glass">
+      <div class="upcoming-stat-icon" style="background:rgba(249,115,22,0.15);color:#f97316"><i class="fa-solid fa-hourglass-half"></i></div>
+      <div><div class="upcoming-stat-val" id="upStatPending">0</div><div class="upcoming-stat-label">Pending Payment</div></div>
+    </div>
+  </div>
+
+  <!-- Filter tabs -->
+  <div class="upcoming-tab-bar">
+    <button class="upcoming-tab active" data-filter="all"><i class="fa-solid fa-list"></i> All</button>
+    <button class="upcoming-tab" data-filter="Ordered"><i class="fa-solid fa-cart-shopping"></i> Ordered</button>
+    <button class="upcoming-tab" data-filter="In Transit"><i class="fa-solid fa-truck-moving"></i> In Transit</button>
+    <button class="upcoming-tab" data-filter="overdue"><i class="fa-solid fa-triangle-exclamation"></i> Overdue</button>
+  </div>
+
+  <!-- Cards Grid -->
+  <div class="upcoming-grid" id="upcomingGrid">
+    <div class="empty-state">No upcoming deliveries</div>
+  </div>
+</section>
+
 <!-- ═══ SECTION: SELLERS ═══ -->
 <section class="section" id="section-sellers">
   <div class="section-header">
@@ -1145,6 +1192,70 @@
       .ar-row { grid-template-columns: 36px 1fr; grid-template-rows: auto auto; }
       .ar-time, .ar-actions { grid-column: 2; }
     }
+  </style>
+  <style>
+    /* ── Upcoming Deliveries Section ── */
+    .upcoming-stats-row {
+      display: flex; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap;
+    }
+    .upcoming-stat {
+      display: flex; align-items: center; gap: 0.85rem;
+      padding: 0.9rem 1.25rem; border-radius: 14px; flex: 1; min-width: 130px;
+    }
+    .upcoming-stat-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;
+    }
+    .upcoming-stat-val   { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+    .upcoming-stat-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .upcoming-tab-bar {
+      display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap;
+    }
+    .upcoming-tab {
+      padding: 0.45rem 1rem; border-radius: 8px;
+      border: 1px solid var(--border, rgba(0,0,0,0.1));
+      background: transparent; color: var(--text-secondary);
+      cursor: pointer; font-size: 0.78rem; font-weight: 600; font-family: inherit;
+      display: flex; align-items: center; gap: 0.4rem; transition: all 0.18s;
+    }
+    .upcoming-tab.active { background: var(--primary,#7c5cfc); color: #fff; border-color: var(--primary,#7c5cfc); }
+    .upcoming-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+    .upcoming-card {
+      border-radius: 16px; padding: 1.1rem 1.25rem;
+      display: flex; flex-direction: column; gap: 0.6rem;
+      cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+      position: relative; overflow: hidden;
+    }
+    .upcoming-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+    .upcoming-card-top { display: flex; align-items: center; gap: 0.75rem; }
+    .upcoming-card-thumb {
+      width: 52px; height: 52px; border-radius: 10px; overflow: hidden; flex-shrink: 0;
+      background: var(--surface-2, rgba(0,0,0,0.05));
+      display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: var(--text-muted);
+    }
+    .upcoming-card-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .upcoming-card-name { font-weight: 700; font-size: 0.9rem; line-height: 1.3; }
+    .upcoming-card-brand { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .upcoming-card-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+    .upcoming-eta-chip {
+      padding: 3px 10px; border-radius: 20px; font-size: 0.68rem; font-weight: 700;
+      display: inline-flex; align-items: center; gap: 0.3rem;
+    }
+    .eta-ok       { background: rgba(34,197,94,0.12);  color: #16a34a; }
+    .eta-soon     { background: rgba(249,115,22,0.12); color: #ea580c; }
+    .eta-overdue  { background: rgba(239,68,68,0.12);  color: #dc2626; }
+    .eta-no-date  { background: rgba(148,163,184,0.12);color: #64748b; }
+    .upcoming-card-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.75rem; color: var(--text-muted); padding-top: 0.4rem;
+      border-top: 1px solid var(--border, rgba(0,0,0,0.07));
+    }
+    .upcoming-pending-amt { color: #f97316; font-weight: 700; }
+    .upcoming-paid-amt    { color: #22c55e; font-weight: 700; }
   </style>
   <script type="module" src="app.js"></script>
 </body>
