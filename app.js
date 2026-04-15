@@ -114,8 +114,38 @@ if (document.getElementById('pageContent')) {
     _authReady = true;
     if (!user) { window.location.href = 'login.html'; return; }
     _currentUser = user;
-    const el = document.getElementById('profileName');
-    if (el) el.textContent = user.email || 'Admin';
+
+    // Set profile name and correct role label
+    const isSuperAdmin = user.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
+    if (isSuperAdmin) {
+      const nameEl = document.getElementById('profileName');
+      if (nameEl) nameEl.textContent = 'Super Admin';
+      const roleEl = document.getElementById('profileRole');
+      if (roleEl) roleEl.textContent = 'Super Admin';
+    } else {
+      try {
+        const snap = await getDocs(query(collection(db, 'users'), where('email', '==', user.email)));
+        if (!snap.empty) {
+          const data = snap.docs[0].data();
+          const nameEl = document.getElementById('profileName');
+          if (nameEl) nameEl.textContent = (data.name && data.name.trim()) ? data.name.trim() : user.email;
+          const roleEl = document.getElementById('profileRole');
+          if (roleEl) {
+            const roleMap = { 'super_admin': 'Super Admin', 'admin': 'Admin', 'editor': 'Editor', 'viewer': 'User' };
+            roleEl.textContent = roleMap[data.role] || 'User';
+          }
+        } else {
+          const nameEl = document.getElementById('profileName');
+          if (nameEl) nameEl.textContent = user.email;
+          const roleEl = document.getElementById('profileRole');
+          if (roleEl) roleEl.textContent = 'User';
+        }
+      } catch(e) {
+        const nameEl = document.getElementById('profileName');
+        if (nameEl) nameEl.textContent = user.email;
+      }
+    }
+
     if (user.email !== SUPER_ADMIN) await ensureUserProfile(user);
     await fetchData();
     initDashboard();
@@ -232,6 +262,7 @@ function closeAddUserModal() {
   document.body.style.overflow = '';
   document.getElementById('newUserEmail').value    = '';
   document.getElementById('newUserPassword').value = '';
+  if (document.getElementById('newUserName')) document.getElementById('newUserName').value = '';
   document.getElementById('addUserErr').textContent = '';
 }
 document.getElementById('addUserModalClose')?.addEventListener('click', closeAddUserModal);
@@ -242,6 +273,7 @@ document.getElementById('addUserConfirmBtn')?.addEventListener('click', async ()
 if (!isAdmin) { showToast('Admin only', 'warning'); return; }
   const email    = document.getElementById('newUserEmail')?.value.trim();
   const password = document.getElementById('newUserPassword')?.value;
+  const name     = document.getElementById('newUserName')?.value.trim() || '';
   const role     = document.getElementById('newUserRole')?.value || 'viewer';
   const errEl    = document.getElementById('addUserErr');
   const btn      = document.getElementById('addUserConfirmBtn');
@@ -254,7 +286,7 @@ if (!isAdmin) { showToast('Admin only', 'warning'); return; }
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
     await secondaryAuth.signOut();
     await addDoc(collection(db, 'users'), {
-      uid: cred.user.uid, email, role, status: 'active', createdAt: serverTimestamp()
+      uid: cred.user.uid, email, name, role, status: 'active', createdAt: serverTimestamp()
     });
     showToast(`User ${email} created!`, 'success');
     closeAddUserModal();
@@ -502,7 +534,8 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     const paidEach = parseFloat(document.getElementById('fPaid')?.value)        || 0;
     const total    = (price * qty) + ship;
     const paidTotal = paidEach * qty;
-    const pending  = Math.max(0, total - paidTotal);
+    const diff     = total - paidTotal; // can be negative (overpaid)
+    const pending  = Math.max(0, diff);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
     const td = document.getElementById('fTotalDisplay');
     if (td) {
@@ -511,9 +544,18 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     }
     const pd = document.getElementById('fPendingDisplay');
     if (pd) {
-      pd.textContent = fmt(pending);
-      pd.classList.toggle('fg-calc-overdue', pending > 0);
-      if (paidTotal > 0) pd.title = `Paid ₹${paidEach.toLocaleString('en-IN')} × ${qty} = ₹${paidTotal.toLocaleString('en-IN')}`;
+      if (diff < 0) {
+        // Overpaid — show as +amount in green
+        pd.textContent = `+₹${Math.abs(diff).toLocaleString('en-IN')}`;
+        pd.classList.remove('fg-calc-overdue');
+        pd.style.color = 'var(--green, #22c55e)';
+        pd.title = `Overpaid by ₹${Math.abs(diff).toLocaleString('en-IN')}`;
+      } else {
+        pd.textContent = fmt(pending);
+        pd.style.color = '';
+        pd.classList.toggle('fg-calc-overdue', pending > 0);
+        if (paidTotal > 0) pd.title = `Paid ₹${paidEach.toLocaleString('en-IN')} × ${qty} = ₹${paidTotal.toLocaleString('en-IN')}`;
+      }
     }
     if (document.getElementById('fTotal'))    document.getElementById('fTotal').value   = total;
     if (document.getElementById('fPending'))  document.getElementById('fPending').value = pending;
@@ -716,10 +758,23 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     const ship     = parseFloat(document.getElementById('pShipping')?.value)    || 0;
     const paidEach = parseFloat(document.getElementById('pPaid')?.value)        || 0;
     const total    = (price * qty) + ship;
-    const pending  = Math.max(0, total - paidEach * qty);
+    const diff     = total - paidEach * qty; // can be negative (overpaid)
+    const pending  = Math.max(0, diff);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
     const td = document.getElementById('pTotalDisplay');   if(td) td.textContent = fmt(total);
-    const pd = document.getElementById('pPendingDisplay'); if(pd) { pd.textContent = fmt(pending); pd.classList.toggle('fg-calc-overdue', pending > 0); }
+    const pd = document.getElementById('pPendingDisplay');
+    if (pd) {
+      if (diff < 0) {
+        pd.textContent = `+₹${Math.abs(diff).toLocaleString('en-IN')}`;
+        pd.classList.remove('fg-calc-overdue');
+        pd.style.color = 'var(--green, #22c55e)';
+        pd.title = `Overpaid by ₹${Math.abs(diff).toLocaleString('en-IN')}`;
+      } else {
+        pd.textContent = fmt(pending);
+        pd.style.color = '';
+        pd.classList.toggle('fg-calc-overdue', pending > 0);
+      }
+    }
     if(document.getElementById('pTotal'))   document.getElementById('pTotal').value   = total;
     if(document.getElementById('pPending')) document.getElementById('pPending').value = pending;
   }
@@ -902,12 +957,24 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     const paidEach2 = parseFloat(o.paid_each ?? o.paid)       || 0;
     const paidTotal2 = paidEach2 * qty2;
     const total2    = (price2 * qty2) + ship2;
-    const pending2  = Math.max(0, total2 - paidTotal2);
+    const diff2     = total2 - paidTotal2;
+    const pending2  = Math.max(0, diff2);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
     const td = document.getElementById('fTotalDisplay');
     if (td) td.textContent = fmt(total2);
     const pd = document.getElementById('fPendingDisplay');
-    if (pd) { pd.textContent = fmt(pending2); pd.classList.toggle('fg-calc-overdue', pending2 > 0); }
+    if (pd) {
+      if (diff2 < 0) {
+        pd.textContent = `+₹${Math.abs(diff2).toLocaleString('en-IN')}`;
+        pd.classList.remove('fg-calc-overdue');
+        pd.style.color = 'var(--green, #22c55e)';
+        pd.title = `Overpaid by ₹${Math.abs(diff2).toLocaleString('en-IN')}`;
+      } else {
+        pd.textContent = fmt(pending2);
+        pd.style.color = '';
+        pd.classList.toggle('fg-calc-overdue', pending2 > 0);
+      }
+    }
     if (document.getElementById('fTotal'))    document.getElementById('fTotal').value   = total2;
     if (document.getElementById('fPending'))  document.getElementById('fPending').value = pending2;
 
@@ -1000,14 +1067,13 @@ async function fetchData() {
 
     DB.orders = allOrders
       .filter(o => {
-        if (isAdmin) return true;
-
         const ownerUid = (o.ownerUid || '').trim();
         const ownerEmail = (o.ownerEmail || '').toLowerCase().trim();
-
+        // Everyone (including admin) only sees their own data
         return (
           ownerUid === user.uid ||
-          ownerEmail === currentEmail
+          ownerEmail === currentEmail ||
+          (!ownerUid && !ownerEmail) // legacy orders with no owner
         );
       })
       .sort((a, b) => {
@@ -1021,14 +1087,13 @@ async function fetchData() {
 
     DB.activity = allActivity
       .filter(a => {
-        if (isAdmin) return true;
-
         const ownerUid = (a.ownerUid || '').trim();
         const ownerEmail = (a.ownerEmail || '').toLowerCase().trim();
-
+        // Everyone (including admin) only sees their own activity
         return (
           ownerUid === user.uid ||
-          ownerEmail === currentEmail
+          ownerEmail === currentEmail ||
+          (!ownerUid && !ownerEmail)
         );
       })
       .sort((a, b) => {
@@ -1043,14 +1108,13 @@ async function fetchData() {
     if (typeof customBrands !== 'undefined') {
       customBrands = allBrands
         .filter(b => {
-          if (isAdmin) return true;
-
           const ownerUid = (b.ownerUid || '').trim();
           const ownerEmail = (b.ownerEmail || '').toLowerCase().trim();
-
+          // Everyone (including admin) only sees their own brands
           return (
             ownerUid === user.uid ||
-            ownerEmail === currentEmail
+            ownerEmail === currentEmail ||
+            (!ownerUid && !ownerEmail)
           );
         })
         .map(b => b.name)
@@ -1103,11 +1167,26 @@ function initGreeting() {
   const gd = document.getElementById('greetingDate');
   const ss = document.getElementById('systemStatus');
 
-  function update() {
+  async function getDisplayName() {
+    const user = auth.currentUser;
+    if (!user) return 'there';
+    if (user.email?.toLowerCase() === SUPER_ADMIN.toLowerCase()) return 'Super Admin';
+    try {
+      const snap = await getDocs(query(collection(db, 'users'), where('email', '==', user.email)));
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
+        if (data.name && data.name.trim()) return data.name.trim();
+      }
+    } catch(e) { /* fallback */ }
+    // Fallback: use part of email before @
+    return (user.email || '').split('@')[0] || 'there';
+  }
+
+  function update(name) {
     const h     = new Date().getHours();
     const emoji = h < 12 ? '<i class="fa-solid fa-cloud-sun"></i>' : h < 17 ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
     const word  = h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening';
-    if (gt) gt.innerHTML = `Good ${word}, Daksh! ${emoji}`;
+    if (gt) gt.innerHTML = `Good ${word}, ${name}! ${emoji}`;
     if (gd) gd.textContent = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   }
 
@@ -1116,7 +1195,11 @@ function initGreeting() {
     ss.innerHTML = `<span class="status-dot"></span> Checking systems...`; ss.className = 'system-status';
     setTimeout(() => { ss.innerHTML = `<span class="status-dot"></span> All systems live`; ss.className = 'system-status live'; }, 1200);
   }
-  update(); checkSys(); setInterval(update, 60000);
+  getDisplayName().then(name => {
+    update(name);
+    setInterval(() => update(name), 60000);
+  });
+  checkSys();
 }
 
 /* ══════════════════════════════════════ RENDER ALL ══════════════════════════════════════ */
@@ -1762,19 +1845,20 @@ async function renderUsers() {
     if (!users.length) {
       tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No users added yet</td></tr>`; return;
     }
-    const roleStyle = { admin: 'badge-ordered', editor: 'badge-transit', viewer: 'badge-delivered' };
+    const roleStyle = { super_admin: 'badge-ordered', admin: 'badge-ordered', editor: 'badge-transit', viewer: 'badge-delivered' };
+    const roleLabel = { super_admin: 'Super Admin', admin: 'Admin', editor: 'Editor', viewer: 'User' };
     tbody.innerHTML = users.map(u => `
       <tr>
         <td>
           <div style="display:flex;align-items:center;gap:0.6rem">
             <div class="user-avatar-sm"><i class="fa-solid fa-user"></i></div>
             <div>
-              <div style="font-weight:700;font-size:0.85rem">${escHtml(u.email)}</div>
-              <div style="font-size:0.7rem;color:var(--text-muted)">UID: ${escHtml(u.uid||'—').slice(0,12)}...</div>
+              <div style="font-weight:700;font-size:0.85rem">${u.name ? escHtml(u.name) : escHtml(u.email)}</div>
+              <div style="font-size:0.7rem;color:var(--text-muted)">${escHtml(u.email)}</div>
             </div>
           </div>
         </td>
-        <td><span class="badge ${roleStyle[u.role]||'badge-ordered'}">${escHtml(u.role||'viewer')}</span></td>
+        <td><span class="badge ${roleStyle[u.role]||'badge-delivered'}">${escHtml(roleLabel[u.role]||'User')}</span></td>
         <td>
           <span class="badge ${u.status==='active'?'badge-delivered':'badge-cancelled'}">
             <i class="fa-solid fa-${u.status==='active'?'circle-check':'ban'}"></i>
@@ -1937,6 +2021,7 @@ window.approveAccessRequest = async function(id) {
       await addDoc(collection(db, 'users'), {
         email: req.email,
         uid: req.uid || '',
+        name: req.name || req.fullName || '',
         role: 'viewer',
         status: 'active',
         createdAt: serverTimestamp()
