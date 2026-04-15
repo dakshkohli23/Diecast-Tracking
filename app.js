@@ -1859,16 +1859,29 @@ async function renderUsers() {
           </div>
         </td>
         <td>
-          <select
-            class="role-select"
-            style="padding:4px 8px;border-radius:8px;border:1px solid var(--border,#333);background:var(--surface,#1e1e2e);color:var(--text,#fff);font-size:0.8rem;cursor:pointer;"
-            onchange="changeUserRole('${u.docId}', this.value)"
-          >
-            <option value="viewer"       ${(u.role||'viewer')==='viewer'       ? 'selected' : ''}>User</option>
-            <option value="editor"       ${(u.role||'')==='editor'             ? 'selected' : ''}>Editor</option>
-            <option value="admin"        ${(u.role||'')==='admin'              ? 'selected' : ''}>Admin</option>
-            <option value="super_admin"  ${(u.role||'')==='super_admin'        ? 'selected' : ''}>Super Admin</option>
-          </select>
+          <div style="display:flex;flex-direction:column;gap:0.4rem;min-width:160px">
+            <div style="display:flex;align-items:center;gap:0.4rem">
+              <select
+                id="role-select-${u.docId}"
+                class="role-select"
+                style="flex:1;padding:4px 8px;border-radius:8px;border:1px solid rgba(124,92,252,0.25);background:#f9f8ff;color:var(--text-primary);font-size:0.8rem;cursor:pointer;font-family:inherit;"
+                onchange="onRoleSelectChange('${u.docId}', this.value)"
+              >
+                <option value="viewer"      ${(u.role||'viewer')==='viewer'      ? 'selected' : ''}>User</option>
+                <option value="editor"      ${(u.role||'')==='editor'            ? 'selected' : ''}>Editor</option>
+                <option value="admin"       ${(u.role||'')==='admin'             ? 'selected' : ''}>Admin</option>
+                <option value="super_admin" ${(u.role||'')==='super_admin'       ? 'selected' : ''}>Super Admin</option>
+              </select>
+              <button
+                id="role-save-${u.docId}"
+                class="btn btn-primary btn-icon"
+                title="Save role"
+                style="display:none;width:28px;height:28px;padding:0;font-size:0.7rem;"
+                onclick="saveUserRole('${u.docId}')"
+              ><i class="fa-solid fa-check"></i></button>
+            </div>
+            <div id="role-desc-${u.docId}" style="font-size:0.68rem;color:var(--text-muted);line-height:1.3;">${getRoleDescription(u.role||'viewer')}</div>
+          </div>
         </td>
         <td>
           <span class="badge ${u.status==='active'?'badge-delivered':'badge-cancelled'}">
@@ -1893,15 +1906,44 @@ async function renderUsers() {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Failed to load users</td></tr>`;
   }
 }
+function getRoleDescription(role) {
+  const desc = {
+    viewer:      '👁 View only — cannot add or edit',
+    editor:      '✏️ Can add & edit orders',
+    admin:       '⚙️ Full access, no user mgmt',
+    super_admin: '👑 Full access + user management'
+  };
+  return desc[role] || '👁 View only';
+}
 
-window.changeUserRole = async function(docId, newRole) {
+window.onRoleSelectChange = function(docId, newRole) {
+  const saveBtn = document.getElementById(`role-save-${docId}`);
+  const descEl  = document.getElementById(`role-desc-${docId}`);
+  if (saveBtn) saveBtn.style.display = 'flex';
+  if (descEl)  descEl.textContent = getRoleDescription(newRole) + ' — unsaved';
+  if (descEl)  descEl.style.color = 'var(--orange)';
+};
+
+window.saveUserRole = async function(docId) {
   const isAdmin = (auth.currentUser?.email || '').toLowerCase().trim() === SUPER_ADMIN.toLowerCase().trim();
   if (!isAdmin) { showToast('Admin only', 'warning'); return; }
+  const select  = document.getElementById(`role-select-${docId}`);
+  const saveBtn = document.getElementById(`role-save-${docId}`);
+  const descEl  = document.getElementById(`role-desc-${docId}`);
+  if (!select) return;
+  const newRole = select.value;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
   try {
     await updateDoc(doc(db, 'users', docId), { role: newRole });
     const roleLabel = { super_admin: 'Super Admin', admin: 'Admin', editor: 'Editor', viewer: 'User' };
     showToast(`Role updated to ${roleLabel[newRole] || newRole}`, 'success');
-  } catch(e) { showToast('Failed to update role', 'warning'); renderUsers(); }
+    if (saveBtn) saveBtn.style.display = 'none';
+    if (descEl)  { descEl.textContent = getRoleDescription(newRole); descEl.style.color = 'var(--text-muted)'; }
+  } catch(e) {
+    showToast('Failed to update role', 'warning');
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-check"></i>'; }
+  }
 };
 
 window.toggleUserStatus = async function(docId, currentStatus) {
