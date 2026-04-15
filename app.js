@@ -373,15 +373,12 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
 
     customBrands = allBrands
       .filter(b => {
-        if (isAdmin) return true;
-
         const ownerUid = (b.ownerUid || '').trim();
         const ownerEmail = (b.ownerEmail || '').toLowerCase().trim();
-
-        return (
-          ownerUid === user?.uid ||
-          ownerEmail === currentEmail
-        );
+        const hasOwner = ownerUid || ownerEmail;
+        if (ownerUid === user?.uid || ownerEmail === currentEmail) return true;
+        if (!hasOwner && isAdmin) return true;
+        return false;
       })
       .map(b => b.name)
       .filter(Boolean);
@@ -1069,12 +1066,12 @@ async function fetchData() {
       .filter(o => {
         const ownerUid = (o.ownerUid || '').trim();
         const ownerEmail = (o.ownerEmail || '').toLowerCase().trim();
-        // Everyone (including admin) only sees their own data
-        return (
-          ownerUid === user.uid ||
-          ownerEmail === currentEmail ||
-          (!ownerUid && !ownerEmail) // legacy orders with no owner
-        );
+        const hasOwner = ownerUid || ownerEmail;
+        // Own data always visible
+        if (ownerUid === user.uid || ownerEmail === currentEmail) return true;
+        // Legacy records with no owner: only Super Admin can see them
+        if (!hasOwner && isAdmin) return true;
+        return false;
       })
       .sort((a, b) => {
         const aTime = a.createdAt?.seconds || 0;
@@ -1089,12 +1086,10 @@ async function fetchData() {
       .filter(a => {
         const ownerUid = (a.ownerUid || '').trim();
         const ownerEmail = (a.ownerEmail || '').toLowerCase().trim();
-        // Everyone (including admin) only sees their own activity
-        return (
-          ownerUid === user.uid ||
-          ownerEmail === currentEmail ||
-          (!ownerUid && !ownerEmail)
-        );
+        const hasOwner = ownerUid || ownerEmail;
+        if (ownerUid === user.uid || ownerEmail === currentEmail) return true;
+        if (!hasOwner && isAdmin) return true;
+        return false;
       })
       .sort((a, b) => {
         const aTime = a.createdAt?.seconds || 0;
@@ -1110,12 +1105,10 @@ async function fetchData() {
         .filter(b => {
           const ownerUid = (b.ownerUid || '').trim();
           const ownerEmail = (b.ownerEmail || '').toLowerCase().trim();
-          // Everyone (including admin) only sees their own brands
-          return (
-            ownerUid === user.uid ||
-            ownerEmail === currentEmail ||
-            (!ownerUid && !ownerEmail)
-          );
+          const hasOwner = ownerUid || ownerEmail;
+          if (ownerUid === user.uid || ownerEmail === currentEmail) return true;
+          if (!hasOwner && isAdmin) return true;
+          return false;
         })
         .map(b => b.name)
         .filter(Boolean);
@@ -1838,12 +1831,19 @@ function renderSellers() {
 /* ══════════════════════════════════════ USERS ══════════════════════════════════════ */
 async function renderUsers() {
   const tbody = document.getElementById('usersTableBody'); if (!tbody) return;
-  tbody.innerHTML = `<tr><td colspan="5" class="empty-row"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
+  // Only admin can see this section
+  const currentUserEmail = (auth.currentUser?.email || '').toLowerCase().trim();
+  const isAdmin = currentUserEmail === SUPER_ADMIN.toLowerCase().trim();
+  if (!isAdmin) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-row"><i class="fa-solid fa-lock"></i> Admin only</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = `<tr><td colspan="6" class="empty-row"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
   try {
     const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')));
     const users = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
     if (!users.length) {
-      tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No users added yet</td></tr>`; return;
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-row">No users added yet</td></tr>`; return;
     }
     const roleStyle = { super_admin: 'badge-ordered', admin: 'badge-ordered', editor: 'badge-transit', viewer: 'badge-delivered' };
     const roleLabel = { super_admin: 'Super Admin', admin: 'Admin', editor: 'Editor', viewer: 'User' };
@@ -1858,7 +1858,18 @@ async function renderUsers() {
             </div>
           </div>
         </td>
-        <td><span class="badge ${roleStyle[u.role]||'badge-delivered'}">${escHtml(roleLabel[u.role]||'User')}</span></td>
+        <td>
+          <select
+            class="role-select"
+            style="padding:4px 8px;border-radius:8px;border:1px solid var(--border,#333);background:var(--surface,#1e1e2e);color:var(--text,#fff);font-size:0.8rem;cursor:pointer;"
+            onchange="changeUserRole('${u.docId}', this.value)"
+          >
+            <option value="viewer"       ${(u.role||'viewer')==='viewer'       ? 'selected' : ''}>User</option>
+            <option value="editor"       ${(u.role||'')==='editor'             ? 'selected' : ''}>Editor</option>
+            <option value="admin"        ${(u.role||'')==='admin'              ? 'selected' : ''}>Admin</option>
+            <option value="super_admin"  ${(u.role||'')==='super_admin'        ? 'selected' : ''}>Super Admin</option>
+          </select>
+        </td>
         <td>
           <span class="badge ${u.status==='active'?'badge-delivered':'badge-cancelled'}">
             <i class="fa-solid fa-${u.status==='active'?'circle-check':'ban'}"></i>
@@ -1879,9 +1890,19 @@ async function renderUsers() {
         </td>
       </tr>`).join('');
   } catch(e) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Failed to load users</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Failed to load users</td></tr>`;
   }
 }
+
+window.changeUserRole = async function(docId, newRole) {
+  const isAdmin = (auth.currentUser?.email || '').toLowerCase().trim() === SUPER_ADMIN.toLowerCase().trim();
+  if (!isAdmin) { showToast('Admin only', 'warning'); return; }
+  try {
+    await updateDoc(doc(db, 'users', docId), { role: newRole });
+    const roleLabel = { super_admin: 'Super Admin', admin: 'Admin', editor: 'Editor', viewer: 'User' };
+    showToast(`Role updated to ${roleLabel[newRole] || newRole}`, 'success');
+  } catch(e) { showToast('Failed to update role', 'warning'); renderUsers(); }
+};
 
 window.toggleUserStatus = async function(docId, currentStatus) {
   const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
