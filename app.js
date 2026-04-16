@@ -530,8 +530,8 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     const ship     = parseFloat(document.getElementById('fShipping')?.value)    || 0;
     const paidEach = parseFloat(document.getElementById('fPaid')?.value)        || 0;
     const total    = (price * qty) + ship;
-    const paidTotal = paidEach * qty;
-    const diff     = total - paidTotal; // can be negative (overpaid)
+    const paid = parseFloat(document.getElementById('fPaid')?.value) || 0;
+    const diff = total - paid;
     const pending  = Math.max(0, diff);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
     const td = document.getElementById('fTotalDisplay');
@@ -602,9 +602,8 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     const qty       = parseInt(document.getElementById('fQty')?.value)           || 1;
     const ship      = parseFloat(document.getElementById('fShipping')?.value)    || 0;
     const paidEach  = parseFloat(document.getElementById('fPaid')?.value)        || 0;
-    const paidTotal = paidEach * qty;
-    const total     = (price * qty) + ship;
-    const pending   = Math.max(0, total - paidTotal);
+    const paid    = parseFloat(document.getElementById('fPaid')?.value) || 0;
+    const pending = Math.max(0, total - paid);
     const existing  = DB.orders.find(o => o.id === editId);
 
     try {
@@ -632,7 +631,7 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
         status:   document.getElementById('fStatus')?.value || 'Ordered',
         preorder_price: parseFloat(document.getElementById('fPreorderPrice')?.value) || 0,
         actual_price: price, shipping: ship,
-        paid_each: paidEach, paid: paidTotal, pending, total,
+        paid: paid, pending, total,
         image: imageUrl, updatedAt: serverTimestamp(),
         ownerUid:   auth.currentUser?.uid   || '',   // ← ADD
         ownerEmail: auth.currentUser?.email || ''    // ← ADD
@@ -753,9 +752,9 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     const price    = parseFloat(document.getElementById('pActualPrice')?.value) || 0;
     const qty      = parseInt(document.getElementById('pQty')?.value)           || 1;
     const ship     = parseFloat(document.getElementById('pShipping')?.value)    || 0;
-    const paidEach = parseFloat(document.getElementById('pPaid')?.value)        || 0;
-    const total    = (price * qty) + ship;
-    const diff     = total - paidEach * qty; // can be negative (overpaid)
+    const paid  = parseFloat(document.getElementById('pPaid')?.value) || 0;
+const total = (price * qty) + ship;
+const diff  = total - paid;
     const pending  = Math.max(0, diff);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
     const td = document.getElementById('pTotalDisplay');   if(td) td.textContent = fmt(total);
@@ -820,7 +819,7 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
         status:         document.getElementById('pStatus')?.value              || 'Ordered',
         preorder_price: parseFloat(document.getElementById('pPreorderPrice')?.value) || 0,
         actual_price: price, shipping: ship,
-        paid_each: paidEach, paid: paidTotal, pending, total,
+        paid: paid, pending, total,
         image: imageUrl, series: '', condition: 'Mint', vendor: '', location: '',
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         ownerUid:   auth.currentUser?.uid   || '',   // ← ADD
@@ -917,7 +916,7 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
 
     // paid per piece
     const paidEachEl = document.getElementById('fPaid');
-    if (paidEachEl) paidEachEl.value = o.paid_each ?? (o.paid || 0);
+    if (paidEachEl) paidEachEl.value = o.paid || 0;
 
     // Brand dropdown — ensure brand exists in list before rebuilding
     const brandSel = document.getElementById('fBrandSelect');
@@ -951,10 +950,10 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     const price2    = parseFloat(o.actual_price)              || 0;
     const qty2      = parseInt(o.quantity)                    || 1;
     const ship2     = parseFloat(o.shipping)                  || 0;
-    const paidEach2 = parseFloat(o.paid_each ?? o.paid)       || 0;
+    const paid2 = parseFloat(o.paid) || 0;
     const paidTotal2 = paidEach2 * qty2;
     const total2    = (price2 * qty2) + ship2;
-    const diff2     = total2 - paidTotal2;
+    const diff2 = total2 - paid2;
     const pending2  = Math.max(0, diff2);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
     const td = document.getElementById('fTotalDisplay');
