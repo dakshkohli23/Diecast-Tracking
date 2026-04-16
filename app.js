@@ -4,7 +4,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/fireba
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-// REPLACE the firestore import line with:
 import {
   getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
@@ -115,7 +114,6 @@ if (document.getElementById('pageContent')) {
     if (!user) { window.location.href = 'login.html'; return; }
     _currentUser = user;
 
-    // Set profile name and correct role label
     const isSuperAdmin = user.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
     if (isSuperAdmin) {
       const nameEl = document.getElementById('profileName');
@@ -176,7 +174,7 @@ function initDashboard() {
   const mainWrap       = document.getElementById('mainWrap');
   const sidebarToggle  = document.getElementById('sidebarToggle');
   const sidebarOverlay = document.getElementById('sidebarOverlay');
-  const orderModal     = document.getElementById('orderModal'); // ← pulled into closure
+  const orderModal     = document.getElementById('orderModal');
   const isMobile       = () => window.innerWidth <= 900;
 
   sidebarToggle?.addEventListener('click', () => {
@@ -202,28 +200,23 @@ function initDashboard() {
   initGreeting();
 
   // ── ADMIN GATE ──
-  // ── ADMIN GATE ──
-const isAdmin = auth.currentUser?.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
+  const isAdmin = auth.currentUser?.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
 
-// Access Requests nav item
-const accessRequestsNav = document.querySelector('.nav-item[data-section="access-requests"]');
+  const accessRequestsNav = document.querySelector('.nav-item[data-section="access-requests"]');
+  const usersNav = document.querySelector('.nav-item[data-section="users"]');
 
-// Users nav item
-const usersNav = document.querySelector('.nav-item[data-section="users"]');
+  if (isAdmin) {
+    usersNav?.style.setProperty('display', '');
+    accessRequestsNav?.style.setProperty('display', '');
+    document.getElementById('openAddUserBtn')?.style.setProperty('display', '');
+    document.getElementById('clearDataBtn')?.style.setProperty('display', '');
+  } else {
+    usersNav?.style.setProperty('display', 'none');
+    accessRequestsNav?.style.setProperty('display', 'none');
+    document.getElementById('openAddUserBtn')?.style.setProperty('display', 'none');
+    document.getElementById('clearDataBtn')?.style.setProperty('display', 'none');
+  }
 
-if (isAdmin) {
-  // SHOW admin-only items
-  usersNav?.style.setProperty('display', '');
-  accessRequestsNav?.style.setProperty('display', '');
-  document.getElementById('openAddUserBtn')?.style.setProperty('display', '');
-  document.getElementById('clearDataBtn')?.style.setProperty('display', '');
-} else {
-  // HIDE admin-only items
-  usersNav?.style.setProperty('display', 'none');
-  accessRequestsNav?.style.setProperty('display', 'none');
-  document.getElementById('openAddUserBtn')?.style.setProperty('display', 'none');
-  document.getElementById('clearDataBtn')?.style.setProperty('display', 'none');
-}
   // ── NAV ──
   function navigateTo(section) {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -253,62 +246,63 @@ if (isAdmin) {
   });
 
   // ── USER MANAGEMENT ──
-document.getElementById('openAddUserBtn')?.addEventListener('click', () => {
-  document.getElementById('addUserModal')?.classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
-});
-function closeAddUserModal() {
-  document.getElementById('addUserModal')?.classList.add('hidden');
-  document.body.style.overflow = '';
-  document.getElementById('newUserEmail').value    = '';
-  document.getElementById('newUserPassword').value = '';
-  if (document.getElementById('newUserName')) document.getElementById('newUserName').value = '';
-  document.getElementById('addUserErr').textContent = '';
-}
-document.getElementById('addUserModalClose')?.addEventListener('click', closeAddUserModal);
-document.getElementById('addUserCancelBtn')?.addEventListener('click', closeAddUserModal);
+  document.getElementById('openAddUserBtn')?.addEventListener('click', () => {
+    document.getElementById('addUserModal')?.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  });
 
-document.getElementById('addUserConfirmBtn')?.addEventListener('click', async () => {
- const isAdmin = (auth.currentUser?.email || '').toLowerCase().trim() === SUPER_ADMIN.toLowerCase().trim();
-if (!isAdmin) { showToast('Admin only', 'warning'); return; }
-  const email    = document.getElementById('newUserEmail')?.value.trim();
-  const password = document.getElementById('newUserPassword')?.value;
-  const name     = document.getElementById('newUserName')?.value.trim() || '';
-  const role     = document.getElementById('newUserRole')?.value || 'viewer';
-  const errEl    = document.getElementById('addUserErr');
-  const btn      = document.getElementById('addUserConfirmBtn');
-
-  if (!email || !password) { errEl.textContent = 'Email and password are required'; return; }
-  if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
-
-  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
-  try {
-    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-    await secondaryAuth.signOut();
-    await addDoc(collection(db, 'users'), {
-      uid: cred.user.uid, email, name, role, status: 'active', createdAt: serverTimestamp()
-    });
-    showToast(`User ${email} created!`, 'success');
-    closeAddUserModal();
-    renderUsers();
-  } catch (err) {
-    const msg = err.code === 'auth/email-already-in-use' ? 'Email already in use'
-              : err.code === 'auth/invalid-email'        ? 'Invalid email address'
-              : err.message;
-    errEl.textContent = msg;
-  } finally {
-    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create User';
+  function closeAddUserModal() {
+    document.getElementById('addUserModal')?.classList.add('hidden');
+    document.body.style.overflow = '';
+    document.getElementById('newUserEmail').value    = '';
+    document.getElementById('newUserPassword').value = '';
+    if (document.getElementById('newUserName')) document.getElementById('newUserName').value = '';
+    document.getElementById('addUserErr').textContent = '';
   }
-});
+  document.getElementById('addUserModalClose')?.addEventListener('click', closeAddUserModal);
+  document.getElementById('addUserCancelBtn')?.addEventListener('click', closeAddUserModal);
+
+  document.getElementById('addUserConfirmBtn')?.addEventListener('click', async () => {
+    const isAdmin = (auth.currentUser?.email || '').toLowerCase().trim() === SUPER_ADMIN.toLowerCase().trim();
+    if (!isAdmin) { showToast('Admin only', 'warning'); return; }
+    const email    = document.getElementById('newUserEmail')?.value.trim();
+    const password = document.getElementById('newUserPassword')?.value;
+    const name     = document.getElementById('newUserName')?.value.trim() || '';
+    const role     = document.getElementById('newUserRole')?.value || 'viewer';
+    const errEl    = document.getElementById('addUserErr');
+    const btn      = document.getElementById('addUserConfirmBtn');
+
+    if (!email || !password) { errEl.textContent = 'Email and password are required'; return; }
+    if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
+
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
+    try {
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      await secondaryAuth.signOut();
+      await addDoc(collection(db, 'users'), {
+        uid: cred.user.uid, email, name, role, status: 'active', createdAt: serverTimestamp()
+      });
+      showToast(`User ${email} created!`, 'success');
+      closeAddUserModal();
+      renderUsers();
+    } catch (err) {
+      const msg = err.code === 'auth/email-already-in-use' ? 'Email already in use'
+                : err.code === 'auth/invalid-email'        ? 'Invalid email address'
+                : err.message;
+      errEl.textContent = msg;
+    } finally {
+      btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create User';
+    }
+  });
 
   // ── SELLER TABS ──
-document.querySelectorAll('.sellers-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.sellers-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    renderSellers();
+  document.querySelectorAll('.sellers-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.sellers-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderSellers();
+    });
   });
-});
 
   // ── UPCOMING TABS ──
   document.querySelectorAll('.upcoming-tab').forEach(tab => {
@@ -318,21 +312,22 @@ document.querySelectorAll('.sellers-tab').forEach(tab => {
       renderUpcoming();
     });
   });
+
   // ── ACCESS REQUESTS ──
-document.getElementById('refreshAccessRequestsBtn')?.addEventListener('click', async () => {
-  await fetchData();
-  showToast('Access requests refreshed', 'info');
-});
-
-document.querySelectorAll('.ar-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.ar-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    renderAccessRequests();
+  document.getElementById('refreshAccessRequestsBtn')?.addEventListener('click', async () => {
+    await fetchData();
+    showToast('Access requests refreshed', 'info');
   });
-});
 
-  // ── GLOBAL SEARCH → goes to orders ──
+  document.querySelectorAll('.ar-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.ar-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderAccessRequests();
+    });
+  });
+
+  // ── GLOBAL SEARCH ──
   document.getElementById('globalSearch')?.addEventListener('input', (e) => {
     const q = e.target.value.trim();
     if (q.length > 0) {
@@ -362,56 +357,52 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
   const BASE_BRANDS = ['Hot Wheels','Mini GT','Pop Race','Tarmac Works','Tomica','Matchbox','Kaido House','Inno64'];
   let customBrands = [];
 
-    async function loadBrandsFromFirestore() {
-  const user = auth.currentUser;
-  const currentEmail = (user?.email || '').toLowerCase().trim();
-  const isAdmin = currentEmail === SUPER_ADMIN.toLowerCase().trim();
+  async function loadBrandsFromFirestore() {
+    const user = auth.currentUser;
+    const currentEmail = (user?.email || '').toLowerCase().trim();
+    const isAdmin = currentEmail === SUPER_ADMIN.toLowerCase().trim();
 
-  try {
-    const snap = await getDocs(collection(db, 'brands'));
-    const allBrands = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    try {
+      const snap = await getDocs(collection(db, 'brands'));
+      const allBrands = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    customBrands = allBrands
-      .filter(b => {
-        const ownerUid = (b.ownerUid || '').trim();
-        const ownerEmail = (b.ownerEmail || '').toLowerCase().trim();
-        const hasOwner = ownerUid || ownerEmail;
-        if (ownerUid === user?.uid || ownerEmail === currentEmail) return true;
-        if (!hasOwner && isAdmin) return true;
-        return false;
-      })
-      .map(b => b.name)
-      .filter(Boolean);
-  } catch (e) {
-    customBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
+      customBrands = allBrands
+        .filter(b => {
+          const ownerUid   = (b.ownerUid   || '').trim();
+          const ownerEmail = (b.ownerEmail || '').toLowerCase().trim();
+          const hasOwner   = ownerUid || ownerEmail;
+          if (ownerUid === user?.uid || ownerEmail === currentEmail) return true;
+          if (!hasOwner && isAdmin) return true;
+          return false;
+        })
+        .map(b => b.name)
+        .filter(Boolean);
+    } catch (e) {
+      customBrands = JSON.parse(localStorage.getItem('pretrack_brands') || '[]');
+    }
+
+    rebuildAllBrandDropdowns();
   }
-
-  rebuildAllBrandDropdowns();
-}
 
   async function addCustomBrand(name) {
-  if (!name) return false;
-
-  const normalized = name.trim();
-  const all = [...BASE_BRANDS, ...customBrands].map(x => (x || '').toLowerCase().trim());
-
-  if (all.includes(normalized.toLowerCase())) return false;
-
-  try {
-    await addDoc(collection(db, 'brands'), {
-      name: normalized,
-      createdAt: serverTimestamp(),
-      ownerUid: auth.currentUser?.uid || '',
-      ownerEmail: auth.currentUser?.email || ''
-    });
-    customBrands.push(normalized);
-  } catch (e) {
-    customBrands.push(normalized);
-    localStorage.setItem('pretrack_brands', JSON.stringify(customBrands));
+    if (!name) return false;
+    const normalized = name.trim();
+    const all = [...BASE_BRANDS, ...customBrands].map(x => (x || '').toLowerCase().trim());
+    if (all.includes(normalized.toLowerCase())) return false;
+    try {
+      await addDoc(collection(db, 'brands'), {
+        name: normalized,
+        createdAt: serverTimestamp(),
+        ownerUid:   auth.currentUser?.uid   || '',
+        ownerEmail: auth.currentUser?.email || ''
+      });
+      customBrands.push(normalized);
+    } catch (e) {
+      customBrands.push(normalized);
+      localStorage.setItem('pretrack_brands', JSON.stringify(customBrands));
+    }
+    return true;
   }
-
-  return true;
-}
 
   function getAllBrands() { return [...BASE_BRANDS, ...customBrands]; }
 
@@ -516,24 +507,29 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     document.querySelector('#orderModal .status-pill')?.classList.add('active');
     const fStatusEl = document.getElementById('fStatus'); if (fStatusEl) fStatusEl.value = 'Ordered';
     const td = document.getElementById('fTotalDisplay');   if (td) td.textContent = '₹0';
-    const pd = document.getElementById('fPendingDisplay'); if (pd) { pd.textContent = '₹0'; pd.classList.remove('fg-calc-overdue'); }
+    const pd = document.getElementById('fPendingDisplay'); if (pd) { pd.textContent = '₹0'; pd.classList.remove('fg-calc-overdue'); pd.style.color = ''; }
   }
 
   // ── PAYMENT CALC ──
+  // Formulas:
+  //   total   = (buy_price × qty) + shipping
+  //   paid    = flat amount paid (entered directly, not per-piece)
+  //   pending = max(0, total - paid)
   ['fPreorderPrice','fActualPrice','fShipping','fPaid','fQty'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', calcTotals);
   });
 
   function calcTotals() {
-    const price    = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
-    const qty      = parseInt(document.getElementById('fQty')?.value)           || 1;
-    const ship     = parseFloat(document.getElementById('fShipping')?.value)    || 0;
-    const paidEach = parseFloat(document.getElementById('fPaid')?.value)        || 0;
-    const total    = (price * qty) + ship;
-    const paid = parseFloat(document.getElementById('fPaid')?.value) || 0;
-    const diff = total - paid;
-    const pending  = Math.max(0, diff);
+    const price = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
+    const qty   = parseInt(document.getElementById('fQty')?.value)           || 1;
+    const ship  = parseFloat(document.getElementById('fShipping')?.value)    || 0;
+    const paid  = parseFloat(document.getElementById('fPaid')?.value)        || 0;
+
+    const total   = (price * qty) + ship;
+    const diff    = total - paid;
+    const pending = Math.max(0, diff);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
+
     const td = document.getElementById('fTotalDisplay');
     if (td) {
       td.textContent = fmt(total);
@@ -542,7 +538,6 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     const pd = document.getElementById('fPendingDisplay');
     if (pd) {
       if (diff < 0) {
-        // Overpaid — show as +amount in green
         pd.textContent = `+₹${Math.abs(diff).toLocaleString('en-IN')}`;
         pd.classList.remove('fg-calc-overdue');
         pd.style.color = 'var(--green, #22c55e)';
@@ -551,12 +546,11 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
         pd.textContent = fmt(pending);
         pd.style.color = '';
         pd.classList.toggle('fg-calc-overdue', pending > 0);
-        if (paidTotal > 0) pd.title = `Paid ₹${paidEach.toLocaleString('en-IN')} × ${qty} = ₹${paidTotal.toLocaleString('en-IN')}`;
+        pd.title = '';
       }
     }
-    if (document.getElementById('fTotal'))    document.getElementById('fTotal').value   = total;
-    if (document.getElementById('fPending'))  document.getElementById('fPending').value = pending;
-    if (document.getElementById('fPaidTotal')) document.getElementById('fPaidTotal').value = paidTotal;
+    if (document.getElementById('fTotal'))   document.getElementById('fTotal').value   = total;
+    if (document.getElementById('fPending')) document.getElementById('fPending').value = pending;
   }
 
   ['addOrderBtn','quickAddBtn','qaAddOrder','sidebarAddOrder','topbarAddBtn'].forEach(id => {
@@ -591,24 +585,22 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
     reader.readAsDataURL(file);
   });
 
-  // ── SAVE ORDER ──
+  // ── SAVE ORDER (modal form) ──
   document.getElementById('orderForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const saveBtn = document.getElementById('modalSave');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
 
-    const editId    = document.getElementById('editOrderId')?.value || '';
-    const price     = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
-    const qty       = parseInt(document.getElementById('fQty')?.value)           || 1;
-    const ship      = parseFloat(document.getElementById('fShipping')?.value)    || 0;
-    const paidEach  = parseFloat(document.getElementById('fPaid')?.value)        || 0;
-    const paid    = parseFloat(document.getElementById('fPaid')?.value) || 0;
+    const editId  = document.getElementById('editOrderId')?.value || '';
+    const price   = parseFloat(document.getElementById('fActualPrice')?.value) || 0;
+    const qty     = parseInt(document.getElementById('fQty')?.value)           || 1;
+    const ship    = parseFloat(document.getElementById('fShipping')?.value)    || 0;
+    const paid    = parseFloat(document.getElementById('fPaid')?.value)        || 0;
+    const total   = (price * qty) + ship;
     const pending = Math.max(0, total - paid);
-    const existing  = DB.orders.find(o => o.id === editId);
+    const existing = DB.orders.find(o => o.id === editId);
 
     try {
-      // ── IMAGE LOGIC (fixed) ──
-      // Keep existing image by default; only replace if a new file was chosen
       let imageUrl = existing?.image || '';
       if (_currentImageFile) {
         if (existing?.image) await deleteImageFromSupabase(existing.image);
@@ -616,42 +608,39 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
       }
 
       const order = {
-        product_name: document.getElementById('fProductName')?.value.trim() || '',
-        order_number: document.getElementById('fOrderNumber')?.value.trim() || '',
-        brand:        document.getElementById('fBrand')?.value.trim()       || '',
-        series:       document.getElementById('fSeries')?.value?.trim()     || '',
-        scale:        document.getElementById('fScale')?.value              || '1:64',
-        condition:    document.getElementById('fCondition')?.value          || 'Mint',
-        vendor:       document.getElementById('fVendor')?.value?.trim()     || '',
-        location:     document.getElementById('fLocation')?.value?.trim()   || '',
-        variant:      document.getElementById('fVariant')?.value            || '',
-        notes:        document.getElementById('fNotes')?.value?.trim()      || '',
-        quantity: qty, order_date: document.getElementById('fOrderDate')?.value || '',
-        eta:      document.getElementById('fEta')?.value    || '',
-        status:   document.getElementById('fStatus')?.value || 'Ordered',
+        product_name:   document.getElementById('fProductName')?.value.trim()  || '',
+        order_number:   document.getElementById('fOrderNumber')?.value.trim()  || '',
+        brand:          document.getElementById('fBrand')?.value.trim()        || '',
+        series:         document.getElementById('fSeries')?.value?.trim()      || '',
+        scale:          document.getElementById('fScale')?.value               || '1:64',
+        condition:      document.getElementById('fCondition')?.value           || 'Mint',
+        vendor:         document.getElementById('fVendor')?.value?.trim()      || '',
+        location:       document.getElementById('fLocation')?.value?.trim()    || '',
+        variant:        document.getElementById('fVariant')?.value             || '',
+        notes:          document.getElementById('fNotes')?.value?.trim()       || '',
+        quantity:       qty,
+        order_date:     document.getElementById('fOrderDate')?.value           || '',
+        eta:            document.getElementById('fEta')?.value                 || '',
+        status:         document.getElementById('fStatus')?.value              || 'Ordered',
         preorder_price: parseFloat(document.getElementById('fPreorderPrice')?.value) || 0,
-        actual_price: price, shipping: ship,
-        paid: paid, pending, total,
-        image: imageUrl, updatedAt: serverTimestamp(),
-        ownerUid:   auth.currentUser?.uid   || '',   // ← ADD
-        ownerEmail: auth.currentUser?.email || ''    // ← ADD
+        actual_price:   price,
+        shipping:       ship,
+        paid:           paid,
+        pending:        pending,
+        total:          total,
+        image:          imageUrl,
+        updatedAt:      serverTimestamp(),
+        ownerUid:       auth.currentUser?.uid   || '',
+        ownerEmail:     auth.currentUser?.email || ''
       };
 
       if (editId) {
         await updateDoc(doc(db, 'orders', editId), order);
-        try {
-  await addActivity('info', `Updated — ${order.product_name}`);
-} catch (e) {
-  console.warn('Activity log failed:', e);
-}
+        try { await addActivity('info', `Updated — ${order.product_name}`); } catch (e) { console.warn('Activity log failed:', e); }
         showToast('Order updated!', 'success');
       } else {
         await addDoc(collection(db, 'orders'), { ...order, createdAt: serverTimestamp() });
-        try {
-  await addActivity('success', `Added — ${order.product_name}`);
-} catch (e) {
-  console.warn('Activity log failed:', e);
-}
+        try { await addActivity('success', `Added — ${order.product_name}`); } catch (e) { console.warn('Activity log failed:', e); }
         showToast('Order added!', 'success');
       }
       await fetchData(); closeModal();
@@ -748,16 +737,19 @@ document.querySelectorAll('.ar-tab').forEach(tab => {
   ['pActualPrice','pQty','pShipping','pPaid'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', calcPageTotals);
   });
+
   function calcPageTotals() {
-    const price    = parseFloat(document.getElementById('pActualPrice')?.value) || 0;
-    const qty      = parseInt(document.getElementById('pQty')?.value)           || 1;
-    const ship     = parseFloat(document.getElementById('pShipping')?.value)    || 0;
-    const paid  = parseFloat(document.getElementById('pPaid')?.value) || 0;
-const total = (price * qty) + ship;
-const diff  = total - paid;
-    const pending  = Math.max(0, diff);
+    const price = parseFloat(document.getElementById('pActualPrice')?.value) || 0;
+    const qty   = parseInt(document.getElementById('pQty')?.value)           || 1;
+    const ship  = parseFloat(document.getElementById('pShipping')?.value)    || 0;
+    const paid  = parseFloat(document.getElementById('pPaid')?.value)        || 0;
+
+    const total   = (price * qty) + ship;
+    const diff    = total - paid;
+    const pending = Math.max(0, diff);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
-    const td = document.getElementById('pTotalDisplay');   if(td) td.textContent = fmt(total);
+
+    const td = document.getElementById('pTotalDisplay');   if (td) td.textContent = fmt(total);
     const pd = document.getElementById('pPendingDisplay');
     if (pd) {
       if (diff < 0) {
@@ -769,10 +761,11 @@ const diff  = total - paid;
         pd.textContent = fmt(pending);
         pd.style.color = '';
         pd.classList.toggle('fg-calc-overdue', pending > 0);
+        pd.title = '';
       }
     }
-    if(document.getElementById('pTotal'))   document.getElementById('pTotal').value   = total;
-    if(document.getElementById('pPending')) document.getElementById('pPending').value = pending;
+    if (document.getElementById('pTotal'))   document.getElementById('pTotal').value   = total;
+    if (document.getElementById('pPending')) document.getElementById('pPending').value = pending;
   }
 
   function resetPageForm() {
@@ -783,7 +776,10 @@ const diff  = total - paid;
     document.querySelectorAll('#pStatusPillGroup .status-pill').forEach(p => p.classList.remove('active'));
     document.querySelector('#pStatusPillGroup .status-pill')?.classList.add('active');
     const ps = document.getElementById('pStatus'); if(ps) ps.value = 'Ordered';
-    ['pTotalDisplay','pPendingDisplay'].forEach(id => { const el=document.getElementById(id); if(el){el.textContent='₹0';el.classList.remove('fg-calc-overdue');} });
+    ['pTotalDisplay','pPendingDisplay'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = '₹0'; el.classList.remove('fg-calc-overdue'); el.style.color = ''; }
+    });
     const prev = document.getElementById('pImagePreview');
     if (prev) prev.innerHTML = '<i class="fa-solid fa-camera"></i><p>Click to upload photo</p><span>JPG, PNG, WEBP · max 5MB</span>';
     const pi = document.getElementById('pImage'); if (pi) pi.value = '';
@@ -792,20 +788,23 @@ const diff  = total - paid;
 
   document.getElementById('addOrderPageClear')?.addEventListener('click', resetPageForm);
 
+  // ── SAVE ORDER (page form) ──
   pageForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const saveBtn = document.getElementById('addOrderPageSave');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
-    const price    = parseFloat(document.getElementById('pActualPrice')?.value) || 0;
-    const qty      = parseInt(document.getElementById('pQty')?.value)           || 1;
-    const ship     = parseFloat(document.getElementById('pShipping')?.value)    || 0;
-    const paidEach = parseFloat(document.getElementById('pPaid')?.value)        || 0;
-    const paidTotal = paidEach * qty;
-    const total    = (price * qty) + ship;
-    const pending  = Math.max(0, total - paidTotal);
+
+    const price   = parseFloat(document.getElementById('pActualPrice')?.value) || 0;
+    const qty     = parseInt(document.getElementById('pQty')?.value)           || 1;
+    const ship    = parseFloat(document.getElementById('pShipping')?.value)    || 0;
+    const paid    = parseFloat(document.getElementById('pPaid')?.value)        || 0;
+    const total   = (price * qty) + ship;
+    const pending = Math.max(0, total - paid);
+
     try {
       let imageUrl = '';
       if (_pageImageFile) imageUrl = await uploadImageToSupabase(_pageImageFile);
+
       const order = {
         product_name:   document.getElementById('pProductName')?.value.trim()  || '',
         brand:          (document.getElementById('pBrand')?.value.trim() || document.getElementById('pBrandSelect')?.value || '').replace('__new__',''),
@@ -813,25 +812,27 @@ const diff  = total - paid;
         scale:          document.getElementById('pScale')?.value               || '1:64',
         variant:        document.getElementById('pVariant')?.value             || '',
         notes:          document.getElementById('pNotes')?.value?.trim()       || '',
-        quantity: qty,
+        quantity:       qty,
         order_date:     document.getElementById('pOrderDate')?.value           || '',
         eta:            document.getElementById('pEta')?.value                 || '',
         status:         document.getElementById('pStatus')?.value              || 'Ordered',
         preorder_price: parseFloat(document.getElementById('pPreorderPrice')?.value) || 0,
-        actual_price: price, shipping: ship,
-        paid: paid, pending, total,
-        image: imageUrl, series: '', condition: 'Mint', vendor: '', location: '',
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-        ownerUid:   auth.currentUser?.uid   || '',   // ← ADD
-        ownerEmail: auth.currentUser?.email || ''    // ← ADD
+        actual_price:   price,
+        shipping:       ship,
+        paid:           paid,
+        pending:        pending,
+        total:          total,
+        image:          imageUrl,
+        series: '', condition: 'Mint', vendor: '', location: '',
+        createdAt:  serverTimestamp(),
+        updatedAt:  serverTimestamp(),
+        ownerUid:   auth.currentUser?.uid   || '',
+        ownerEmail: auth.currentUser?.email || ''
       };
+
       if (!order.brand) { showToast('Please select a brand','warning'); return; }
       await addDoc(collection(db,'orders'), order);
-      try {
-  await addActivity('success', `Added — ${order.product_name}`);
-} catch (e) {
-  console.warn('Activity log failed:', e);
-}
+      try { await addActivity('success', `Added — ${order.product_name}`); } catch (e) { console.warn('Activity log failed:', e); }
       showToast('Order saved! 🎉', 'success');
       await fetchData();
       resetPageForm();
@@ -864,7 +865,7 @@ const diff  = total - paid;
   });
 
   document.getElementById('clearDataConfirmBtn')?.addEventListener('click', async () => {
-    const pw = document.getElementById('clearDataPw')?.value || '';
+    const pw    = document.getElementById('clearDataPw')?.value || '';
     const pwErr = document.getElementById('clearDataPwErr');
     if (!pw) { if(pwErr) pwErr.textContent='Enter your password'; return; }
     const user = auth.currentUser;
@@ -891,8 +892,6 @@ const diff  = total - paid;
 
   /* ══════════════════════════════════════
      GLOBAL ORDER ACTIONS
-     Defined inside initDashboard so they can access:
-     getAllBrands, customBrands, rebuildDropdown, openModal, closeModal, navigateTo
   ══════════════════════════════════════ */
 
   window.editOrder = function(id) {
@@ -914,11 +913,11 @@ const diff  = total - paid;
       if (el) el.value = key === 'id' ? o.id : (o[key] ?? '');
     });
 
-    // paid per piece
-    const paidEachEl = document.getElementById('fPaid');
-    if (paidEachEl) paidEachEl.value = o.paid || 0;
+    // Paid field — flat total paid amount
+    const paidEl = document.getElementById('fPaid');
+    if (paidEl) paidEl.value = o.paid || 0;
 
-    // Brand dropdown — ensure brand exists in list before rebuilding
+    // Brand dropdown
     const brandSel = document.getElementById('fBrandSelect');
     const fBrandH  = document.getElementById('fBrand');
     const brand    = o.brand || o.vendor || '';
@@ -926,7 +925,7 @@ const diff  = total - paid;
     rebuildDropdown(brandSel, brand);
     if (fBrandH) fBrandH.value = brand;
 
-    // Status pills (modal scoped)
+    // Status pills
     const status = o.status || 'Ordered';
     document.querySelectorAll('#orderModal .status-pill').forEach(p => {
       p.classList.remove('active');
@@ -935,7 +934,7 @@ const diff  = total - paid;
     });
     const fSt = document.getElementById('fStatus'); if (fSt) fSt.value = status;
 
-    // ── IMAGE: show existing image or placeholder; reset new-file state ──
+    // Image
     _currentImageFile = null;
     _currentImageB64  = '';
     const fi = document.getElementById('fImage'); if (fi) fi.value = '';
@@ -946,18 +945,21 @@ const diff  = total - paid;
         : '<i class="fa-solid fa-camera"></i><p>Click to upload photo</p><span>JPG, PNG, WEBP · max 5MB</span>';
     }
 
-    // Recalculate totals display
-    const price2    = parseFloat(o.actual_price)              || 0;
-    const qty2      = parseInt(o.quantity)                    || 1;
-    const ship2     = parseFloat(o.shipping)                  || 0;
-    const paid2 = parseFloat(o.paid) || 0;
-    const paidTotal2 = paidEach2 * qty2;
-    const total2    = (price2 * qty2) + ship2;
-    const diff2 = total2 - paid2;
-    const pending2  = Math.max(0, diff2);
+    // Recalculate totals display from stored values
+    const price2   = parseFloat(o.actual_price) || 0;
+    const qty2     = parseInt(o.quantity)        || 1;
+    const ship2    = parseFloat(o.shipping)      || 0;
+    const paid2    = parseFloat(o.paid)          || 0;
+    const total2   = (price2 * qty2) + ship2;
+    const diff2    = total2 - paid2;
+    const pending2 = Math.max(0, diff2);
     const fmt = v => `₹${v.toLocaleString('en-IN')}`;
+
     const td = document.getElementById('fTotalDisplay');
-    if (td) td.textContent = fmt(total2);
+    if (td) {
+      td.textContent = fmt(total2);
+      td.title = `(₹${price2.toLocaleString('en-IN')} × ${qty2}) + ₹${ship2.toLocaleString('en-IN')} shipping`;
+    }
     const pd = document.getElementById('fPendingDisplay');
     if (pd) {
       if (diff2 < 0) {
@@ -969,10 +971,11 @@ const diff  = total - paid;
         pd.textContent = fmt(pending2);
         pd.style.color = '';
         pd.classList.toggle('fg-calc-overdue', pending2 > 0);
+        pd.title = '';
       }
     }
-    if (document.getElementById('fTotal'))    document.getElementById('fTotal').value   = total2;
-    if (document.getElementById('fPending'))  document.getElementById('fPending').value = pending2;
+    if (document.getElementById('fTotal'))   document.getElementById('fTotal').value   = total2;
+    if (document.getElementById('fPending')) document.getElementById('fPending').value = pending2;
 
     openModal();
   };
@@ -1044,7 +1047,6 @@ async function fetchData() {
       getDocs(collection(db, 'brands'))
     ];
 
-    // Admin only collections
     if (isAdmin) {
       tasks.push(getDocs(collection(db, 'access_requests')));
       tasks.push(getDocs(collection(db, 'users')));
@@ -1052,59 +1054,46 @@ async function fetchData() {
 
     const results = await Promise.all(tasks);
 
-    const os = results[0];
-    const as = results[1];
-    const bs = results[2];
+    const os  = results[0];
+    const as  = results[1];
+    const bs  = results[2];
     const ars = isAdmin ? results[3] : null;
-    const us = isAdmin ? results[4] : null;
+    const us  = isAdmin ? results[4] : null;
 
     // ── ORDERS ──
     const allOrders = os.docs.map(d => ({ id: d.id, ...d.data() }));
-
     DB.orders = allOrders
       .filter(o => {
-        const ownerUid = (o.ownerUid || '').trim();
+        const ownerUid   = (o.ownerUid   || '').trim();
         const ownerEmail = (o.ownerEmail || '').toLowerCase().trim();
-        const hasOwner = ownerUid || ownerEmail;
-        // Own data always visible
+        const hasOwner   = ownerUid || ownerEmail;
         if (ownerUid === user.uid || ownerEmail === currentEmail) return true;
-        // Legacy records with no owner: only Super Admin can see them
         if (!hasOwner && isAdmin) return true;
         return false;
       })
-      .sort((a, b) => {
-        const aTime = a.createdAt?.seconds || 0;
-        const bTime = b.createdAt?.seconds || 0;
-        return bTime - aTime;
-      });
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
     // ── ACTIVITY ──
     const allActivity = as.docs.map(d => ({ id: d.id, ...d.data() }));
-
     DB.activity = allActivity
       .filter(a => {
-        const ownerUid = (a.ownerUid || '').trim();
+        const ownerUid   = (a.ownerUid   || '').trim();
         const ownerEmail = (a.ownerEmail || '').toLowerCase().trim();
-        const hasOwner = ownerUid || ownerEmail;
+        const hasOwner   = ownerUid || ownerEmail;
         if (ownerUid === user.uid || ownerEmail === currentEmail) return true;
         if (!hasOwner && isAdmin) return true;
         return false;
       })
-      .sort((a, b) => {
-        const aTime = a.createdAt?.seconds || 0;
-        const bTime = b.createdAt?.seconds || 0;
-        return bTime - aTime;
-      });
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
     // ── BRANDS ──
     const allBrands = bs.docs.map(d => ({ id: d.id, ...d.data() }));
-
     if (typeof customBrands !== 'undefined') {
       customBrands = allBrands
         .filter(b => {
-          const ownerUid = (b.ownerUid || '').trim();
+          const ownerUid   = (b.ownerUid   || '').trim();
           const ownerEmail = (b.ownerEmail || '').toLowerCase().trim();
-          const hasOwner = ownerUid || ownerEmail;
+          const hasOwner   = ownerUid || ownerEmail;
           if (ownerUid === user.uid || ownerEmail === currentEmail) return true;
           if (!hasOwner && isAdmin) return true;
           return false;
@@ -1115,20 +1104,12 @@ async function fetchData() {
 
     // ── ACCESS REQUESTS (admin only) ──
     DB.accessRequests = isAdmin && ars
-      ? ars.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+      ? ars.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       : [];
 
     // ── USERS (admin only) ──
     DB.users = isAdmin && us
-      ? us.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => {
-            const aTime = a.createdAt?.seconds || 0;
-            const bTime = b.createdAt?.seconds || 0;
-            return bTime - aTime;
-          })
+      ? us.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       : [];
 
     renderAll();
@@ -1138,21 +1119,20 @@ async function fetchData() {
     renderAll();
   }
 }
+
 async function addActivity(type, msg) {
   const user = auth.currentUser;
   try {
     await addDoc(collection(db, 'activity'), {
-      type,
-      msg,
+      type, msg,
       time: new Date().toLocaleString(),
-      createdAt: serverTimestamp(),
-      ownerUid: user?.uid || '',
+      createdAt:  serverTimestamp(),
+      ownerUid:   user?.uid   || '',
       ownerEmail: user?.email || ''
     });
-  } catch (e) {
-    console.error('addActivity error:', e);
-  }
+  } catch (e) { console.error('addActivity error:', e); }
 }
+
 /* ══════════════════════════════════════ GREETING ══════════════════════════════════════ */
 function initGreeting() {
   const gt = document.getElementById('greetingText');
@@ -1170,7 +1150,6 @@ function initGreeting() {
         if (data.name && data.name.trim()) return data.name.trim();
       }
     } catch(e) { /* fallback */ }
-    // Fallback: use part of email before @
     return (user.email || '').split('@')[0] || 'there';
   }
 
@@ -1187,10 +1166,7 @@ function initGreeting() {
     ss.innerHTML = `<span class="status-dot"></span> Checking systems...`; ss.className = 'system-status';
     setTimeout(() => { ss.innerHTML = `<span class="status-dot"></span> All systems live`; ss.className = 'system-status live'; }, 1200);
   }
-  getDisplayName().then(name => {
-    update(name);
-    setInterval(() => update(name), 60000);
-  });
+  getDisplayName().then(name => { update(name); setInterval(() => update(name), 60000); });
   checkSys();
 }
 
@@ -1230,11 +1206,8 @@ function renderStats() {
   const o = DB.orders, n = o.length;
   const totalQty = o.reduce((s,x) => s + (x.quantity||1), 0);
 
-  const investment = o.reduce((s,x) => {
-    return s + ((x.actual_price||0) * (x.quantity||1)) + (x.shipping||0);
-  }, 0);
-
-  const avgBuy = totalQty > 0 ? Math.round(investment / totalQty) : 0;
+  const investment = o.reduce((s,x) => s + ((x.actual_price||0) * (x.quantity||1)) + (x.shipping||0), 0);
+  const avgBuy     = totalQty > 0 ? Math.round(investment / totalQty) : 0;
   const pendingAmt = o.reduce((s,x) => s + (x.pending||0), 0);
 
   const pendingPO = o.filter(x => x.status==='Ordered'||x.status==='In Transit').length;
@@ -1245,24 +1218,25 @@ function renderStats() {
   const bm = {}; o.forEach(x => { const k=(x.brand||x.vendor||'—').trim(); bm[k]=(bm[k]||0)+(x.quantity||1); });
   const topBrand = Object.entries(bm).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—';
 
-  setText('statTotal', n);
-  setText('statQty', totalQty);
+  setText('statTotal',      n);
+  setText('statQty',        totalQty);
   setText('statAvgBuy',     avgBuy > 0 ? '₹' + avgBuy.toLocaleString('en-IN') : '₹0');
   setText('statInvestment', '₹' + investment.toLocaleString('en-IN'));
   setText('statPending',    '₹' + pendingAmt.toLocaleString('en-IN'));
-  setText('statPendingPO', pendingPO);
-  setText('statDelivered', delivered);
-  setText('statTransit',   transit);
-  setText('statOverdue',   overdue);
-  setText('statTopBrand',  topBrand);
+  setText('statPendingPO',  pendingPO);
+  setText('statDelivered',  delivered);
+  setText('statTransit',    transit);
+  setText('statOverdue',    overdue);
+  setText('statTopBrand',   topBrand);
 
   const pct = (x) => n > 0 ? Math.min(100, Math.round((x/n)*100)) : 0;
   const sb  = (id,v) => { const el=document.getElementById(id); if(el) el.style.width=v+'%'; };
-  sb('statDeliveredBar',  pct(delivered));
-  sb('statTransitBar',    pct(transit));
-  sb('statPendingPOBar',  pct(pendingPO));
-  sb('statOverdueBar',    pct(overdue));
-  sb('statPendingBar',    investment > 0 ? Math.min(100, Math.round((pendingAmt/investment)*100)) : 0);
+  sb('statDeliveredBar', pct(delivered));
+  sb('statTransitBar',   pct(transit));
+  sb('statPendingPOBar', pct(pendingPO));
+  sb('statOverdueBar',   pct(overdue));
+  sb('statPendingBar',   investment > 0 ? Math.min(100, Math.round((pendingAmt/investment)*100)) : 0);
+
   const sellerCount = new Set(DB.orders.map(o => (o.vendor||'Unknown').trim())).size;
   setText('statSellers', sellerCount);
 }
@@ -1316,8 +1290,8 @@ function renderTable(orders) {
     tbody.innerHTML = orders.map(o => {
       const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
       const thumb = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
-      const pb    = (o.pending||0)<=0?'badge-paid':((o.paid||0)>0?'badge-partial':'badge-pending-b');
-      const pl    = (o.pending||0)<=0?'Paid':((o.paid||0)>0?'Partial':'Pending');
+      const pb    = (o.pending||0)<=0 ? 'badge-paid' : ((o.paid||0)>0 ? 'badge-partial' : 'badge-pending-b');
+      const pl    = (o.pending||0)<=0 ? 'Paid'       : ((o.paid||0)>0 ? 'Partial'       : 'Pending');
       return `<tr>
         <td>
           <div class="order-product-cell">
@@ -1349,8 +1323,8 @@ function renderTable(orders) {
     mobileList.innerHTML = orders.map(o => {
       const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
       const thumb = o.image ? `<img src="${o.image}" alt="${escHtml(o.product_name)}" />` : `<i class="fa-solid fa-car-side"></i>`;
-      const pb    = (o.pending||0)<=0?'badge-paid':((o.paid||0)>0?'badge-partial':'badge-pending-b');
-      const pl    = (o.pending||0)<=0?'Paid':((o.paid||0)>0?'Partial':'Pending');
+      const pb    = (o.pending||0)<=0 ? 'badge-paid' : ((o.paid||0)>0 ? 'badge-partial' : 'badge-pending-b');
+      const pl    = (o.pending||0)<=0 ? 'Paid'       : ((o.paid||0)>0 ? 'Partial'       : 'Pending');
       return `<div class="mob-order-card glass">
         <div class="mob-card-top">
           <div class="mob-thumb">${thumb}</div>
@@ -1460,7 +1434,7 @@ function renderPayments() {
     return;
   }
 
-  const fmt = v => `₹${v.toLocaleString('en-IN')}`;
+  const fmt          = v => `₹${v.toLocaleString('en-IN')}`;
   const totalSpent   = DB.orders.reduce((s,o) => s+(o.total||0), 0);
   const totalPaid    = DB.orders.reduce((s,o) => s+(o.paid||0), 0);
   const totalPending = DB.orders.reduce((s,o) => s+(o.pending||0), 0);
@@ -1625,13 +1599,13 @@ function renderCatalog() {
   if (!DB.orders.length) { grid.innerHTML = `<div class="empty-state">No models tracked yet</div>`; return; }
   const fmt = v => `₹${Number(v||0).toLocaleString('en-IN')}`;
   grid.innerHTML = DB.orders.map(o => {
-    const sc       = (o.status||'').toLowerCase().replace(/\s+/g,'-');
-    const hasImg   = !!o.image;
-    const pending  = o.pending||0;
-    const payIcon  = pending <= 0
+    const sc        = (o.status||'').toLowerCase().replace(/\s+/g,'-');
+    const hasImg    = !!o.image;
+    const pending   = o.pending||0;
+    const payIcon   = pending <= 0
       ? `<span class="cc-pay-badge cc-paid"><i class="fa-solid fa-circle-check"></i> Paid</span>`
       : `<span class="cc-pay-badge cc-pending"><i class="fa-solid fa-hourglass-half"></i> ₹${pending.toLocaleString('en-IN')} due</span>`;
-    const etaStr   = o.eta ? formatDate(o.eta) : null;
+    const etaStr    = o.eta ? formatDate(o.eta) : null;
     const isOverdue = o.eta && new Date(o.eta) < new Date() && o.status !== 'Delivered' && o.status !== 'Cancelled';
 
     return `<div class="catalog-card cc-rich" onclick="viewOrder('${o.id}')">
@@ -1719,7 +1693,7 @@ function renderUpcoming() {
     return;
   }
 
-  const fmt = v => '\u20B9' + Number(v||0).toLocaleString('en-IN');
+  const fmt   = v => '\u20B9' + Number(v||0).toLocaleString('en-IN');
   const today = new Date();
 
   grid.innerHTML = filtered.map(o => {
@@ -1773,7 +1747,6 @@ function renderSellers() {
 
   const map = {};
   DB.orders.forEach(o => {
-    // FIXED (vendor = seller name field)
     const name = (o.vendor || 'Unknown Seller').trim();
     if (!map[name]) map[name] = { name, orders: [], total: 0, pending: 0, paid: 0 };
     map[name].orders.push(o);
@@ -1830,7 +1803,6 @@ function renderSellers() {
 /* ══════════════════════════════════════ USERS ══════════════════════════════════════ */
 async function renderUsers() {
   const tbody = document.getElementById('usersTableBody'); if (!tbody) return;
-  // Only admin can see this section
   const currentUserEmail = (auth.currentUser?.email || '').toLowerCase().trim();
   const isAdmin = currentUserEmail === SUPER_ADMIN.toLowerCase().trim();
   if (!isAdmin) {
@@ -1839,13 +1811,11 @@ async function renderUsers() {
   }
   tbody.innerHTML = `<tr><td colspan="6" class="empty-row"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
   try {
-    const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')));
+    const snap  = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')));
     const users = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
     if (!users.length) {
       tbody.innerHTML = `<tr><td colspan="6" class="empty-row">No users added yet</td></tr>`; return;
     }
-    const roleStyle = { super_admin: 'badge-ordered', admin: 'badge-ordered', editor: 'badge-transit', viewer: 'badge-delivered' };
-    const roleLabel = { super_admin: 'Super Admin', admin: 'Admin', editor: 'Editor', viewer: 'User' };
     tbody.innerHTML = users.map(u => `
       <tr>
         <td>
@@ -1905,6 +1875,7 @@ async function renderUsers() {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Failed to load users</td></tr>`;
   }
 }
+
 function getRoleDescription(role) {
   const desc = {
     viewer:      '👁 View only — cannot add or edit',
@@ -1919,8 +1890,7 @@ window.onRoleSelectChange = function(docId, newRole) {
   const saveBtn = document.getElementById(`role-save-${docId}`);
   const descEl  = document.getElementById(`role-desc-${docId}`);
   if (saveBtn) saveBtn.style.display = 'flex';
-  if (descEl)  descEl.textContent = getRoleDescription(newRole) + ' — unsaved';
-  if (descEl)  descEl.style.color = 'var(--orange)';
+  if (descEl)  { descEl.textContent = getRoleDescription(newRole) + ' — unsaved'; descEl.style.color = 'var(--orange)'; }
 };
 
 window.saveUserRole = async function(docId) {
@@ -1977,16 +1947,17 @@ function showToast(message, type='info') {
   clearTimeout(window.__toastTimer);
   window.__toastTimer = setTimeout(() => { t.style.transform='translateY(20px)'; t.style.opacity='0'; }, 2500);
 }
+
 function renderAccessRequests() {
-  const list = document.getElementById('accessRequestsList');
-  const badge = document.getElementById('accessRequestsBadge');
-  const pendingEl = document.getElementById('arCountPending');
+  const list       = document.getElementById('accessRequestsList');
+  const badge      = document.getElementById('accessRequestsBadge');
+  const pendingEl  = document.getElementById('arCountPending');
   const approvedEl = document.getElementById('arCountApproved');
   const rejectedEl = document.getElementById('arCountRejected');
 
   if (!list) return;
 
-  const user = auth.currentUser;
+  const user    = auth.currentUser;
   const isAdmin = user?.email?.toLowerCase() === SUPER_ADMIN.toLowerCase();
 
   if (!isAdmin) {
@@ -1996,23 +1967,19 @@ function renderAccessRequests() {
   }
 
   const activeTab = document.querySelector('.ar-tab.active')?.dataset.filter || 'all';
-  let requests = [...(DB.accessRequests || [])];
+  let requests    = [...(DB.accessRequests || [])];
 
-  const pendingCount = requests.filter(r => (r.status || 'pending').toLowerCase() === 'pending').length;
+  const pendingCount  = requests.filter(r => (r.status || 'pending').toLowerCase() === 'pending').length;
   const approvedCount = requests.filter(r => (r.status || '').toLowerCase() === 'approved').length;
   const rejectedCount = requests.filter(r => (r.status || '').toLowerCase() === 'rejected').length;
 
-  if (pendingEl) pendingEl.textContent = pendingCount;
+  if (pendingEl)  pendingEl.textContent  = pendingCount;
   if (approvedEl) approvedEl.textContent = approvedCount;
   if (rejectedEl) rejectedEl.textContent = rejectedCount;
 
   if (badge) {
-    if (pendingCount > 0) {
-      badge.style.display = 'inline-flex';
-      badge.textContent = pendingCount;
-    } else {
-      badge.style.display = 'none';
-    }
+    badge.style.display = pendingCount > 0 ? 'inline-flex' : 'none';
+    badge.textContent   = pendingCount;
   }
 
   if (activeTab !== 'all') {
@@ -2025,26 +1992,16 @@ function renderAccessRequests() {
   }
 
   list.innerHTML = requests.map(r => {
-    const status = (r.status || 'pending').toLowerCase();
-    const badgeClass =
-      status === 'approved' ? 'ar-badge-approved' :
-      status === 'rejected' ? 'ar-badge-rejected' :
-      'ar-badge-pending';
-
-    const requestedAt = r.createdAt?.seconds
-      ? new Date(r.createdAt.seconds * 1000).toLocaleString('en-IN')
-      : '—';
-
+    const status     = (r.status || 'pending').toLowerCase();
+    const badgeClass = status === 'approved' ? 'ar-badge-approved' : status === 'rejected' ? 'ar-badge-rejected' : 'ar-badge-pending';
+    const requestedAt = r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleString('en-IN') : '—';
     const displayName = r.name || r.fullName || (r.email ? r.email.split('@')[0] : 'Unknown User');
-    const email = r.email || 'No email';
-    const reason = r.reason || r.message || r.note || '';
+    const email       = r.email || 'No email';
+    const reason      = r.reason || r.message || r.note || '';
 
     return `
       <div class="ar-row">
-        <div class="ar-avatar">
-          <i class="fa-solid fa-user"></i>
-        </div>
-
+        <div class="ar-avatar"><i class="fa-solid fa-user"></i></div>
         <div class="ar-info">
           <div class="ar-name">
             ${escHtml(displayName)}
@@ -2053,70 +2010,39 @@ function renderAccessRequests() {
           <div class="ar-email">${escHtml(email)}</div>
           ${reason ? `<div class="ar-reason">${escHtml(reason)}</div>` : ''}
         </div>
-
         <div class="ar-time">${requestedAt}</div>
-
         <div class="ar-actions" style="visibility:${status === 'pending' ? 'visible' : 'hidden'};">
-  <button class="btn btn-sm btn-ar-approve" onclick="approveAccessRequest('${r.id}')">
-    <i class="fa-solid fa-check"></i>
-  </button>
-  <button class="btn btn-sm btn-ar-reject" onclick="rejectAccessRequest('${r.id}')">
-    <i class="fa-solid fa-xmark"></i>
-  </button>
-</div>
-      </div>
-    `;
+          <button class="btn btn-sm btn-ar-approve" onclick="approveAccessRequest('${r.id}')"><i class="fa-solid fa-check"></i></button>
+          <button class="btn btn-sm btn-ar-reject"  onclick="rejectAccessRequest('${r.id}')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>`;
   }).join('');
 }
+
 window.approveAccessRequest = async function(id) {
   try {
-    const req = DB.accessRequests.find(x => x.id === id);
-    if (!req) return;
-
-    await updateDoc(doc(db, 'access_requests', id), {
-      status: 'approved',
-      updatedAt: serverTimestamp()
-    });
-
+    const req = DB.accessRequests.find(x => x.id === id); if (!req) return;
+    await updateDoc(doc(db, 'access_requests', id), { status: 'approved', updatedAt: serverTimestamp() });
     const existingUser = await getDocs(query(collection(db, 'users'), where('email', '==', req.email)));
     if (existingUser.empty) {
       await addDoc(collection(db, 'users'), {
-        email: req.email,
-        uid: req.uid || '',
+        email: req.email, uid: req.uid || '',
         name: req.name || req.fullName || '',
-        role: 'viewer',
-        status: 'active',
-        createdAt: serverTimestamp()
+        role: 'viewer', status: 'active', createdAt: serverTimestamp()
       });
     } else {
-      await updateDoc(existingUser.docs[0].ref, {
-        status: 'active',
-        updatedAt: serverTimestamp()
-      });
+      await updateDoc(existingUser.docs[0].ref, { status: 'active', updatedAt: serverTimestamp() });
     }
-
     showToast(`Approved ${req.email}`, 'success');
     await fetchData();
-  } catch (err) {
-    console.error(err);
-    showToast('Approve failed: ' + err.message, 'warning');
-  }
+  } catch (err) { console.error(err); showToast('Approve failed: ' + err.message, 'warning'); }
 };
 
 window.rejectAccessRequest = async function(id) {
   try {
-    const req = DB.accessRequests.find(x => x.id === id);
-    if (!req) return;
-
-    await updateDoc(doc(db, 'access_requests', id), {
-      status: 'rejected',
-      updatedAt: serverTimestamp()
-    });
-
+    const req = DB.accessRequests.find(x => x.id === id); if (!req) return;
+    await updateDoc(doc(db, 'access_requests', id), { status: 'rejected', updatedAt: serverTimestamp() });
     showToast(`Rejected ${req.email}`, 'warning');
     await fetchData();
-  } catch (err) {
-    console.error(err);
-    showToast('Reject failed: ' + err.message, 'warning');
-  }
+  } catch (err) { console.error(err); showToast('Reject failed: ' + err.message, 'warning'); }
 };
