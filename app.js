@@ -1804,152 +1804,105 @@ function renderSellers() {
 }
 
 /* ══════════════════════════════════════ USERS ══════════════════════════════════════ */
-async function renderUsers() {
-  const tbody     = document.getElementById('usersTableBody');
-  const mobList   = document.getElementById('usersMobList');
-  if (!tbody && !mobList) return;
+function renderUsers() {
+  const usersTableBody = document.getElementById('usersTableBody');
+  const mobileUserList = document.getElementById('mobileUserList');
 
-  const currentUserEmail = (auth.currentUser?.email || '').toLowerCase().trim();
-  const isAdmin = currentUserEmail === SUPER_ADMIN.toLowerCase().trim();
+  if (!usersTableBody || !mobileUserList) return;
 
-  if (!isAdmin) {
-    if (tbody)   tbody.innerHTML   = `<tr><td colspan="5" class="empty-row"><i class="fa-solid fa-lock"></i> Admin only</td></tr>`;
-    if (mobList) mobList.innerHTML = `<div class="empty-state"><i class="fa-solid fa-lock"></i> Admin only</div>`;
+  const users = DB.users || [];
+
+  if (!users.length) {
+    usersTableBody.innerHTML = `
+      <tr>
+        <td colspan="5" class="empty-row">
+          <i class="fa-solid fa-inbox"></i> No users found
+        </td>
+      </tr>
+    `;
+    mobileUserList.innerHTML = `<div class="empty-state">No users found</div>`;
     return;
   }
 
-  const loadingRow = `<tr><td colspan="5" class="empty-row"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>`;
-  if (tbody)   tbody.innerHTML   = loadingRow;
-  if (mobList) mobList.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>`;
-
-  try {
-    const snap  = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')));
-    const users = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
-
-    if (!users.length) {
-      if (tbody)   tbody.innerHTML   = `<tr><td colspan="5" class="empty-row">No users added yet</td></tr>`;
-      if (mobList) mobList.innerHTML = `<div class="empty-state">No users added yet</div>`;
-      return;
-    }
-
-    // ── DESKTOP TABLE ROWS ──
-    if (tbody) {
-      tbody.innerHTML = users.map(u => `
-        <tr>
-          <td>
-            <div style="display:flex;align-items:center;gap:0.6rem">
-              <div class="user-avatar-sm"><i class="fa-solid fa-user"></i></div>
-              <div>
-                <div style="font-weight:700;font-size:0.85rem">${u.name ? escHtml(u.name) : escHtml(u.email)}</div>
-                <div style="font-size:0.7rem;color:var(--text-muted)">${escHtml(u.email)}</div>
-              </div>
-            </div>
-          </td>
-          <td>
-            <div style="display:flex;flex-direction:column;gap:0.4rem;min-width:160px">
-              <div style="display:flex;align-items:center;gap:0.4rem">
-                <select id="role-select-${u.docId}" class="role-select"
-                  style="flex:1;padding:4px 8px;border-radius:8px;border:1px solid rgba(124,92,252,0.25);background:#f9f8ff;color:var(--text-primary);font-size:0.8rem;cursor:pointer;font-family:inherit;"
-                  onchange="onRoleSelectChange('${u.docId}', this.value)">
-                  <option value="viewer"      ${(u.role||'viewer')==='viewer'      ? 'selected' : ''}>User</option>
-                  <option value="editor"      ${(u.role||'')==='editor'            ? 'selected' : ''}>Editor</option>
-                  <option value="admin"       ${(u.role||'')==='admin'             ? 'selected' : ''}>Admin</option>
-                  <option value="super_admin" ${(u.role||'')==='super_admin'       ? 'selected' : ''}>Super Admin</option>
-                </select>
-                <button id="role-save-${u.docId}" class="btn btn-primary btn-icon" title="Save role"
-                  style="display:none;width:28px;height:28px;padding:0;font-size:0.7rem;"
-                  onclick="saveUserRole('${u.docId}')"><i class="fa-solid fa-check"></i></button>
-              </div>
-              <div id="role-desc-${u.docId}" style="font-size:0.68rem;color:var(--text-muted);line-height:1.3;">${getRoleDescription(u.role||'viewer')}</div>
-            </div>
-          </td>
-          <td>
-            <span class="badge ${u.status==='active'?'badge-delivered':'badge-cancelled'}">
-              <i class="fa-solid fa-${u.status==='active'?'circle-check':'ban'}"></i>
-              ${u.status==='active'?'Active':'Disabled'}
-            </span>
-          </td>
-          <td style="font-size:0.78rem;color:var(--text-muted)">${u.createdAt?.toDate?.()?.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})||'—'}</td>
-          <td>
-            <div class="table-actions">
-              <button class="btn btn-ghost btn-icon" title="${u.status==='active'?'Disable':'Enable'} user"
-                onclick="toggleUserStatus('${u.docId}','${u.status}')">
-                <i class="fa-solid fa-${u.status==='active'?'user-slash':'user-check'}"></i>
-              </button>
-              <button class="btn btn-danger btn-icon" title="Remove user" onclick="removeUser('${u.docId}','${escHtml(u.email)}')">
-                <i class="fa-solid fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>`).join('');
-    }
-
-    // ── MOBILE CARDS ──
-    if (mobList) {
-      mobList.innerHTML = users.map(u => {
-        const joined = u.createdAt?.toDate?.()?.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) || '—';
-        const roleLabel = { super_admin:'Super Admin', admin:'Admin', editor:'Editor', viewer:'User' };
-        return `
-        <div class="user-mob-card glass">
-          <div class="user-mob-top">
-            <div class="user-mob-avatar"><i class="fa-solid fa-user"></i></div>
-            <div class="user-mob-info">
-              <div class="user-mob-name">${u.name ? escHtml(u.name) : escHtml(u.email)}</div>
-              <div class="user-mob-email">${escHtml(u.email)}</div>
-            </div>
-            <div class="user-mob-status">
-              <span class="badge ${u.status==='active'?'badge-delivered':'badge-cancelled'}">
-                <i class="fa-solid fa-${u.status==='active'?'circle-check':'ban'}"></i>
-                ${u.status==='active'?'Active':'Disabled'}
-              </span>
-            </div>
-          </div>
-
-          <div class="user-mob-meta">
-            <div class="user-mob-meta-item">
-              <span class="user-mob-meta-label">Role</span>
-              <span class="user-mob-meta-val">${roleLabel[u.role||'viewer']||'User'}</span>
-            </div>
-            <div class="user-mob-meta-item">
-              <span class="user-mob-meta-label">Joined</span>
-              <span class="user-mob-meta-val">${joined}</span>
-            </div>
-          </div>
-
+  // DESKTOP TABLE
+  usersTableBody.innerHTML = users.map(user => `
+    <tr>
+      <td>
+        <div class="user-row-info" style="display:flex;align-items:center;gap:.75rem;">
+          <div class="user-mobile-avatar"><i class="fa-solid fa-user"></i></div>
           <div>
-            <div class="user-mob-role-row">
-              <select id="mob-role-select-${u.docId}" onchange="onMobRoleSelectChange('${u.docId}', this.value)">
-                <option value="viewer"      ${(u.role||'viewer')==='viewer'      ? 'selected':''}>User</option>
-                <option value="editor"      ${(u.role||'')==='editor'            ? 'selected':''}>Editor</option>
-                <option value="admin"       ${(u.role||'')==='admin'             ? 'selected':''}>Admin</option>
-                <option value="super_admin" ${(u.role||'')==='super_admin'       ? 'selected':''}>Super Admin</option>
-              </select>
-              <button id="mob-role-save-${u.docId}" class="btn btn-primary btn-icon"
-                style="display:none;width:34px;height:34px;padding:0;"
-                onclick="saveMobUserRole('${u.docId}')">
-                <i class="fa-solid fa-check"></i>
-              </button>
-            </div>
-            <div id="mob-role-desc-${u.docId}" class="user-mob-role-desc">${getRoleDescription(u.role||'viewer')}</div>
+            <div style="font-weight:800;">${user.name || user.email}</div>
+            <div style="font-size:.78rem;color:var(--text-muted);">${user.email}</div>
           </div>
+        </div>
+      </td>
+      <td><span class="role-pill">${formatRole(user.role)}</span></td>
+      <td>
+        <span class="status-pill-sm ${user.status === 'disabled' ? 'disabled' : 'active'}">
+          ${user.status === 'disabled' ? 'Disabled' : 'Active'}
+        </span>
+      </td>
+      <td>${formatRole(user.role)}</td>
+      <td>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" onclick="toggleUserStatus('${user.id}')">
+            ${user.status === 'disabled' ? 'Enable' : 'Disable'}
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="deleteUser('${user.id}')">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
 
-          <div class="user-mob-actions">
-            <button class="btn btn-ghost" onclick="toggleUserStatus('${u.docId}','${u.status}')">
-              <i class="fa-solid fa-${u.status==='active'?'user-slash':'user-check'}"></i>
-              ${u.status==='active'?'Disable':'Enable'}
-            </button>
-            <button class="btn btn-danger" onclick="removeUser('${u.docId}','${escHtml(u.email)}')">
-              <i class="fa-solid fa-trash"></i>
-            </button>
+  // MOBILE CARDS
+  mobileUserList.innerHTML = users.map(user => `
+    <div class="user-mobile-card">
+      <div class="user-mobile-top">
+        <div class="user-mobile-avatar">
+          <i class="fa-solid fa-user"></i>
+        </div>
+        <div class="user-mobile-meta">
+          <div class="user-mobile-name">${user.name || user.email}</div>
+          <div class="user-mobile-email">${user.email}</div>
+        </div>
+      </div>
+
+      <div class="user-mobile-grid">
+        <div class="user-mobile-field">
+          <div class="user-mobile-label">Role</div>
+          <div class="user-mobile-value">${formatRole(user.role)}</div>
+        </div>
+
+        <div class="user-mobile-field">
+          <div class="user-mobile-label">Status</div>
+          <div class="user-mobile-value">
+            <span class="status-pill-sm ${user.status === 'disabled' ? 'disabled' : 'active'}">
+              ${user.status === 'disabled' ? 'Disabled' : 'Active'}
+            </span>
           </div>
-        </div>`;
-      }).join('');
-    }
+        </div>
+      </div>
 
-  } catch(e) {
-    if (tbody)   tbody.innerHTML   = `<tr><td colspan="5" class="empty-row">Failed to load users</td></tr>`;
-    if (mobList) mobList.innerHTML = `<div class="empty-state">Failed to load users</div>`;
-  }
+      <div class="user-mobile-actions">
+        <button class="btn btn-ghost" onclick="toggleUserStatus('${user.id}')">
+          ${user.status === 'disabled' ? 'Enable' : 'Disable'}
+        </button>
+        <button class="btn btn-danger" onclick="deleteUser('${user.id}')">
+          Delete
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function formatRole(role) {
+  const roleMap = {
+    super_admin: 'Super Admin',
+    admin: 'Admin',
+    editor: 'Editor',
+    viewer: 'User'
+  };
+  return roleMap[role] || 'User';
 }
 
 // Mobile role helpers
