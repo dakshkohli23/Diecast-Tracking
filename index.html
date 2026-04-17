@@ -294,7 +294,7 @@
         </div>
 
         <!-- DESKTOP TABLE -->
-        <div class="table-wrap glass desktop-only" style="overflow-x:auto">
+          <div class="table-wrap glass desktop-only" style="overflow-x:auto">
           <table class="orders-table" id="ordersTable">
             <thead>
               <tr>
@@ -316,7 +316,7 @@
 
         <!-- MOBILE CARDS -->
         <div class="mobile-order-list mobile-only" id="mobileOrderList">
-          <div class="empty-state">No items found</div>
+            <div class="empty-state">No users found</div>
         </div>
       </section>
 
@@ -721,23 +721,32 @@
     </button>
   </div>
 
-  <div class="users-table-wrap glass" id="usersTableWrap">
-    <table class="orders-table">
-      <thead>
-        <tr>
-  <th>User</th>
-  <th>Role & Access</th>
-  <th>Status</th>
-  <th>Created</th>
-  <th>Actions</th>
-</tr>
-      </thead>
-      <tbody id="usersTableBody">
-        <tr><td colspan="5" class="empty-row">Loading users...</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div id="usersMobList" class="user-mob-list" style="display:none"></div>
+  <!-- DESKTOP USERS TABLE -->
+<div class="table-wrap glass desktop-only">
+  <table class="users-table" id="usersTable">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Access</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="usersTableBody">
+      <tr>
+        <td colspan="5" class="empty-row">
+          <i class="fa-solid fa-inbox"></i> No users found
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- MOBILE USER CARDS -->
+<div class="mobile-user-list mobile-only" id="mobileUserList">
+  <div class="empty-state">No users found</div>
+</div>
 </section>
 
 <!-- ═══ ADD USER MODAL ═══ -->
