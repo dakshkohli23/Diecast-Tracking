@@ -3583,3 +3583,248 @@ input, select, textarea { color-scheme: light; }
     font-size: 0.74rem;
   }
 }
+/* ══════════════════════════════════════
+   MOBILE FIX — DASHBOARD RESPONSIVE
+   ADD THIS AT THE VERY END OF CSS
+══════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* Prevent any accidental horizontal scroll */
+  html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Dashboard wrapper */
+  .dashboard-body {
+    display: block;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Sidebar should not take fixed desktop width on mobile */
+  .sidebar {
+    width: 100%;
+    max-width: 280px;
+    min-height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 999;
+  }
+
+  /* When sidebar is opened via JS, add .mobile-open */
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Collapsed sidebar should also stay hidden on mobile */
+  .sidebar.collapsed {
+    width: 100%;
+    max-width: 280px;
+  }
+
+  /* Main content should take full width */
+  .main-wrap,
+  .sidebar.collapsed ~ .main-wrap,
+  .main-wrap.expanded {
+    margin-left: 0 !important;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Topbar spacing */
+  .topbar {
+    padding: 0 1rem;
+    gap: 0.5rem;
+  }
+
+  /* Hide desktop search on mobile if too tight */
+  .search-box {
+    display: none;
+  }
+
+  .topbar-right {
+    gap: 0.35rem;
+  }
+
+  .topbar-profile {
+    padding: 0.3rem 0.5rem;
+  }
+
+  .profile-info {
+    display: none;
+  }
+
+  /* Page content */
+  .page-content {
+    padding: 1rem;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Greeting bar stack */
+  .greeting-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .greeting-text {
+    font-size: 1rem;
+    line-height: 1.3;
+  }
+
+  .greeting-meta {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+  }
+
+  /* Section header stack */
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 1.25rem;
+  }
+
+  /* Buttons fit mobile */
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* IMPORTANT: Stats become 1 column */
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem;
+  }
+
+  /* IMPORTANT: Widgets become 1 column */
+  .widgets-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem;
+  }
+
+  /* Activity row becomes 1 column */
+  .activity-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Analytics become 1 column */
+  .analytics-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Catalog cards fit mobile */
+  .catalog-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Forms */
+  .form-grid,
+  .view-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Filters stack nicely */
+  .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.85rem;
+  }
+
+  .filter-search {
+    min-width: 100%;
+  }
+
+  .filter-select,
+  .filter-search input {
+    width: 100%;
+  }
+
+  /* Tables stay scrollable inside container only */
+  .table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .orders-table {
+    min-width: 700px;
+  }
+
+  /* Modal padding */
+  .modal-overlay {
+    padding: 0.75rem;
+  }
+
+  .modal {
+    max-width: 100%;
+    border-radius: 18px;
+  }
+
+  .modal-header,
+  .modal-body {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+  }
+
+  /* Toast */
+  .toast-container {
+    right: 1rem;
+    left: 1rem;
+    bottom: 1rem;
+  }
+
+  .toast {
+    min-width: unset;
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+/* Extra small phones */
+@media (max-width: 480px) {
+
+  .page-content {
+    padding: 0.85rem;
+  }
+
+  .stat-card {
+    padding: 1rem 1rem 0.8rem;
+  }
+
+  .stat-value {
+    font-size: 1.45rem;
+  }
+
+  .greeting-text {
+    font-size: 0.95rem;
+  }
+
+  .section-title {
+    font-size: 1.15rem;
+  }
+
+  .icon-btn,
+  .sidebar-toggle {
+    width: 34px;
+    height: 34px;
+  }
+}
