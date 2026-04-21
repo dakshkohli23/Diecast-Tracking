@@ -4064,3 +4064,59 @@ input, select, textarea { color-scheme: light; }
   flex: 1;
   min-width: 0;
 }
+/* ── FINAL OVERFLOW FIX ── */
+@media (max-width: 900px) {
+
+  /* Force main-wrap to truly fill viewport with no left offset */
+  .main-wrap {
+    margin-left: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Contain any internal overflow */
+  .page-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Prevent widgets from growing wider than their grid cell */
+  .widget {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    max-width: 100% !important;
+  }
+
+  /* Alert items — "8 delayed" / "52 pending" cut off fix */
+  .alert-item {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Quick-actions buttons — "Ex..." / "De..." cut off fix */
+  .qa-btn {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Upcoming delivery item text */
+  .delivery-name, .roi-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  /* Dashboard-body must not flex-overflow */
+  .dashboard-body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+}
