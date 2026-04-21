@@ -509,6 +509,7 @@ code {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .icon-btn {
@@ -841,6 +842,9 @@ code {
   gap: 0.6rem;
   margin-bottom: 0.75rem;
 }
+@media (max-width: 360px) {
+  .quick-actions { grid-template-columns: 1fr; }
+}
 
 .qa-btn {
   display: flex;
@@ -893,8 +897,8 @@ code {
 }
 .roi-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
-.roi-info { flex: 1; }
-.roi-name { font-size: 0.83rem; font-weight: 600; }
+.roi-info { flex: 1; min-width: 0; overflow: hidden; }
+.roi-name { font-size: 0.83rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .roi-meta { font-size: 0.73rem; color: var(--text-muted); }
 .roi-status { }
 
@@ -1959,13 +1963,16 @@ input, select, textarea { color-scheme: light; }
   margin-top: 0.1rem;
 }
 
-.delivery-info { flex: 1; }
+.delivery-info { flex: 1; min-width: 0; }
 
 .delivery-name {
   font-size: 0.88rem;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .delivery-meta {
@@ -2393,7 +2400,7 @@ input, select, textarea { color-scheme: light; }
 @media (max-width: 640px) {
   .stats-grid { grid-template-columns: 1fr 1fr; }
 }
-@media (max-width: 400px) {
+@media (max-width: 380px) {
   .stats-grid { grid-template-columns: 1fr; }
 }
 
@@ -3695,16 +3702,29 @@ input, select, textarea { color-scheme: light; }
     font-size: 1.25rem;
   }
 
-  /* Buttons fit mobile */
-  .btn {
+  /* Buttons: only make full-width in section/modal contexts.
+     NEVER apply width:100% to topbar buttons — that pushes layout wider
+     than the viewport and clips everything on the right side. */
+  .section-header > .btn,
+  .section-header > div > .btn {
     width: 100%;
     justify-content: center;
   }
+  .add-order-page-footer .btn {
+    width: auto;
+  }
 
-  /* IMPORTANT: Stats become 1 column */
+  /* Topbar buttons must always stay auto-width */
+  .topbar .btn,
+  .topbar-right .btn {
+    width: auto !important;
+    flex-shrink: 0;
+  }
+
+  /* Stats: 2 cols on mobile phones (better use of space) */
   .stats-grid {
-    grid-template-columns: 1fr !important;
-    gap: 0.85rem;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.75rem;
   }
 
   /* IMPORTANT: Widgets become 1 column */
@@ -3889,9 +3909,10 @@ input, select, textarea { color-scheme: light; }
     overflow-x: hidden;
   }
 
-  /* Cards */
+  /* Cards: 2 cols on most mobile, 1 col only on tiny phones */
   .stats-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.75rem;
   }
 
   .widgets-grid,
@@ -3924,4 +3945,122 @@ input, select, textarea { color-scheme: light; }
   .orders-table {
     min-width: 700px;
   }
+}
+
+
+/* ═══════════════════════════════════════════════
+   FINAL MOBILE OVERRIDES — authoritative last word
+   All prior conflicting rules are superseded here.
+   ═══════════════════════════════════════════════ */
+
+/* ── Topbar: never let buttons go full-width ── */
+.topbar-right .btn,
+.topbar .btn {
+  width: auto !important;
+  flex-shrink: 0;
+}
+
+/* ── Topbar layout stability ── */
+.topbar-left {
+  flex: 1;
+  min-width: 0;
+}
+.topbar-right {
+  flex-shrink: 0;
+}
+
+/* ── Flex children that hold long text must not overflow ── */
+.roi-info       { min-width: 0; overflow: hidden; }
+.roi-name       { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.delivery-info  { min-width: 0; }
+.delivery-name  { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mob-card-info  { min-width: 0; overflow: hidden; }
+.seller-info    { min-width: 0; }
+.lb-info        { min-width: 0; }
+.sd-info        { min-width: 0; }
+
+/* ── Stats grid: 2-col on phones, 1-col only on very small ── */
+@media (max-width: 900px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem;
+  }
+}
+@media (max-width: 360px) {
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .quick-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Topbar: compact but never overflows ── */
+@media (max-width: 640px) {
+  .topbar {
+    padding: 0 0.75rem;
+    gap: 0.5rem;
+    overflow: visible;
+  }
+  .topbar-left {
+    flex: 1;
+    min-width: 0;
+  }
+  .search-box {
+    display: none;
+  }
+  .topbar-right {
+    gap: 0.4rem;
+  }
+  .topbar-add-btn {
+    padding: 0.5rem 0.75rem;
+  }
+  .profile-info {
+    display: none;
+  }
+}
+
+/* ── Mobile section header buttons ── */
+@media (max-width: 640px) {
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .section-header > .btn,
+  .section-header > div ~ .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ── Upcoming deliveries widget: truncate long names ── */
+.upcoming-card-name {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ── ETA widget delivery items ── */
+.eta-item {
+  min-width: 0;
+}
+.eta-item > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Recent order items ── */
+.recent-order-item {
+  min-width: 0;
+}
+
+/* ── Upcoming cards: inner layout fix ── */
+.upcoming-card-top > div:last-child {
+  flex: 1;
+  min-width: 0;
 }
