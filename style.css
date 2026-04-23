@@ -568,8 +568,8 @@ code {
 /* background orbs subtle */
 .page-content::before {
   content: '';
-  position: fixed;
-  top: -200px; right: -200px;
+  position: absolute;
+  top: -200px; right: 200px;
   width: 600px; height: 600px;
   border-radius: 50%;
   background: var(--primary);
