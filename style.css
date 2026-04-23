@@ -286,10 +286,6 @@ code {
 /* ══════════════════════════════════════
    DASHBOARD LAYOUT
 ══════════════════════════════════════ */
-.dashboard-body {
-  display: flex;
-  min-height: 100vh;
-}
 
 /* ── SIDEBAR ── */
 .sidebar {
