@@ -4120,3 +4120,414 @@ input, select, textarea { color-scheme: light; }
     max-width: 100vw !important;
   }
 }
+/* ═══════════════════════════════════════════════════════════════
+   PRETRACK — RESPONSIVE FIX PATCH
+   Append this AFTER the main stylesheet (or merge at bottom).
+   Fixes: grid overflow, missing intermediate breakpoints,
+          min-width:0 on flex/grid children, main-wrap capping.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────
+   1. OVERFLOW CONTAINMENT — base layer
+   ───────────────────────────────────────────── */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+/* Every flex/grid child that can grow must be allowed to SHRINK */
+.main-wrap {
+  overflow-x: hidden;
+  min-width: 0;
+  /* Never wider than: viewport minus whichever sidebar width is active */
+  max-width: calc(100vw - var(--sidebar-w));
+  box-sizing: border-box;
+}
+
+.sidebar.collapsed ~ .main-wrap {
+  max-width: calc(100vw - var(--sidebar-collapsed));
+}
+
+.page-content {
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ─────────────────────────────────────────────
+   2. CSS GRID — critical min-width:0 fix
+      Without this, grid children won't shrink
+      below their intrinsic content size, causing
+      the column to bust out of its 1fr track.
+   ───────────────────────────────────────────── */
+
+/* All direct grid children */
+.stats-grid      > *,
+.widgets-grid    > *,
+.analytics-grid  > *,
+.activity-row    > *,
+.roi-stats-grid  > *,
+.catalog-grid    > *,
+.kanban-board    > *,
+.pay-summary-row > * {
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Specific widget fix — content inside must also shrink */
+.widget {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────
+   3. TEXT TRUNCATION — prevent content blowout
+   ───────────────────────────────────────────── */
+.roi-name,
+.delivery-name,
+.mob-card-name,
+.catalog-card-name,
+.cc-name,
+.order-product-name,
+.seller-name,
+.lb-name,
+.kb-card-name,
+.alert-item,
+.qa-btn {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Items whose names should wrap to 2 lines max */
+.mob-card-name,
+.cc-name {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Flex children that hold text */
+.roi-info,
+.delivery-info,
+.lb-info,
+.sd-info,
+.seller-info,
+.plb-info,
+.mob-card-info,
+.stat-card {
+  min-width: 0;
+}
+
+/* ─────────────────────────────────────────────
+   4. BREAKPOINT — ≤1400px
+      5-col stats → 4-col
+   ───────────────────────────────────────────── */
+@media (max-width: 1400px) {
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   5. BREAKPOINT — ≤1200px
+      widgets 3-col → 2-col + single activity-row
+   ───────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .widgets-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Let full-width widgets still span all cols */
+  .widgets-grid .widget.full-width {
+    grid-column: 1 / -1;
+  }
+
+  /* Third widget drops to its own row as full-width */
+  .widgets-grid .widget:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .activity-row {
+    grid-template-columns: 1fr;
+  }
+
+  .roi-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   6. BREAKPOINT — ≤1024px
+      Start collapsing heavier layouts
+   ───────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .widgets-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kanban-board {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .page-content {
+    padding: 1.25rem;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   7. BREAKPOINT — ≤900px  (sidebar goes mobile)
+      main-wrap takes full width
+   ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .main-wrap,
+  .sidebar.collapsed ~ .main-wrap,
+  .main-wrap.expanded {
+    margin-left: 0 !important;
+    max-width: 100vw !important;
+    width: 100% !important;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    width: 280px !important;
+    max-width: 82vw;
+    height: 100vh;
+    min-height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    z-index: 999;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0) !important;
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.18);
+  }
+
+  /* Show labels in mobile sidebar (un-collapse) */
+  .sidebar .brand-text,
+  .sidebar .brand-sub,
+  .sidebar .nav-item span,
+  .sidebar .nav-group-label,
+  .sidebar .sidebar-footer span {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    height: auto !important;
+    padding: revert !important;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem;
+  }
+
+  .widgets-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .widgets-grid .widget:nth-child(3) {
+    grid-column: auto;
+  }
+
+  .analytics-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .activity-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .roi-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .greeting-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .greeting-text { font-size: 1rem; }
+  .greeting-meta { flex-wrap: wrap; }
+
+  .page-content {
+    padding: 1rem;
+    overflow-x: hidden;
+  }
+
+  .topbar {
+    padding: 0 1rem;
+  }
+
+  .search-box { display: none; }
+  .profile-info { display: none; }
+}
+
+/* ─────────────────────────────────────────────
+   8. BREAKPOINT — ≤768px
+   ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .section-header > .btn,
+  .section-header > div > .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Topbar buttons must stay auto-width */
+  .topbar .btn,
+  .topbar-right .btn,
+  .topbar-add-btn {
+    width: auto !important;
+    flex-shrink: 0 !important;
+  }
+
+  .filters-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .filter-search { grid-column: 1 / -1; }
+  .filters-bar .btn { grid-column: 1 / -1; }
+
+  .modal-overlay { padding: 0.5rem; align-items: flex-end; }
+  .modal {
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+  }
+  .modal-footer .btn { width: 100%; }
+
+  .toast-container { left: 1rem; right: 1rem; bottom: 1rem; }
+  .toast { min-width: unset; width: 100%; max-width: 100%; }
+}
+
+/* ─────────────────────────────────────────────
+   9. BREAKPOINT — ≤640px
+   ───────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.6rem;
+  }
+
+  .stat-value { font-size: 1.3rem; }
+  .section-title { font-size: 1.25rem; }
+
+  .page-content { padding: 0.85rem; }
+  .topbar { padding: 0 0.75rem; gap: 0.4rem; }
+  .topbar-right { gap: 0.35rem; }
+
+  .kanban-board { grid-template-columns: 1fr 1fr; }
+  .catalog-grid { grid-template-columns: repeat(2, 1fr); }
+  .form-grid,
+  .view-grid    { grid-template-columns: 1fr !important; }
+
+  .filters-bar  { grid-template-columns: 1fr; }
+}
+
+/* ─────────────────────────────────────────────
+   10. BREAKPOINT — ≤480px
+   ───────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr !important; }
+  .kanban-board { grid-template-columns: 1fr; }
+  .catalog-grid { grid-template-columns: 1fr; }
+  .page-content { padding: 0.65rem; }
+
+  .quick-actions { grid-template-columns: 1fr !important; }
+}
+
+/* ─────────────────────────────────────────────
+   11. TOPBAR — always stable, never overflow
+   ───────────────────────────────────────────── */
+.topbar {
+  box-sizing: border-box;
+  width: 100%;
+  overflow: visible;
+}
+
+.topbar-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.topbar-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Topbar buttons: NEVER full-width regardless of other rules */
+.topbar .btn,
+.topbar-right .btn,
+.topbar-add-btn {
+  width: auto !important;
+  flex-shrink: 0 !important;
+}
+
+/* ─────────────────────────────────────────────
+   12. TABLE WRAP — only scroll internally
+   ───────────────────────────────────────────── */
+.table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+}
+
+.orders-table {
+  min-width: 760px; /* reduced from 900px to fit better */
+}
+
+/* ─────────────────────────────────────────────
+   13. ACTIVITY ROW — fixed column fix
+   ───────────────────────────────────────────── */
+@media (min-width: 1201px) {
+  /* Only use fixed 320px leaderboard column on very wide screens */
+  .activity-row {
+    grid-template-columns: 1fr 300px;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   14. SIDEBAR COLLAPSED — main-wrap adjustment
+   ───────────────────────────────────────────── */
+@media (min-width: 901px) {
+  .sidebar.collapsed ~ .main-wrap {
+    margin-left: var(--sidebar-collapsed) !important;
+    max-width: calc(100vw - var(--sidebar-collapsed)) !important;
+  }
+}
