@@ -1423,7 +1423,7 @@ function renderTable(orders) {
 /* ══════════════════════════════════════ WIDGETS ══════════════════════════════════════ */
 function renderRecentOrders() {
   const c = document.getElementById('recentOrdersList'); if (!c) return;
-  const items = DB.orders.slice(0,5);
+  const items = DB.orders.slice(0,10);
   if (!items.length) { c.innerHTML=`<div class="empty-state">No orders yet</div>`; return; }
   c.innerHTML = items.map(o => `
     <div class="recent-order-item">
@@ -1461,7 +1461,7 @@ function renderEtaWidget() {
 
 function renderActivityFeed() {
   const c = document.getElementById('activityList'); if (!c) return;
-  const items = DB.activity.slice(0,8);
+  const items = DB.activity.slice(0,12);
   if (!items.length) { c.innerHTML=`<div class="empty-state">No recent activity</div>`; return; }
   c.innerHTML = items.map(a => `
     <div class="activity-item">
