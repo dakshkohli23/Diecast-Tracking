@@ -1235,7 +1235,7 @@ function initGreeting() {
     const emoji = h < 12 ? '<i class="fa-solid fa-cloud-sun"></i>' : h < 17 ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
     const word  = h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening';
     const gt = document.getElementById('greetingText');
-    if (gt) gt.innerHTML = `Good ${word}, ${name}! ${emoji}`;
+    if (gt) gt.innerHTML = `${word}, ${name}! ${emoji}`;
     const gd = document.getElementById('greetingDate');
     if (gd) gd.textContent = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   }
