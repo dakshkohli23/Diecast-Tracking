@@ -758,6 +758,22 @@ code {
 }
 .stat-footer i { font-size: 0.72rem; }
 
+/* ── Variant Tag ── */
+.variant-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: .65rem;
+  font-weight: 700;
+  background: rgba(124, 92, 252, 0.12);
+  color: #7c5cfc;
+  border: 1px solid rgba(124, 92, 252, 0.2);
+  white-space: nowrap;
+  letter-spacing: .02em;
+}
+
 /* Progress bar */
 .stat-bar {
   width: 100%;
