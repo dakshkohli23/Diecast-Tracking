@@ -1703,9 +1703,10 @@ function renderCatalog() {
           ${etaStr?`<span class="cc-eta ${isOverdue?'cc-eta-overdue':''}"><i class="fa-solid fa-${isOverdue?'triangle-exclamation':'calendar-days'}"></i> ${etaStr}</span>`:''}
         </div>
         <div class="cc-actions" onclick="event.stopPropagation()">
-          <button class="btn btn-ghost btn-icon cc-btn" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn btn-danger btn-icon cc-btn" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
-        </div>
+  <button class="btn btn-ghost btn-icon cc-btn" onclick="editOrder('${o.id}')"      title="Edit"><i class="fa-solid fa-pen"></i></button>
+  <button class="btn btn-ghost btn-icon cc-btn" onclick="duplicateOrder('${o.id}')" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
+  <button class="btn btn-danger btn-icon cc-btn" onclick="deleteOrder('${o.id}')"   title="Delete"><i class="fa-solid fa-trash"></i></button>
+</div>
       </div>
     </div>`;
   }).join('');
