@@ -1368,7 +1368,10 @@ function renderTable(orders) {
             <div class="order-thumb">${thumb}</div>
             <div style="min-width:0">
               <div class="order-product-name">${escHtml(o.product_name)}</div>
-              <div style="font-size:.7rem;opacity:.6;white-space:nowrap">${escHtml(o.scale||'1:64')}</div>
+              <div style="font-size:.7rem;opacity:.6;white-space:nowrap;display:flex;align-items:center;gap:.35rem">
+                ${escHtml(o.scale||'1:64')}
+                ${o.variant?`<span class="variant-tag">${escHtml(o.variant)}</span>`:''}
+              </div>
             </div>
           </div>
         </td>
@@ -1400,7 +1403,10 @@ function renderTable(orders) {
           <div class="mob-card-info">
             <div class="mob-card-name">${escHtml(o.product_name)}</div>
             <div class="mob-card-brand">${escHtml(o.brand||o.vendor||'—')} · ${escHtml(o.scale||'1:64')}</div>
-            <span class="badge badge-${sc}" style="margin-top:.3rem;display:inline-block">${escHtml(o.status||'Ordered')}</span>
+            <div style="display:flex;align-items:center;gap:.4rem;margin-top:.3rem;flex-wrap:wrap">
+              <span class="badge badge-${sc}">${escHtml(o.status||'Ordered')}</span>
+              ${o.variant?`<span class="variant-tag">${escHtml(o.variant)}</span>`:''}
+            </div>
           </div>
         </div>
         <div class="mob-card-stats">
@@ -1684,7 +1690,7 @@ function renderCatalog() {
           <span class="cc-scale">${escHtml(o.scale||'1:64')}</span>
         </div>
         <div class="cc-name">${escHtml(o.product_name)}</div>
-        ${o.variant?`<div class="cc-variant"><i class="fa-solid fa-cube"></i> ${escHtml(o.variant)}</div>`:''}
+        ${o.variant?`<span class="variant-tag" style="margin-top:.25rem;display:inline-flex"><i class="fa-solid fa-cube" style="font-size:.65rem"></i>&nbsp;${escHtml(o.variant)}</span>`:''}
         <div class="cc-price-row">
           <div class="cc-price-block"><span class="cc-price-label">Buy Price</span><span class="cc-price-val">${fmt(o.actual_price)}</span></div>
           <div class="cc-price-block"><span class="cc-price-label">Qty</span><span class="cc-price-val">${o.quantity||1}</span></div>
@@ -1748,7 +1754,8 @@ function renderUpcoming() {
     const payChip    = (o.pending||0) > 0
       ? `<span class="upcoming-eta-chip eta-soon"><i class="fa-solid fa-hourglass-half"></i> ${fmt(o.pending)} due</span>`
       : `<span class="upcoming-eta-chip eta-ok"><i class="fa-solid fa-circle-check"></i> Paid</span>`;
-    const vendorChip = o.vendor ? `<span class="upcoming-eta-chip eta-no-date"><i class="fa-solid fa-store"></i> ${escHtml(o.vendor)}</span>` : '';
+    const vendorChip  = o.vendor  ? `<span class="upcoming-eta-chip eta-no-date"><i class="fa-solid fa-store"></i> ${escHtml(o.vendor)}</span>` : '';
+    const variantChip = o.variant ? `<span class="upcoming-eta-chip" style="background:rgba(124,92,252,0.12);color:#7c5cfc"><i class="fa-solid fa-cube"></i> ${escHtml(o.variant)}</span>` : '';
     const etaFooter  = o.eta ? `<span>ETA: ${formatDate(o.eta)}</span>` : `<span style="opacity:.4">No ETA set</span>`;
 
     return `<div class="upcoming-card glass" onclick="viewOrder('${o.id}')">
@@ -1760,7 +1767,7 @@ function renderUpcoming() {
           <span class="badge badge-${sc}" style="margin-top:4px;display:inline-block;font-size:.65rem">${escHtml(o.status)}</span>
         </div>
       </div>
-      <div class="upcoming-card-chips">${etaChip}${payChip}${vendorChip}</div>
+      <div class="upcoming-card-chips">${etaChip}${payChip}${variantChip}${vendorChip}</div>
       <div class="upcoming-card-footer">
         <span>Qty: <strong>${o.quantity||1}</strong></span>
         <span>Total: <strong>${fmt(o.total)}</strong></span>
