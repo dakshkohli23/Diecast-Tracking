@@ -1383,10 +1383,11 @@ function renderTable(orders) {
         <td style="font-size:.76rem;color:var(--text-muted);white-space:nowrap">${o.eta?formatDate(o.eta):'—'}</td>
         <td>
           <div class="table-actions">
-            <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')"   title="View"><i class="fa-solid fa-eye"></i></button>
-            <button class="btn btn-ghost btn-icon" onclick="editOrder('${o.id}')"   title="Edit"><i class="fa-solid fa-pen"></i></button>
-            <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
-          </div>
+  <button class="btn btn-ghost btn-icon" onclick="viewOrder('${o.id}')"      title="View"><i class="fa-solid fa-eye"></i></button>
+  <button class="btn btn-ghost btn-icon" onclick="editOrder('${o.id}')"      title="Edit"><i class="fa-solid fa-pen"></i></button>
+  <button class="btn btn-ghost btn-icon" onclick="duplicateOrder('${o.id}')" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
+  <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')"   title="Delete"><i class="fa-solid fa-trash"></i></button>
+</div>
         </td>
       </tr>`;
     }).join('');
@@ -1417,10 +1418,11 @@ function renderTable(orders) {
           ${o.eta?`<div class="mob-stat"><span>ETA</span><strong>${formatDate(o.eta)}</strong></div>`:''}
         </div>
         <div class="mob-card-actions">
-          <button class="btn btn-ghost btn-sm" onclick="viewOrder('${o.id}')"><i class="fa-solid fa-eye"></i> View</button>
-          <button class="btn btn-ghost btn-sm" onclick="editOrder('${o.id}')"><i class="fa-solid fa-pen"></i> Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteOrder('${o.id}')"><i class="fa-solid fa-trash"></i></button>
-        </div>
+  <button class="btn btn-ghost btn-sm" onclick="viewOrder('${o.id}')">     <i class="fa-solid fa-eye"></i> View</button>
+  <button class="btn btn-ghost btn-sm" onclick="editOrder('${o.id}')">     <i class="fa-solid fa-pen"></i> Edit</button>
+  <button class="btn btn-ghost btn-sm" onclick="duplicateOrder('${o.id}')"><i class="fa-solid fa-copy"></i></button>
+  <button class="btn btn-danger btn-sm" onclick="deleteOrder('${o.id}')">  <i class="fa-solid fa-trash"></i></button>
+</div>
       </div>`;
     }).join('');
   }
