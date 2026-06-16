@@ -47,6 +47,14 @@ jobs:
           sed -i "s|__FIREBASE_APP_ID__|${{ secrets.FIREBASE_APP_ID }}|g"                       login.html
           sed -i "s|__SUPER_ADMIN_EMAIL__|${{ secrets.SUPER_ADMIN_EMAIL }}|g"                   login.html
 
+      - name: Verify no placeholders remain
+        run: |
+          if grep -l "__FIREBASE_\|__SUPABASE_\|__SUPER_ADMIN_" app.js login.html; then
+            echo "FAILED: unreplaced placeholders found"
+            exit 1
+          fi
+          echo "All secrets injected successfully"
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
