@@ -2171,53 +2171,6 @@ function renderWeekArrivals() {
   if(subEl) subEl.textContent = cards.length+' insights from '+allO.length+' models';
 }
 
-function renderCatalog() {
-  const grid = document.getElementById('catalogGrid'); if (!grid) return;
-  if (!DB.orders.length) {
-    grid.innerHTML = '<div class="empty-state"><i class="fa-solid fa-inbox"></i><p>No models tracked yet</p></div>';
-    return;
-  }
-  const fmt   = v => '₹' + Number(v||0).toLocaleString('en-IN');
-  const today = new Date(); today.setHours(0,0,0,0);
-  grid.innerHTML = DB.orders.map(o => {
-    const sc    = (o.status||'').toLowerCase().replace(/\s+/g,'-');
-    const thumb = o.image
-      ? `<img src="${escHtml(o.image)}" alt="${escHtml(o.product_name)}" />`
-      : `<i class="fa-solid fa-car-side"></i>`;
-    const isPaid = (o.pending||0) <= 0;
-    let etaHtml = '';
-    if (o.eta) {
-      const d = Math.ceil((new Date(o.eta) - today) / (1000*60*60*24));
-      const cls = o.status==='Delivered'?'':d<0?'overdue':d<=7?'soon':'';
-      const lbl = o.status==='Delivered'?'Delivered':d<0?Math.abs(d)+'d overdue':d===0?'Today!':d<=7?'in '+d+'d':formatDate(o.eta);
-      etaHtml = `<div class="col-card-eta ${cls}"><i class="fa-solid fa-calendar-days"></i> ${lbl}</div>`;
-    }
-    return `<div class="col-card" onclick="viewOrder('${o.id}')">
-      <div class="col-card-img">${thumb}
-        <span class="col-card-badge"><span class="badge badge-${sc}" style="font-size:.58rem">${escHtml(o.status||'Ordered')}</span></span>
-        <div class="col-card-actions" onclick="event.stopPropagation()">
-          <button class="col-card-action-btn edit" onclick="editOrder('${o.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
-          <button class="col-card-action-btn del" onclick="deleteOrder('${o.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
-        </div>
-      </div>
-      <div class="col-card-body">
-        <div class="col-card-name">${escHtml(o.product_name)}</div>
-        <div class="col-card-meta">
-          <span>${escHtml(o.brand||o.vendor||'—')}</span>
-          <span class="col-card-meta-dot"></span>
-          <span>${escHtml(o.scale||'1:64')}</span>
-          ${o.variant?`<span class="col-card-meta-dot"></span><span>${escHtml(o.variant)}</span>`:''}
-        </div>
-        ${etaHtml}
-        <div class="col-card-footer">
-          <span class="col-card-price">${fmt(o.total||0)}</span>
-          <span class="col-card-pending ${isPaid?'paid':'due'}">${isPaid?'✓ Paid':fmt(o.pending||0)+' due'}</span>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
 function renderRecentOrders() {
   const c = document.getElementById('recentOrdersList'); if (!c) return;
   const items = DB.orders.slice(0,10);
