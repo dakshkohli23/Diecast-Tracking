@@ -1,4 +1,4 @@
-const CACHE = 'pretrack-v1';
+const CACHE = 'pretrack-v2';
 const STATIC = [
   '/Diecast-Tracking/',
   '/Diecast-Tracking/index.html',
