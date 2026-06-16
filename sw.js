@@ -5,7 +5,6 @@ const STATIC = [
   '/Diecast-Tracking/login.html',
   '/Diecast-Tracking/style.css',
   '/Diecast-Tracking/app.js',
-  '/Diecast-Tracking/config.js',
   '/Diecast-Tracking/manifest.json'
 ];
 
