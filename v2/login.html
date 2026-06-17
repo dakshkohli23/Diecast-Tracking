@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PreTrack — Sign In</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#7c5cfc" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="PreTrack" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f0c1e;
+      --surface:   #16122d;
+      --surface-2: #1e1a38;
+      --surface-3: #26224a;
+      --border:    rgba(124,92,252,0.12);
+      --border-hi: rgba(124,92,252,0.30);
+      --primary:   #7c5cfc;
+      --primary-d: #6647e0;
+      --primary-l: rgba(124,92,252,0.12);
+      --pink:      #e8458f;
+      --teal:      #0fa38e;
+      --ink:       #e8e3ff;
+      --ink-soft:  #c4b5fd;
+      --ink-muted: #8b7bb8;
+      --ink-dim:   #4e4570;
+      --grad:      linear-gradient(135deg, #7c5cfc 0%, #e8458f 100%);
+      --hero-bg:   #0f0c1e;
+      --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --r-sm: 8px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px;
+    }
+
+    html { font-size: 15px; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      overflow-x: hidden;
+    }
+    .hidden { display: none !important; }
+
+    /* ── HERO PANEL ── */
+    .hero {
+      width: 50%;
+      min-height: 100vh;
+      background: var(--hero-bg);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 3rem 3.5rem;
+      overflow: hidden;
+      flex-shrink: 0;
+      border-right: 1px solid rgba(124,92,252,0.08);
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 90% 70% at 15% 5%,  rgba(124,92,252,0.55) 0%, transparent 55%),
+        radial-gradient(ellipse 70% 55% at 85% 85%,  rgba(232,69,143,0.45) 0%, transparent 55%),
+        radial-gradient(ellipse 55% 65% at 65% 45%,  rgba(15,163,142,0.22) 0%, transparent 50%),
+        radial-gradient(ellipse 40% 40% at 30% 75%,  rgba(124,92,252,0.18) 0%, transparent 50%);
+      animation: meshPulse 14s ease-in-out infinite alternate;
+    }
+    @keyframes meshPulse {
+      0%   { opacity: 0.9; transform: scale(1)    rotate(0deg); }
+      100% { opacity: 1;   transform: scale(1.05) rotate(2deg); }
+    }
+    .hero::after {
+      content: '';
+      position: absolute; inset: 0; z-index: 1;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+      pointer-events: none; opacity: 0.5;
+    }
+    .hero-rings { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+    .ring {
+      position: absolute; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.05);
+      animation: spin linear infinite;
+    }
+    .ring-1 { width: 520px; height: 520px; top: -160px; left: -160px; animation-duration: 70s; }
+    .ring-2 { width: 360px; height: 360px; bottom: -100px; right: -100px; animation-duration: 50s; border-color: rgba(232,69,143,0.07); }
+    .ring-3 { width: 220px; height: 220px; top: 50%; right: 80px; margin-top: -110px; animation-duration: 38s; animation-direction: reverse; border-color: rgba(15,163,142,0.09); }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .deco-float {
+      position: absolute; z-index: 2;
+      font-size: 1rem; color: rgba(255,255,255,0.07);
+      animation: floatBob ease-in-out infinite;
+    }
+    .deco-float:nth-child(1) { bottom: 28%; left: 7%;  font-size: 1.5rem; animation-duration: 18s; }
+    .deco-float:nth-child(2) { top: 22%;  right: 10%; font-size: 0.9rem; animation-duration: 22s; animation-delay: 5s; }
+    .deco-float:nth-child(3) { bottom: 10%; right: 22%; animation-duration: 16s; animation-delay: 9s; }
+    @keyframes floatBob {
+      0%,100% { transform: translateY(0)    rotate(-4deg); }
+      50%     { transform: translateY(-16px) rotate(4deg); }
+    }
+
+    .hero-top {
+      position: relative; z-index: 3;
+      display: flex; align-items: center; gap: 0.85rem;
+    }
+    .hero-logo-box {
+      width: 42px; height: 42px;
+      background: rgba(124,92,252,0.18);
+      border: 1px solid rgba(124,92,252,0.30);
+      border-radius: var(--r-md);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.05rem; color: var(--primary);
+      backdrop-filter: blur(6px);
+    }
+    .hero-logo-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.2rem; font-weight: 700;
+      color: white; letter-spacing: 0.4px;
+    }
+    .hero-logo-sub {
+      font-size: 0.63rem; color: rgba(255,255,255,0.38);
+      letter-spacing: 0.1em; text-transform: uppercase;
+      display: block; margin-top: -0.05rem;
+    }
+    .hero-body {
+      position: relative; z-index: 3;
+      flex: 1; display: flex; flex-direction: column; justify-content: center;
+      padding: 1.5rem 0 2rem;
+    }
+    .hero-live {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      font-size: 0.67rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.13em;
+      color: rgba(255,255,255,0.38);
+      margin-bottom: 1.2rem;
+    }
+    .live-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 8px var(--teal);
+      animation: livePulse 2.2s ease-in-out infinite;
+    }
+    @keyframes livePulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%     { opacity:0.4; transform:scale(0.65); }
+    }
+    .hero-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.4rem, 3.8vw, 3.6rem);
+      font-weight: 400; color: white;
+      line-height: 1.12; margin-bottom: 1.3rem;
+    }
+    .hero-title em {
+      font-style: italic;
+      background: linear-gradient(135deg, #a78bff, #ff85c2);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero-desc {
+      font-size: 0.88rem; color: rgba(255,255,255,0.4);
+      line-height: 1.75; max-width: 370px; margin-bottom: 2.5rem; font-weight: 400;
+    }
+    .hero-stats { display: flex; gap: 1.8rem; margin-bottom: 2.5rem; }
+    .stat-num {
+      font-family: 'Space Mono', monospace;
+      font-size: 1.4rem; font-weight: 700; color: white; line-height: 1;
+      background: var(--grad);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .stat-label {
+      font-size: 0.65rem; color: rgba(255,255,255,0.35);
+      text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.25rem; font-weight: 500;
+    }
+    .feature-list { display: flex; flex-direction: column; gap: 0.8rem; }
+    .feature-row {
+      display: flex; align-items: center; gap: 0.75rem;
+      font-size: 0.82rem; color: rgba(255,255,255,0.50); font-weight: 500;
+    }
+    .feature-icon {
+      width: 32px; height: 32px; border-radius: var(--r-sm);
+      background: rgba(124,92,252,0.12);
+      border: 1px solid rgba(124,92,252,0.18);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; color: rgba(124,92,252,0.75); flex-shrink: 0;
+    }
+    .hero-footer {
+      position: relative; z-index: 3;
+      display: flex; gap: 1.5rem;
+      font-size: 0.65rem; color: rgba(255,255,255,0.20);
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .hero-footer a { color: inherit; text-decoration: none; transition: color 0.15s; }
+    .hero-footer a:hover { color: rgba(255,255,255,0.45); }
+
+    /* ── FORM PANEL (DARK) ── */
+    .form-panel {
+      flex: 1;
+      display: flex; align-items: center; justify-content: center;
+      padding: 3rem 2rem;
+      position: relative; overflow-y: auto;
+      background: var(--bg);
+    }
+    .form-panel::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: radial-gradient(circle, rgba(124,92,252,0.055) 1.5px, transparent 1.5px);
+      background-size: 26px 26px;
+      pointer-events: none;
+    }
+    .form-panel::after {
+      content: '';
+      position: absolute;
+      width: 600px; height: 600px;
+      top: -200px; right: -200px;
+      background: radial-gradient(circle, rgba(124,92,252,0.07) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .form-wrap {
+      width: 100%; max-width: 420px;
+      position: relative; z-index: 1;
+      animation: formReveal 0.75s var(--ease) forwards;
+    }
+    @keyframes formReveal {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Card */
+    .form-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 2.4rem;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.40), 0 0 0 1px rgba(124,92,252,0.05);
+      position: relative; overflow: hidden;
+    }
+    .form-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--grad);
+    }
+
+    /* Form header */
+    .form-header { margin-bottom: 2rem; }
+    .form-eyebrow {
+      font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--primary);
+      margin-bottom: 0.55rem;
+      display: flex; align-items: center; gap: 0.35rem;
+    }
+    .form-eyebrow-line {
+      flex: 0 0 24px; height: 2px;
+      background: var(--grad); border-radius: 2px;
+    }
+    .form-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem; font-weight: 500;
+      color: var(--ink); line-height: 1.15; margin-bottom: 0.35rem;
+    }
+    .form-subtitle { font-size: 0.82rem; color: var(--ink-muted); line-height: 1.6; font-weight: 400; }
+
+    /* Fields */
+    .field { margin-bottom: 1.1rem; }
+    .field-label {
+      display: flex; align-items: center; gap: 0.35rem;
+      font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--ink-muted); margin-bottom: 0.45rem;
+    }
+    .field-label i { color: var(--primary); font-size: 0.63rem; }
+    .field-wrap { position: relative; }
+    .field-input {
+      width: 100%;
+      padding: 0.82rem 1rem;
+      background: var(--surface-2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--ink);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.92rem; font-weight: 500;
+      outline: none;
+      transition: border-color 0.2s var(--ease), background 0.2s, box-shadow 0.2s;
+    }
+    .field-input::placeholder { color: var(--ink-dim); font-weight: 400; }
+    .field-input:focus {
+      border-color: var(--primary);
+      background: var(--surface-3);
+      box-shadow: 0 0 0 4px rgba(124,92,252,0.12);
+    }
+    .field-input.has-toggle { padding-right: 3rem; }
+    .pw-toggle {
+      position: absolute; right: 0.9rem; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: var(--ink-dim);
+      cursor: pointer; font-size: 0.88rem; padding: 0.25rem;
+      transition: color 0.15s;
+    }
+    .pw-toggle:hover { color: var(--primary); }
+
+    /* Signin button */
+    .btn-signin {
+      width: 100%; margin-top: 1.5rem; padding: 0.92rem;
+      border-radius: var(--r-md); border: none;
+      background: var(--grad); color: white;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem; font-weight: 700; letter-spacing: 0.04em;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+      transition: transform 0.2s var(--ease), box-shadow 0.2s, opacity 0.2s;
+      box-shadow: 0 4px 22px rgba(124,92,252,0.40), 0 1px 0 rgba(255,255,255,0.08) inset;
+    }
+    .btn-signin:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 36px rgba(124,92,252,0.52);
+    }
+    .btn-signin:active:not(:disabled) { transform: translateY(0); }
+    .btn-signin:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* Error */
+    .form-error {
+      margin-top: 0.85rem; padding: 0.65rem 0.9rem;
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: var(--r-sm);
+      font-size: 0.8rem; color: #f87171;
+      display: flex; align-items: center; gap: 0.45rem;
+      animation: shake 0.3s var(--ease);
+    }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25%     { transform: translateX(-5px); }
+      75%     { transform: translateX(5px); }
+    }
+
+    /* Divider */
+    .form-divider {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin: 1.75rem 0 1.25rem;
+      font-size: 0.68rem; font-weight: 600;
+      color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .form-divider::before, .form-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* Request access */
+    .btn-request-access {
+      width: 100%; padding: 0.82rem;
+      border-radius: var(--r-md);
+      border: 1.5px solid var(--border-hi);
+      background: transparent; color: var(--primary);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.86rem; font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 0.45rem;
+      transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .btn-request-access:hover {
+      background: var(--primary-l);
+      border-color: var(--primary);
+      box-shadow: 0 4px 16px rgba(124,92,252,0.18);
+      transform: translateY(-1px);
+    }
+
+    /* Footnote */
+    .form-footnote {
+      margin-top: 1.5rem; padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 0.68rem; color: var(--ink-dim);
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .form-footnote span { color: var(--primary); opacity: 0.4; margin: 0 0.4rem; }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(5,3,15,0.78);
+      backdrop-filter: blur(14px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1.5rem;
+      animation: overlayIn 0.25s ease;
+    }
+    @keyframes overlayIn { from{opacity:0} to{opacity:1} }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border-hi);
+      border-radius: var(--r-xl);
+      width: 100%; max-width: 440px;
+      overflow: hidden;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px rgba(124,92,252,0.07);
+      animation: modalIn 0.3s var(--ease);
+    }
+    @keyframes modalIn {
+      from { opacity:0; transform: scale(0.93) translateY(14px); }
+      to   { opacity:1; transform: scale(1) translateY(0); }
+    }
+    .modal-top-bar { height: 3px; background: var(--grad); }
+    .modal-body { padding: 2.2rem; }
+    .modal-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 1.75rem; gap: 1rem;
+    }
+    .modal-eyebrow {
+      font-size: 0.63rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.13em;
+      color: var(--primary); margin-bottom: 0.35rem;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+    .modal-eyebrow-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
+    .modal-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.65rem; font-weight: 500;
+      color: var(--ink); line-height: 1.2;
+    }
+    .modal-subtitle { font-size: 0.78rem; color: var(--ink-muted); line-height: 1.6; margin-top: 0.3rem; }
+    .modal-close {
+      width: 32px; height: 32px; border-radius: var(--r-sm);
+      border: 1px solid var(--border); background: var(--surface-2);
+      color: var(--ink-muted); cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; transition: all 0.15s;
+    }
+    .modal-close:hover { background: rgba(239,68,68,0.10); color: #f87171; border-color: rgba(239,68,68,0.30); }
+    .modal-field { margin-bottom: 1rem; }
+    .modal-field label {
+      display: flex; align-items: center; gap: 0.3rem;
+      font-size: 0.67rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--ink-muted); margin-bottom: 0.4rem;
+    }
+    .modal-field label i { color: var(--primary); font-size: 0.62rem; }
+    .modal-field input, .modal-field textarea {
+      width: 100%; padding: 0.75rem 0.9rem;
+      background: var(--surface-2); border: 1.5px solid var(--border);
+      border-radius: var(--r-md); color: var(--ink);
+      font-family: 'Outfit', sans-serif; font-size: 0.88rem; font-weight: 500;
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s; resize: vertical;
+    }
+    .modal-field input::placeholder, .modal-field textarea::placeholder { color: var(--ink-dim); font-weight: 400; }
+    .modal-field input:focus, .modal-field textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(124,92,252,0.12);
+      background: var(--surface-3);
+    }
+    .modal-field textarea { min-height: 80px; }
+    .modal-alert {
+      padding: 0.65rem 0.9rem; border-radius: var(--r-sm);
+      font-size: 0.8rem;
+      display: flex; align-items: flex-start; gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .modal-alert.error {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.22);
+      color: #f87171;
+    }
+    .modal-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+    .btn-modal-cancel {
+      flex: 1; padding: 0.72rem;
+      border-radius: var(--r-md);
+      border: 1.5px solid var(--border);
+      background: transparent; color: var(--ink-muted);
+      font-family: 'Outfit', sans-serif; font-size: 0.84rem; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .btn-modal-cancel:hover { background: var(--surface-2); color: var(--ink); border-color: var(--border-hi); }
+    .btn-modal-submit {
+      flex: 2; padding: 0.72rem;
+      border-radius: var(--r-md); border: none;
+      background: var(--grad); color: white;
+      font-family: 'Outfit', sans-serif; font-size: 0.84rem; font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 0.45rem;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+      box-shadow: 0 4px 16px rgba(124,92,252,0.35);
+    }
+    .btn-modal-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,92,252,0.45); }
+    .btn-modal-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .modal-success { text-align: center; padding: 1rem 0; }
+    .success-circle {
+      width: 60px; height: 60px;
+      background: linear-gradient(135deg, rgba(124,92,252,0.15), rgba(15,163,142,0.15));
+      border: 2px solid rgba(124,92,252,0.30);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.2rem;
+      font-size: 1.4rem; color: var(--teal);
+    }
+    .success-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem; font-weight: 500; color: var(--ink); margin-bottom: 0.5rem;
+    }
+    .success-sub { font-size: 0.82rem; color: var(--ink-muted); line-height: 1.65; }
+    .btn-success-close {
+      margin-top: 1.5rem; padding: 0.65rem 2rem;
+      border-radius: var(--r-md);
+      border: 1.5px solid var(--border-hi);
+      background: transparent; color: var(--primary);
+      font-family: 'Outfit', sans-serif; font-size: 0.84rem; font-weight: 700;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .btn-success-close:hover { background: var(--primary-l); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 860px) {
+      body { flex-direction: column; }
+      .hero { width: 100%; min-height: auto; padding: 2rem 2rem 1.5rem; }
+      .hero-stats { gap: 1.2rem; }
+      .feature-list { display: none; }
+      .hero-body { padding: 1.2rem 0 1rem; }
+      .hero-title { font-size: 2rem; }
+      .form-panel { padding: 2rem 1.25rem; }
+      .form-card { padding: 1.8rem 1.5rem; }
+    }
+    @media (max-width: 480px) {
+      .hero { padding: 1.5rem; }
+      .modal-actions { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════ LEFT HERO PANEL ════════ -->
+  <div class="hero">
+    <div class="hero-rings">
+      <div class="ring ring-1"></div>
+      <div class="ring ring-2"></div>
+      <div class="ring ring-3"></div>
+    </div>
+    <div class="deco-float"><i class="fa-solid fa-car-side"></i></div>
+    <div class="deco-float"><i class="fa-solid fa-gauge-high"></i></div>
+    <div class="deco-float"><i class="fa-solid fa-calendar-check"></i></div>
+
+    <div class="hero-top">
+      <div class="hero-logo-box"><i class="fa-solid fa-car-side"></i></div>
+      <div>
+        <div class="hero-logo-name">PreTrack</div>
+        <span class="hero-logo-sub">Diecast Manager</span>
+      </div>
+    </div>
+
+    <div class="hero-body">
+      <div class="hero-live">
+        <div class="live-dot"></div> Live &amp; Synced
+      </div>
+      <h1 class="hero-title">Every diecast.<br><em>Perfectly tracked.</em></h1>
+      <p class="hero-desc">
+        Your personal command centre for preorders, ETAs, payments, and collection analytics — all in one place.
+      </p>
+      <div class="hero-stats">
+        <div class="stat-item">
+          <div class="stat-num">&#8734;</div>
+          <div class="stat-label">Models</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">0</div>
+          <div class="stat-label">Missed ETAs</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">4.1</div>
+          <div class="stat-label">Version</div>
+        </div>
+      </div>
+      <div class="feature-list">
+        <div class="feature-row">
+          <div class="feature-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+          Full collection grid with filters &amp; card view
+        </div>
+        <div class="feature-row">
+          <div class="feature-icon"><i class="fa-solid fa-calendar-days"></i></div>
+          ETA calendar with urgency heatmap
+        </div>
+        <div class="feature-row">
+          <div class="feature-icon"><i class="fa-solid fa-chart-line"></i></div>
+          Analytics, brand leaderboard &amp; spend trends
+        </div>
+        <div class="feature-row">
+          <div class="feature-icon"><i class="fa-solid fa-store"></i></div>
+          Seller hub with payment tracking
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-footer">
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+      <a href="https://dakshkohli23.github.io/Diecast-Tracking/" target="_blank" rel="noopener">Dashboard</a>
+    </div>
+  </div>
+
+  <!-- ════════ RIGHT FORM PANEL ════════ -->
+  <main class="form-panel">
+    <div class="form-wrap">
+      <div class="form-card">
+
+        <div class="form-header">
+          <div class="form-eyebrow">
+            <div class="form-eyebrow-line"></div>
+            Member access
+          </div>
+          <h2 class="form-title">Welcome back</h2>
+          <p class="form-subtitle">Sign in to your PreTrack dashboard.</p>
+        </div>
+
+        <form id="loginForm" novalidate autocomplete="on">
+          <div class="field">
+            <label class="field-label" for="username">
+              <i class="fa-solid fa-envelope"></i> Email address
+            </label>
+            <div class="field-wrap">
+              <input class="field-input" type="email" id="username" name="email"
+                autocomplete="email" placeholder="you@example.com" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="password">
+              <i class="fa-solid fa-lock"></i> Password
+            </label>
+            <div class="field-wrap">
+              <input class="field-input has-toggle" type="password" id="password" name="password"
+                autocomplete="current-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" required />
+              <button type="button" class="pw-toggle" id="togglePw" aria-label="Toggle password visibility">
+                <i class="fa-solid fa-eye-slash"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-error hidden" id="loginError" role="alert">
+            <i class="fa-solid fa-circle-xmark"></i>
+            <span id="errorMsg">Invalid email or password.</span>
+          </div>
+
+          <button type="submit" class="btn-signin" id="loginBtn">
+            <i class="fa-solid fa-right-to-bracket"></i>
+            <span>Sign In to Dashboard</span>
+          </button>
+        </form>
+
+        <div class="form-divider">or</div>
+
+        <button type="button" class="btn-request-access" id="openModal">
+          <i class="fa-solid fa-user-plus"></i>
+          Request Access
+        </button>
+
+        <div class="form-footnote">
+          PreTrack Pegasus <span>&middot;</span> v4.1 <span>&middot;</span> Firebase + Supabase
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ════════ REQUEST ACCESS MODAL ════════ -->
+  <div class="modal-overlay hidden" id="reqModal">
+    <div class="modal">
+      <div class="modal-top-bar"></div>
+      <div class="modal-body">
+
+        <div id="modalFormState">
+          <div class="modal-header">
+            <div>
+              <div class="modal-eyebrow">
+                <div class="modal-eyebrow-dot"></div>
+                New user
+              </div>
+              <div class="modal-title">Request Access</div>
+              <div class="modal-subtitle">Fill in your details — the admin will review shortly.</div>
+            </div>
+            <button type="button" class="modal-close" id="closeModal" aria-label="Close">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <form id="accessForm" novalidate>
+            <div class="modal-field">
+              <label for="aName"><i class="fa-solid fa-user"></i> Full Name *</label>
+              <input type="text" id="aName" placeholder="Your name" autocomplete="name" />
+            </div>
+            <div class="modal-field">
+              <label for="aEmail"><i class="fa-solid fa-envelope"></i> Email Address *</label>
+              <input type="email" id="aEmail" placeholder="your@email.com" autocomplete="email" />
+            </div>
+            <div class="modal-field">
+              <label for="aReason"><i class="fa-solid fa-comment"></i> Reason (optional)</label>
+              <textarea id="aReason" placeholder="Briefly tell us why you need access…" rows="3"></textarea>
+            </div>
+
+            <div class="modal-alert error hidden" id="reqError">
+              <i class="fa-solid fa-circle-xmark"></i>
+              <span id="reqErrorMsg">Failed to send. Please try again.</span>
+            </div>
+
+            <div class="modal-actions">
+              <button type="button" class="btn-modal-cancel" id="closeModal2">Cancel</button>
+              <button type="submit" class="btn-modal-submit" id="reqBtn">
+                <i class="fa-solid fa-paper-plane"></i> Send Request
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div id="modalSuccessState" class="modal-success hidden">
+          <div class="success-circle"><i class="fa-solid fa-check"></i></div>
+          <div class="success-title">Request Sent!</div>
+          <p class="success-sub">Your request has been saved. The admin will review it and reach out shortly.</p>
+          <button class="btn-success-close" id="closeSuccess">Close</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // ── Firebase 12.14.0 (latest stable as of June 2026) ──
+    import { initializeApp }
+      from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+    import {
+      getAuth, setPersistence, browserLocalPersistence,
+      signInWithEmailAndPassword, signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+    import {
+      getFirestore, addDoc, getDocs, collection, query, where, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+    // ── Config — injected by GitHub Actions at build time ──
+    const SUPER_ADMIN = '__SUPER_ADMIN_EMAIL__';
+
+    const app = initializeApp({
+      apiKey:            "__FIREBASE_API_KEY__",
+      authDomain:        "__FIREBASE_AUTH_DOMAIN__",
+      projectId:         "__FIREBASE_PROJECT_ID__",
+      storageBucket:     "__FIREBASE_STORAGE_BUCKET__",
+      messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
+      appId:             "__FIREBASE_APP_ID__"
+    });
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    setPersistence(auth, browserLocalPersistence).catch(() => {});
+
+    // ── Auth state listener ──
+    // _signingIn flag prevents onAuthStateChanged from redirecting while the
+    // form submit handler is still running its own checks (race-condition fix).
+    let _signingIn = false;
+
+    onAuthStateChanged(auth, user => {
+      if (user && !_signingIn) window.location.href = 'index.html';
+    });
+
+    // ── Password toggle ──
+    document.getElementById('togglePw')?.addEventListener('click', () => {
+      const inp  = document.getElementById('password');
+      const icon = document.querySelector('#togglePw i');
+      const show = inp.type === 'password';
+      inp.type   = show ? 'text' : 'password';
+      icon.className = `fa-solid fa-eye${show ? '' : '-slash'}`;
+    });
+
+    // ── Login ──
+    document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Normalize to lowercase — Firebase Auth is case-insensitive but JS === is not
+      const email = document.getElementById('username').value.trim().toLowerCase();
+      const pw    = document.getElementById('password').value;
+      const btn   = document.getElementById('loginBtn');
+      const err   = document.getElementById('loginError');
+      const msg   = document.getElementById('errorMsg');
+
+      if (!email || !pw) return;
+
+      err.classList.add('hidden');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Signing in\u2026</span>';
+      _signingIn = true; // Hold onAuthStateChanged redirect
+
+      const resetBtn = () => {
+        btn.disabled  = false;
+        btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> <span>Sign In to Dashboard</span>';
+        _signingIn = false;
+      };
+      const showErr = (m) => {
+        msg.textContent = m;
+        err.classList.remove('hidden');
+        resetBtn();
+        setTimeout(() => err.classList.add('hidden'), 7000);
+      };
+
+      try {
+        await signInWithEmailAndPassword(auth, email, pw);
+
+        // Super admin bypasses the users collection check
+        if (email === SUPER_ADMIN.toLowerCase()) {
+          btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> <span>Redirecting\u2026</span>';
+          window.location.href = 'index.html';
+          return;
+        }
+
+        // Regular user: must exist in the Firestore users collection
+        const snap = await getDocs(
+          query(collection(db, 'users'), where('email', '==', email))
+        );
+        if (snap.empty) {
+          await signOut(auth);
+          showErr('You are not registered in PreTrack. Use \u201cRequest Access\u201d or contact the admin.');
+          return;
+        }
+
+        const profile = snap.docs[0].data();
+        if (profile.status === 'disabled') {
+          await signOut(auth);
+          showErr('Your account has been disabled. Contact the admin.');
+          return;
+        }
+
+        btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> <span>Redirecting\u2026</span>';
+        window.location.href = 'index.html';
+
+      } catch (error) {
+        // Errors thrown by our own signOut+message path bubble up — ignore them
+        if (error.message?.includes('not registered') || error.message?.includes('disabled')) return;
+
+        let m = 'Invalid email or password. Please try again.';
+        if (error.code === 'auth/too-many-requests')      m = 'Too many attempts — please wait a moment.';
+        if (error.code === 'auth/network-request-failed') m = 'Network error — check your connection.';
+        if (error.code === 'auth/user-disabled')          m = 'This account has been disabled.';
+        if (error.code === 'auth/invalid-credential')     m = 'Invalid email or password. Please try again.';
+        showErr(m);
+      }
+    });
+
+    // ── Modal ──
+    const modal = document.getElementById('reqModal');
+
+    function openModal() {
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => document.getElementById('aName')?.focus(), 50);
+    }
+    function closeModal() {
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+      document.getElementById('modalFormState').classList.remove('hidden');
+      document.getElementById('modalSuccessState').classList.add('hidden');
+      document.getElementById('reqError').classList.add('hidden');
+      document.getElementById('accessForm').reset();
+      const btn = document.getElementById('reqBtn');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Request';
+    }
+
+    document.getElementById('openModal')?.addEventListener('click', openModal);
+    document.getElementById('closeModal')?.addEventListener('click', closeModal);
+    document.getElementById('closeModal2')?.addEventListener('click', closeModal);
+    document.getElementById('closeSuccess')?.addEventListener('click', closeModal);
+    modal?.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+    });
+
+    // ── Access Request ──
+    document.getElementById('accessForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name   = document.getElementById('aName').value.trim();
+      const email  = document.getElementById('aEmail').value.trim().toLowerCase();
+      const reason = document.getElementById('aReason').value.trim();
+      const btn    = document.getElementById('reqBtn');
+      const err    = document.getElementById('reqError');
+      const msg    = document.getElementById('reqErrorMsg');
+
+      err.classList.add('hidden');
+      if (!name || !email) {
+        msg.textContent = 'Please fill in your name and email.';
+        err.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending\u2026';
+
+      try {
+        await addDoc(collection(db, 'access_requests'), {
+          name, email,
+          reason: reason || '(no reason provided)',
+          status: 'pending',
+          createdAt: serverTimestamp()
+        });
+        document.getElementById('modalFormState').classList.add('hidden');
+        document.getElementById('modalSuccessState').classList.remove('hidden');
+      } catch (error) {
+        const isRules = error.code === 'permission-denied' || error.message?.includes('permission');
+        msg.textContent = isRules
+          ? 'Permission denied \u2014 admin must allow unauthenticated writes to access_requests in Firestore rules.'
+          : 'Failed to send. Check your connection and try again.';
+        err.classList.remove('hidden');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Request';
+      }
+    });
+  </script>
+</body>
+</html>
