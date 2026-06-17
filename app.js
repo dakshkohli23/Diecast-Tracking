@@ -1,14 +1,14 @@
 'use strict';
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
   createUserWithEmailAndPassword, sendPasswordResetEmail
-} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc,
   query, where, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 /* ══ CONFIG — values injected by GitHub Actions at build time ══ */
@@ -108,62 +108,29 @@ function initLoginPage() {
     togglePw.querySelector('i').className = `fa-solid fa-eye${isText ? '' : '-slash'}`;
   });
 
-  // Guard flag: prevents onAuthStateChanged from redirecting while form logic is running
-  let _signingIn = false;
-
-  onAuthStateChanged(auth, user => {
-    if (user && !_signingIn) window.location.href = 'index.html';
-  });
+  onAuthStateChanged(auth, user => { if (user) window.location.href = 'index.html'; });
 
   loginForm.addEventListener('submit', async e => {
     e.preventDefault();
-    const email    = document.getElementById('username').value.trim().toLowerCase();
+    const email    = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
     loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
     loginBtn.disabled  = true;
-    _signingIn = true;
-
-    const resetBtn = () => {
-      loginBtn.innerHTML = '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>';
-      loginBtn.disabled  = false;
-      _signingIn = false;
-    };
-    const showErr = (m) => {
-      loginErr.classList.remove('hidden');
-      errMsg.textContent = m;
-      resetBtn();
-      setTimeout(() => loginErr.classList.add('hidden'), 5000);
-    };
-
     try {
       await signInWithEmailAndPassword(auth, email, password);
-
-      // Super admin always passes through
-      if (email === SUPER_ADMIN.toLowerCase()) {
-        window.location.href = 'index.html'; return;
-      }
-
-      // Check users collection (not access_requests) for disabled status
-      const snap    = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
-      if (snap.empty) {
-        await signOut(auth);
-        showErr('You are not registered in PreTrack. Contact the admin.');
-        return;
-      }
-      const profile = snap.docs[0].data();
+      const snap    = await getDocs(collection(db, 'access_requests'));
+      const profile = snap.docs.map(d => d.data()).find(u => u.email === email);
       if (profile?.status === 'disabled') {
         await signOut(auth);
-        showErr('Your account has been disabled. Contact the admin.');
-        return;
+        throw new Error('Your account has been disabled. Contact the admin.');
       }
       window.location.href = 'index.html';
     } catch (error) {
-      let m = 'Invalid email or password. Please try again.';
-      if (error.code === 'auth/too-many-requests')      m = 'Too many attempts. Please wait a moment.';
-      if (error.code === 'auth/network-request-failed') m = 'Network error. Check your connection.';
-      if (error.code === 'auth/user-disabled')          m = 'This account has been disabled.';
-      if (error.message?.includes('disabled') || error.message?.includes('registered')) m = error.message;
-      showErr(m);
+      loginErr.classList.remove('hidden');
+      errMsg.textContent = error.message?.includes('disabled') ? error.message : 'Invalid email or password';
+      loginBtn.innerHTML = '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>';
+      loginBtn.disabled  = false;
+      setTimeout(() => loginErr.classList.add('hidden'), 4000);
     }
   });
 }
@@ -1301,28 +1268,23 @@ async function fetchData() {
     const currentEmail = (user.email || '').toLowerCase().trim();
     const isAdmin      = currentEmail === SUPER_ADMIN.toLowerCase().trim();
 
-    const tasks = [
-      getDocs(collection(db, 'orders')),
-      getDocs(collection(db, 'activity')),
-      getDocs(collection(db, 'brands'))
-    ];
-    if (isAdmin) {
-      tasks.push(getDocs(collection(db, 'access_requests')));
-      tasks.push(getDocs(collection(db, 'users')));
-    }
+    // Wrap each fetch individually — one failure won't kill everything
+    const safeGet = async (ref) => {
+      try { return await getDocs(ref); }
+      catch(e) { console.warn('Fetch failed:', e.code, e.message); return { docs: [] }; }
+    };
 
-    const results = await Promise.all(tasks);
-    const [ordSnap, actSnap, brnSnap] = results;
-    const arsSnap = isAdmin ? results[3] : null;
-    const usrSnap = isAdmin ? results[4] : null;
+    const [ordSnap, actSnap, brnSnap] = await Promise.all([
+      safeGet(collection(db, 'orders')),
+      safeGet(collection(db, 'activity')),
+      safeGet(collection(db, 'brands')),
+    ]);
 
-    function ownerFilter(item) {
-      return true; // All authenticated users see the shared collection
-    }
+    const arsSnap = isAdmin ? await safeGet(collection(db, 'access_requests')) : { docs: [] };
+    const usrSnap = isAdmin ? await safeGet(collection(db, 'users'))           : { docs: [] };
 
     DB.orders = ordSnap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(ownerFilter)
       .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
     // Fix incorrect totals in memory + Firestore silently
@@ -1343,32 +1305,32 @@ async function fetchData() {
 
     DB.activity = actSnap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(ownerFilter)
       .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
-    // FIX: customBrands is now module-level — direct update works
     customBrands = brnSnap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(ownerFilter)
       .map(b => b.name)
       .filter(Boolean);
-    rebuildAllBrandDropdowns(); // keep brand dropdowns in sync after refresh
+    rebuildAllBrandDropdowns();
 
-    DB.accessRequests = isAdmin && arsSnap
+    DB.accessRequests = isAdmin
       ? arsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
           .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       : [];
 
-    DB.users = isAdmin && usrSnap
+    DB.users = isAdmin
       ? usrSnap.docs.map(d => ({ id: d.id, ...d.data() }))
           .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       : [];
 
+    console.log(`fetchData: ${DB.orders.length} orders loaded`);
     renderAll();
+
   } catch(err) {
-    console.error('fetchData error:', err);
+    console.error('fetchData fatal error:', err);
     DB = { orders: [], activity: [], accessRequests: [], users: [] };
     renderAll();
+    showToast('Error loading data: ' + (err.code || err.message), 'warning');
   }
 }
 
