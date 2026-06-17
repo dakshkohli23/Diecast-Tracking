@@ -1,14 +1,14 @@
 'use strict';
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
   createUserWithEmailAndPassword, sendPasswordResetEmail
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc,
   query, where, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 /* ══ CONFIG — values injected by GitHub Actions at build time ══ */
@@ -108,29 +108,62 @@ function initLoginPage() {
     togglePw.querySelector('i').className = `fa-solid fa-eye${isText ? '' : '-slash'}`;
   });
 
-  onAuthStateChanged(auth, user => { if (user) window.location.href = 'index.html'; });
+  // Guard flag: prevents onAuthStateChanged from redirecting while form logic is running
+  let _signingIn = false;
+
+  onAuthStateChanged(auth, user => {
+    if (user && !_signingIn) window.location.href = 'index.html';
+  });
 
   loginForm.addEventListener('submit', async e => {
     e.preventDefault();
-    const email    = document.getElementById('username').value.trim();
+    const email    = document.getElementById('username').value.trim().toLowerCase();
     const password = document.getElementById('password').value;
     loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Signing in...';
     loginBtn.disabled  = true;
+    _signingIn = true;
+
+    const resetBtn = () => {
+      loginBtn.innerHTML = '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>';
+      loginBtn.disabled  = false;
+      _signingIn = false;
+    };
+    const showErr = (m) => {
+      loginErr.classList.remove('hidden');
+      errMsg.textContent = m;
+      resetBtn();
+      setTimeout(() => loginErr.classList.add('hidden'), 5000);
+    };
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      const snap    = await getDocs(collection(db, 'access_requests'));
-      const profile = snap.docs.map(d => d.data()).find(u => u.email === email);
+
+      // Super admin always passes through
+      if (email === SUPER_ADMIN.toLowerCase()) {
+        window.location.href = 'index.html'; return;
+      }
+
+      // Check users collection (not access_requests) for disabled status
+      const snap    = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+      if (snap.empty) {
+        await signOut(auth);
+        showErr('You are not registered in PreTrack. Contact the admin.');
+        return;
+      }
+      const profile = snap.docs[0].data();
       if (profile?.status === 'disabled') {
         await signOut(auth);
-        throw new Error('Your account has been disabled. Contact the admin.');
+        showErr('Your account has been disabled. Contact the admin.');
+        return;
       }
       window.location.href = 'index.html';
     } catch (error) {
-      loginErr.classList.remove('hidden');
-      errMsg.textContent = error.message?.includes('disabled') ? error.message : 'Invalid email or password';
-      loginBtn.innerHTML = '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>';
-      loginBtn.disabled  = false;
-      setTimeout(() => loginErr.classList.add('hidden'), 4000);
+      let m = 'Invalid email or password. Please try again.';
+      if (error.code === 'auth/too-many-requests')      m = 'Too many attempts. Please wait a moment.';
+      if (error.code === 'auth/network-request-failed') m = 'Network error. Check your connection.';
+      if (error.code === 'auth/user-disabled')          m = 'This account has been disabled.';
+      if (error.message?.includes('disabled') || error.message?.includes('registered')) m = error.message;
+      showErr(m);
     }
   });
 }
