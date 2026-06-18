@@ -780,16 +780,16 @@
     import { getFirestore, addDoc, getDocs, collection, query, where, serverTimestamp }
                                       from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-    const SUPER_ADMIN = 'dlaize@dlaize.com';
+    const SUPER_ADMIN = '__SUPER_ADMIN_EMAIL__';
 
-    /* ══ CONFIG — real credentials (protected by Firebase domain restriction) ══ */
+    /* ══ CONFIG — injected by GitHub Actions ══ */
     const app  = initializeApp({
-      apiKey:            "AIzaSyA2-6u8rETOIn9xUJQW0ZODFupZQ56orJg",
-      authDomain:        "diecast-tracking-471f7.firebaseapp.com",
-      projectId:         "diecast-tracking-471f7",
-      storageBucket:     "diecast-tracking-471f7.firebasestorage.app",
-      messagingSenderId: "1042711268055",
-      appId:             "1:1042711268055:web:9b09ded970a85532767e92"
+      apiKey:            "__FIREBASE_API_KEY__",
+      authDomain:        "__FIREBASE_AUTH_DOMAIN__",
+      projectId:         "__FIREBASE_PROJECT_ID__",
+      storageBucket:     "__FIREBASE_STORAGE_BUCKET__",
+      messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
+      appId:             "__FIREBASE_APP_ID__"
     });
     const auth = getAuth(app);
     const db   = getFirestore(app);
