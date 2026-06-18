@@ -11,7 +11,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-/* ══ CONFIG — values injected by GitHub Actions at build time ══ */
+/* ══ CONFIG — injected by GitHub Actions ══ */
 const firebaseConfig = {
   apiKey:            "__FIREBASE_API_KEY__",
   authDomain:        "__FIREBASE_AUTH_DOMAIN__",
