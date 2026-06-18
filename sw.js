@@ -1,34 +1,47 @@
-const CACHE = 'pretrack-v2';
+const CACHE = 'pretrack-v4';
 const STATIC = [
   '/Diecast-Tracking/',
   '/Diecast-Tracking/index.html',
-  '/Diecast-Tracking/login.html',
   '/Diecast-Tracking/style.css',
-  '/Diecast-Tracking/app.js',
   '/Diecast-Tracking/manifest.json'
 ];
 
+// DO NOT cache login.html or app.js — they contain injected secrets
+// that must always be fresh from the server
+
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then(c => c.addAll(STATIC))
+      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE).map(k => {
+        console.log('SW: deleting old cache', k);
+        return caches.delete(k);
+      }))
     ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', e => {
-  if (e.request.url.includes('firestore') ||
-      e.request.url.includes('firebase') ||
-      e.request.url.includes('supabase') ||
-      e.request.url.includes('googleapis')) {
-    return;
+  const url = e.request.url;
+
+  // Always go to network for these — never serve from cache
+  if (url.includes('login.html') ||
+      url.includes('app.js') ||
+      url.includes('firestore') ||
+      url.includes('firebase') ||
+      url.includes('supabase') ||
+      url.includes('googleapis') ||
+      url.includes('gstatic')) {
+    return; // Let browser handle normally
   }
+
   e.respondWith(
     fetch(e.request)
       .then(res => {
