@@ -26,36 +26,55 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Inject secrets into app.js
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          sed -i "s|__FIREBASE_API_KEY__|${{ secrets.FIREBASE_API_KEY }}|g"                         app.js
-          sed -i "s|__FIREBASE_AUTH_DOMAIN__|${{ secrets.FIREBASE_AUTH_DOMAIN }}|g"                 app.js
-          sed -i "s|__FIREBASE_PROJECT_ID__|${{ secrets.FIREBASE_PROJECT_ID }}|g"                   app.js
-          sed -i "s|__FIREBASE_STORAGE_BUCKET__|${{ secrets.FIREBASE_STORAGE_BUCKET }}|g"           app.js
-          sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}|g" app.js
-          sed -i "s|__FIREBASE_APP_ID__|${{ secrets.FIREBASE_APP_ID }}|g"                           app.js
-          sed -i "s|__SUPER_ADMIN_EMAIL__|${{ secrets.SUPER_ADMIN_EMAIL }}|g"                       app.js
-          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g"                                 app.js
-          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g"                       app.js
+          sed -i "s|__FIREBASE_API_KEY__|${FIREBASE_API_KEY}|g"                         app.js
+          sed -i "s|__FIREBASE_AUTH_DOMAIN__|${FIREBASE_AUTH_DOMAIN}|g"                 app.js
+          sed -i "s|__FIREBASE_PROJECT_ID__|${FIREBASE_PROJECT_ID}|g"                   app.js
+          sed -i "s|__FIREBASE_STORAGE_BUCKET__|${FIREBASE_STORAGE_BUCKET}|g"           app.js
+          sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${FIREBASE_MESSAGING_SENDER_ID}|g" app.js
+          sed -i "s|__FIREBASE_APP_ID__|${FIREBASE_APP_ID}|g"                           app.js
+          sed -i "s|__SUPER_ADMIN_EMAIL__|${SUPER_ADMIN_EMAIL}|g"                       app.js
+          sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g"                                 app.js
+          sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g"                       app.js
 
       - name: Inject secrets into login.html
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
         run: |
-          sed -i "s|__FIREBASE_API_KEY__|${{ secrets.FIREBASE_API_KEY }}|g"                         login.html
-          sed -i "s|__FIREBASE_AUTH_DOMAIN__|${{ secrets.FIREBASE_AUTH_DOMAIN }}|g"                 login.html
-          sed -i "s|__FIREBASE_PROJECT_ID__|${{ secrets.FIREBASE_PROJECT_ID }}|g"                   login.html
-          sed -i "s|__FIREBASE_STORAGE_BUCKET__|${{ secrets.FIREBASE_STORAGE_BUCKET }}|g"           login.html
-          sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}|g" login.html
-          sed -i "s|__FIREBASE_APP_ID__|${{ secrets.FIREBASE_APP_ID }}|g"                           login.html
-          sed -i "s|__SUPER_ADMIN_EMAIL__|${{ secrets.SUPER_ADMIN_EMAIL }}|g"                       login.html
+          sed -i "s|__FIREBASE_API_KEY__|${FIREBASE_API_KEY}|g"                         login.html
+          sed -i "s|__FIREBASE_AUTH_DOMAIN__|${FIREBASE_AUTH_DOMAIN}|g"                 login.html
+          sed -i "s|__FIREBASE_PROJECT_ID__|${FIREBASE_PROJECT_ID}|g"                   login.html
+          sed -i "s|__FIREBASE_STORAGE_BUCKET__|${FIREBASE_STORAGE_BUCKET}|g"           login.html
+          sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${FIREBASE_MESSAGING_SENDER_ID}|g" login.html
+          sed -i "s|__FIREBASE_APP_ID__|${FIREBASE_APP_ID}|g"                           login.html
+          sed -i "s|__SUPER_ADMIN_EMAIL__|${SUPER_ADMIN_EMAIL}|g"                       login.html
 
-      - name: Verify injection worked
+      - name: Verify injection
         run: |
-          echo "=== Checking app.js ==="
-          grep -n "apiKey" app.js | head -3
-          echo "=== Checking login.html ==="
-          grep -n "apiKey" login.html | head -3
-          echo "=== Checking SUPER_ADMIN ==="
-          grep -n "SUPER_ADMIN" app.js | head -2
-          grep -n "SUPER_ADMIN" login.html | head -2
+          echo "--- app.js apiKey line ---"
+          grep "apiKey" app.js | head -1
+          echo "--- login.html apiKey line ---"
+          grep "apiKey" login.html | head -1
+          echo "--- Checking no placeholders remain ---"
+          if grep -q "__FIREBASE_API_KEY__" app.js; then echo "ERROR: placeholder still in app.js!"; exit 1; fi
+          if grep -q "__FIREBASE_API_KEY__" login.html; then echo "ERROR: placeholder still in login.html!"; exit 1; fi
+          echo "All placeholders replaced successfully"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
