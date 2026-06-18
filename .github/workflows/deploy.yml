@@ -27,25 +27,35 @@ jobs:
 
       - name: Inject secrets into app.js
         run: |
-          sed -i "s|__FIREBASE_API_KEY__|${{ secrets.FIREBASE_API_KEY }}|g"                    app.js
-          sed -i "s|__FIREBASE_AUTH_DOMAIN__|${{ secrets.FIREBASE_AUTH_DOMAIN }}|g"            app.js
-          sed -i "s|__FIREBASE_PROJECT_ID__|${{ secrets.FIREBASE_PROJECT_ID }}|g"              app.js
-          sed -i "s|__FIREBASE_STORAGE_BUCKET__|${{ secrets.FIREBASE_STORAGE_BUCKET }}|g"     app.js
+          sed -i "s|__FIREBASE_API_KEY__|${{ secrets.FIREBASE_API_KEY }}|g"                         app.js
+          sed -i "s|__FIREBASE_AUTH_DOMAIN__|${{ secrets.FIREBASE_AUTH_DOMAIN }}|g"                 app.js
+          sed -i "s|__FIREBASE_PROJECT_ID__|${{ secrets.FIREBASE_PROJECT_ID }}|g"                   app.js
+          sed -i "s|__FIREBASE_STORAGE_BUCKET__|${{ secrets.FIREBASE_STORAGE_BUCKET }}|g"           app.js
           sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}|g" app.js
-          sed -i "s|__FIREBASE_APP_ID__|${{ secrets.FIREBASE_APP_ID }}|g"                      app.js
-          sed -i "s|__SUPER_ADMIN_EMAIL__|${{ secrets.SUPER_ADMIN_EMAIL }}|g"                  app.js
-          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g"                            app.js
-          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g"                 app.js
+          sed -i "s|__FIREBASE_APP_ID__|${{ secrets.FIREBASE_APP_ID }}|g"                           app.js
+          sed -i "s|__SUPER_ADMIN_EMAIL__|${{ secrets.SUPER_ADMIN_EMAIL }}|g"                       app.js
+          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g"                                 app.js
+          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g"                       app.js
 
       - name: Inject secrets into login.html
         run: |
-          sed -i "s|__FIREBASE_API_KEY__|${{ secrets.FIREBASE_API_KEY }}|g"                    login.html
-          sed -i "s|__FIREBASE_AUTH_DOMAIN__|${{ secrets.FIREBASE_AUTH_DOMAIN }}|g"            login.html
-          sed -i "s|__FIREBASE_PROJECT_ID__|${{ secrets.FIREBASE_PROJECT_ID }}|g"              login.html
-          sed -i "s|__FIREBASE_STORAGE_BUCKET__|${{ secrets.FIREBASE_STORAGE_BUCKET }}|g"     login.html
+          sed -i "s|__FIREBASE_API_KEY__|${{ secrets.FIREBASE_API_KEY }}|g"                         login.html
+          sed -i "s|__FIREBASE_AUTH_DOMAIN__|${{ secrets.FIREBASE_AUTH_DOMAIN }}|g"                 login.html
+          sed -i "s|__FIREBASE_PROJECT_ID__|${{ secrets.FIREBASE_PROJECT_ID }}|g"                   login.html
+          sed -i "s|__FIREBASE_STORAGE_BUCKET__|${{ secrets.FIREBASE_STORAGE_BUCKET }}|g"           login.html
           sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}|g" login.html
-          sed -i "s|__FIREBASE_APP_ID__|${{ secrets.FIREBASE_APP_ID }}|g"                      login.html
-          sed -i "s|__SUPER_ADMIN_EMAIL__|${{ secrets.SUPER_ADMIN_EMAIL }}|g"                  login.html
+          sed -i "s|__FIREBASE_APP_ID__|${{ secrets.FIREBASE_APP_ID }}|g"                           login.html
+          sed -i "s|__SUPER_ADMIN_EMAIL__|${{ secrets.SUPER_ADMIN_EMAIL }}|g"                       login.html
+
+      - name: Verify injection worked
+        run: |
+          echo "=== Checking app.js ==="
+          grep -n "apiKey" app.js | head -3
+          echo "=== Checking login.html ==="
+          grep -n "apiKey" login.html | head -3
+          echo "=== Checking SUPER_ADMIN ==="
+          grep -n "SUPER_ADMIN" app.js | head -2
+          grep -n "SUPER_ADMIN" login.html | head -2
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
