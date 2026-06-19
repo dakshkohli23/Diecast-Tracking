@@ -25,40 +25,63 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Inject secrets into all files
-        env:
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      - name: Inject secrets
         run: |
-          for FILE in app.js login.html config.js; do
-            sed -i "s|__FIREBASE_API_KEY__|${FIREBASE_API_KEY}|g"                         $FILE
-            sed -i "s|__FIREBASE_AUTH_DOMAIN__|${FIREBASE_AUTH_DOMAIN}|g"                 $FILE
-            sed -i "s|__FIREBASE_PROJECT_ID__|${FIREBASE_PROJECT_ID}|g"                   $FILE
-            sed -i "s|__FIREBASE_STORAGE_BUCKET__|${FIREBASE_STORAGE_BUCKET}|g"           $FILE
-            sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${FIREBASE_MESSAGING_SENDER_ID}|g" $FILE
-            sed -i "s|__FIREBASE_APP_ID__|${FIREBASE_APP_ID}|g"                           $FILE
-            sed -i "s|__SUPER_ADMIN_EMAIL__|${SUPER_ADMIN_EMAIL}|g"                       $FILE
-            sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g"                                 $FILE
-            sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g"                       $FILE
-            echo "✓ Injected into $FILE"
-          done
+          # Use Python for reliable replacement — no shell escaping issues
+          python3 << 'PYEOF'
+          import os, re
 
-      - name: Verify no placeholders remain
+          replacements = {
+            '__FIREBASE_API_KEY__':            os.environ['FIREBASE_API_KEY'],
+            '__FIREBASE_AUTH_DOMAIN__':        os.environ['FIREBASE_AUTH_DOMAIN'],
+            '__FIREBASE_PROJECT_ID__':         os.environ['FIREBASE_PROJECT_ID'],
+            '__FIREBASE_STORAGE_BUCKET__':     os.environ['FIREBASE_STORAGE_BUCKET'],
+            '__FIREBASE_MESSAGING_SENDER_ID__':os.environ['FIREBASE_MESSAGING_SENDER_ID'],
+            '__FIREBASE_APP_ID__':             os.environ['FIREBASE_APP_ID'],
+            '__SUPER_ADMIN_EMAIL__':           os.environ['SUPER_ADMIN_EMAIL'],
+            '__SUPABASE_URL__':                os.environ['SUPABASE_URL'],
+            '__SUPABASE_ANON_KEY__':           os.environ['SUPABASE_ANON_KEY'],
+          }
+
+          for filename in ['app.js', 'login.html', 'config.js']:
+            try:
+              with open(filename, 'r') as f:
+                content = f.read()
+              for placeholder, value in replacements.items():
+                content = content.replace(placeholder, value)
+              with open(filename, 'w') as f:
+                f.write(content)
+              print(f'✓ Injected into {filename}')
+            except FileNotFoundError:
+              print(f'⚠ {filename} not found, skipping')
+          PYEOF
+        env:
+          FIREBASE_API_KEY:            ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN:        ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID:         ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET:     ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID:${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID:             ${{ secrets.FIREBASE_APP_ID }}
+          SUPER_ADMIN_EMAIL:           ${{ secrets.SUPER_ADMIN_EMAIL }}
+          SUPABASE_URL:                ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY:           ${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Verify injection
         run: |
-          for FILE in app.js login.html config.js; do
-            if grep -q "__FIREBASE_API_KEY__" $FILE; then
-              echo "FAIL: placeholder still in $FILE — secret may be missing"
-              exit 1
-            fi
-            echo "✓ $FILE clean"
-          done
+          echo "=== app.js apiKey ==="
+          grep "apiKey" app.js | head -1
+          echo "=== login.html apiKey ==="
+          grep "apiKey" login.html | head -1
+          if grep -q "__FIREBASE_API_KEY__" app.js; then
+            echo "FAILED: placeholder still in app.js"
+            echo "Check that FIREBASE_API_KEY secret exists in repo Settings"
+            exit 1
+          fi
+          if grep -q "__FIREBASE_API_KEY__" login.html; then
+            echo "FAILED: placeholder still in login.html"
+            exit 1
+          fi
+          echo "✓ All secrets injected successfully"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
