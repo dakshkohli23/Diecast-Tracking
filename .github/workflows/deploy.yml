@@ -25,7 +25,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Inject secrets into app.js
+      - name: Inject secrets into all files
         env:
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
@@ -37,44 +37,28 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          sed -i "s|__FIREBASE_API_KEY__|${FIREBASE_API_KEY}|g"                         app.js
-          sed -i "s|__FIREBASE_AUTH_DOMAIN__|${FIREBASE_AUTH_DOMAIN}|g"                 app.js
-          sed -i "s|__FIREBASE_PROJECT_ID__|${FIREBASE_PROJECT_ID}|g"                   app.js
-          sed -i "s|__FIREBASE_STORAGE_BUCKET__|${FIREBASE_STORAGE_BUCKET}|g"           app.js
-          sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${FIREBASE_MESSAGING_SENDER_ID}|g" app.js
-          sed -i "s|__FIREBASE_APP_ID__|${FIREBASE_APP_ID}|g"                           app.js
-          sed -i "s|__SUPER_ADMIN_EMAIL__|${SUPER_ADMIN_EMAIL}|g"                       app.js
-          sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g"                                 app.js
-          sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g"                       app.js
+          for FILE in app.js login.html config.js; do
+            sed -i "s|__FIREBASE_API_KEY__|${FIREBASE_API_KEY}|g"                         $FILE
+            sed -i "s|__FIREBASE_AUTH_DOMAIN__|${FIREBASE_AUTH_DOMAIN}|g"                 $FILE
+            sed -i "s|__FIREBASE_PROJECT_ID__|${FIREBASE_PROJECT_ID}|g"                   $FILE
+            sed -i "s|__FIREBASE_STORAGE_BUCKET__|${FIREBASE_STORAGE_BUCKET}|g"           $FILE
+            sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${FIREBASE_MESSAGING_SENDER_ID}|g" $FILE
+            sed -i "s|__FIREBASE_APP_ID__|${FIREBASE_APP_ID}|g"                           $FILE
+            sed -i "s|__SUPER_ADMIN_EMAIL__|${SUPER_ADMIN_EMAIL}|g"                       $FILE
+            sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g"                                 $FILE
+            sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g"                       $FILE
+            echo "✓ Injected into $FILE"
+          done
 
-      - name: Inject secrets into login.html
-        env:
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
+      - name: Verify no placeholders remain
         run: |
-          sed -i "s|__FIREBASE_API_KEY__|${FIREBASE_API_KEY}|g"                         login.html
-          sed -i "s|__FIREBASE_AUTH_DOMAIN__|${FIREBASE_AUTH_DOMAIN}|g"                 login.html
-          sed -i "s|__FIREBASE_PROJECT_ID__|${FIREBASE_PROJECT_ID}|g"                   login.html
-          sed -i "s|__FIREBASE_STORAGE_BUCKET__|${FIREBASE_STORAGE_BUCKET}|g"           login.html
-          sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${FIREBASE_MESSAGING_SENDER_ID}|g" login.html
-          sed -i "s|__FIREBASE_APP_ID__|${FIREBASE_APP_ID}|g"                           login.html
-          sed -i "s|__SUPER_ADMIN_EMAIL__|${SUPER_ADMIN_EMAIL}|g"                       login.html
-
-      - name: Verify injection
-        run: |
-          echo "--- app.js apiKey line ---"
-          grep "apiKey" app.js | head -1
-          echo "--- login.html apiKey line ---"
-          grep "apiKey" login.html | head -1
-          echo "--- Checking no placeholders remain ---"
-          if grep -q "__FIREBASE_API_KEY__" app.js; then echo "ERROR: placeholder still in app.js!"; exit 1; fi
-          if grep -q "__FIREBASE_API_KEY__" login.html; then echo "ERROR: placeholder still in login.html!"; exit 1; fi
-          echo "All placeholders replaced successfully"
+          for FILE in app.js login.html config.js; do
+            if grep -q "__FIREBASE_API_KEY__" $FILE; then
+              echo "FAIL: placeholder still in $FILE — secret may be missing"
+              exit 1
+            fi
+            echo "✓ $FILE clean"
+          done
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
