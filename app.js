@@ -1262,6 +1262,13 @@ window.deleteUser = window.removeUser; // ← alias: HTML that calls deleteUser(
 
 /* ══════════════════════════════════════ FIRESTORE ══════════════════════════════════════ */
 async function fetchData() {
+  // Detect if secrets were never injected
+  if (firebaseConfig.apiKey.startsWith('__')) {
+    console.error('FATAL: Firebase credentials not injected. Check GitHub Actions.');
+    showToast('Config error — credentials missing. Contact admin.', 'warning');
+    return;
+  }
+
   try {
     const user = auth.currentUser;
     if (!user) return;
