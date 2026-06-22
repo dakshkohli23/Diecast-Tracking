@@ -783,7 +783,10 @@
     import { getFirestore, addDoc, getDocs, collection, query, where, serverTimestamp }
                                       from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-    const SUPER_ADMIN = '__SUPER_ADMIN_EMAIL__';
+    const _cfg = window.__PRETRACK_CONFIG__ || {};
+    const SUPER_ADMIN = '__SUPER_ADMIN_EMAIL__' !== '__SUPER_ADMIN_EMAIL__'
+      ? '__SUPER_ADMIN_EMAIL__'
+      : (_cfg.superAdmin || 'dlaize@dlaize.com');
 
     /* ══ CONFIG — injected by GitHub Actions ══ */
     const app  = initializeApp({
@@ -944,5 +947,6 @@
       }
     });
   </script>
+  <script src="config.js"></script>
 </body>
 </html>
