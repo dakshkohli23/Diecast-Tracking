@@ -11,14 +11,15 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-/* ══ CONFIG — injected by GitHub Actions ══ */
+/* ══ CONFIG — injected by GitHub Actions OR from window.__PRETRACK_CONFIG__ ══ */
+const _cfg = (typeof window !== 'undefined' && window.__PRETRACK_CONFIG__) || {};
 const firebaseConfig = {
-  apiKey:            "__FIREBASE_API_KEY__",
-  authDomain:        "__FIREBASE_AUTH_DOMAIN__",
-  projectId:         "__FIREBASE_PROJECT_ID__",
-  storageBucket:     "__FIREBASE_STORAGE_BUCKET__",
-  messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
-  appId:             "__FIREBASE_APP_ID__"
+  apiKey:            "__FIREBASE_API_KEY__"            !== '__FIREBASE_API_KEY__'            ? "__FIREBASE_API_KEY__"            : (_cfg.firebase?.apiKey            || ''),
+  authDomain:        "__FIREBASE_AUTH_DOMAIN__"        !== '__FIREBASE_AUTH_DOMAIN__'        ? "__FIREBASE_AUTH_DOMAIN__"        : (_cfg.firebase?.authDomain        || ''),
+  projectId:         "__FIREBASE_PROJECT_ID__"         !== '__FIREBASE_PROJECT_ID__'         ? "__FIREBASE_PROJECT_ID__"         : (_cfg.firebase?.projectId         || ''),
+  storageBucket:     "__FIREBASE_STORAGE_BUCKET__"     !== '__FIREBASE_STORAGE_BUCKET__'     ? "__FIREBASE_STORAGE_BUCKET__"     : (_cfg.firebase?.storageBucket     || ''),
+  messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__"!== '__FIREBASE_MESSAGING_SENDER_ID__'? "__FIREBASE_MESSAGING_SENDER_ID__": (_cfg.firebase?.messagingSenderId  || ''),
+  appId:             "__FIREBASE_APP_ID__"             !== '__FIREBASE_APP_ID__'             ? "__FIREBASE_APP_ID__"             : (_cfg.firebase?.appId             || ''),
 };
 
 /* ══ FIREBASE ══ */
@@ -30,9 +31,9 @@ const secondaryApp  = initializeApp(firebaseConfig, 'secondary');
 const secondaryAuth = getAuth(secondaryApp);
 
 /* ══ SUPABASE ══ */
-const SUPER_ADMIN       = "__SUPER_ADMIN_EMAIL__";
-const SUPABASE_URL      = "__SUPABASE_URL__";
-const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+const SUPER_ADMIN       = "__SUPER_ADMIN_EMAIL__"   !== '__SUPER_ADMIN_EMAIL__'   ? "__SUPER_ADMIN_EMAIL__"   : (_cfg.superAdmin       || 'dlaize@dlaize.com');
+const SUPABASE_URL      = "__SUPABASE_URL__"         !== '__SUPABASE_URL__'         ? "__SUPABASE_URL__"         : (_cfg.supabase?.url    || '');
+const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__"   !== '__SUPABASE_ANON_KEY__'   ? "__SUPABASE_ANON_KEY__"   : (_cfg.supabase?.anonKey || '');
 const SUPABASE_BUCKET   = 'order-images';
 const supabaseClient    = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -1262,11 +1263,9 @@ window.deleteUser = window.removeUser; // ← alias: HTML that calls deleteUser(
 
 /* ══════════════════════════════════════ FIRESTORE ══════════════════════════════════════ */
 async function fetchData() {
-  // Detect if secrets were never injected
+  // Warn if secrets not injected but continue anyway
   if (firebaseConfig.apiKey.startsWith('__')) {
-    console.error('FATAL: Firebase credentials not injected. Check GitHub Actions.');
-    showToast('Config error — credentials missing. Contact admin.', 'warning');
-    return;
+    console.error('WARNING: Firebase credentials not injected by GitHub Actions.');
   }
 
   try {
