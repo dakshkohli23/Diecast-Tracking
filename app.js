@@ -1451,7 +1451,7 @@ function renderAll() {
   renderAnalytics();
   renderBrandLeaderboard();
   renderWeekArrivals();
-  renderCatalog();
+  if (typeof renderCatalog === 'function') renderCatalog();
   renderSellers();
   renderUpcoming();
   renderUsers();
@@ -2324,6 +2324,39 @@ function renderPayments() {
       </div>
       <div class="pay-mob-list mobile-only">${mobCards}</div>
     </div>`;
+}
+
+function renderCatalog() {
+  const grid = document.getElementById('catalogGrid'); if (!grid) return;
+  const o    = DB.orders;
+  if (!o.length) { grid.innerHTML = '<div class="empty-state">No models tracked yet</div>'; return; }
+  const fmt = v => '₹' + Number(v||0).toLocaleString('en-IN');
+  grid.innerHTML = o.map(order => {
+    const sc    = (order.status||'').toLowerCase().replace(/\s+/g,'-');
+    const thumb = order.image
+      ? `<img src="${escHtml(order.image)}" alt="${escHtml(order.product_name)}" />`
+      : `<i class="fa-solid fa-car-side"></i>`;
+    const variantTag = order.variant === 'Box'
+      ? `<span style="background:#16a34a;color:#fff;padding:1px 7px;border-radius:999px;font-size:.6rem;font-weight:800">Box</span>`
+      : order.variant === 'Blister'
+      ? `<span style="background:#0284c7;color:#fff;padding:1px 7px;border-radius:999px;font-size:.6rem;font-weight:800">Blister</span>`
+      : order.variant ? `<span class="variant-tag">${escHtml(order.variant)}</span>` : '';
+    return `<div class="catalog-card cc-rich" onclick="viewOrder('${order.id}')">
+      <div class="cc-img">${thumb}
+        <span class="badge badge-${sc} cc-badge">${escHtml(order.status||'Ordered')}</span>
+      </div>
+      <div class="cc-body">
+        <div class="cc-name">${escHtml(order.product_name||'—')}</div>
+        <div class="cc-meta">
+          <span>${escHtml(order.brand||order.vendor||'—')}</span>
+          <span class="cc-dot">·</span>
+          <span>${escHtml(order.scale||'1:64')}</span>
+          ${variantTag}
+        </div>
+        <div class="cc-price">${fmt(order.total||0)}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderAnalytics() {
