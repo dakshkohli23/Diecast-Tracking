@@ -2336,11 +2336,14 @@ function renderCatalog() {
     const thumb = order.image
       ? `<img src="${escHtml(order.image)}" alt="${escHtml(order.product_name)}" />`
       : `<i class="fa-solid fa-car-side"></i>`;
-    const variantTag = order.variant === 'Box'
-      ? `<span style="background:#16a34a;color:#fff;padding:1px 7px;border-radius:999px;font-size:.6rem;font-weight:800">Box</span>`
-      : order.variant === 'Blister'
-      ? `<span style="background:#0284c7;color:#fff;padding:1px 7px;border-radius:999px;font-size:.6rem;font-weight:800">Blister</span>`
-      : order.variant ? `<span class="variant-tag">${escHtml(order.variant)}</span>` : '';
+    const boxSvg = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>';
+const blisterSvg = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7a4 4 0 0 1 8 0"/></svg>';
+
+const variantTag = order.variant === 'Box'
+  ? `<span style="display:inline-flex;align-items:center;gap:3px;background:#16a34a;color:#fff;padding:1px 7px;border-radius:999px;font-size:.6rem;font-weight:800">${boxSvg}Box</span>`
+  : order.variant === 'Blister'
+  ? `<span style="display:inline-flex;align-items:center;gap:3px;background:#0284c7;color:#fff;padding:1px 7px;border-radius:999px;font-size:.6rem;font-weight:800">${blisterSvg}Blister</span>`
+  : order.variant ? `<span class="variant-tag">${escHtml(order.variant)}</span>` : '';
     return `<div class="catalog-card cc-rich" onclick="viewOrder('${order.id}')">
       <div class="cc-img">${thumb}
         <span class="badge badge-${sc} cc-badge">${escHtml(order.status||'Ordered')}</span>
